@@ -88,6 +88,10 @@ export function Ga4Card({
           <SkeletonTableRows rows={5} columns={3} />
           <Skeleton className="h-24" />
         </div>
+      ) : "unavailable" in report ? (
+        <p role="alert" className="text-sm text-destructive">
+          {report.unavailable}
+        </p>
       ) : !report.totals.sessions ? (
         <p className="text-sm text-muted-foreground">
           No organic search traffic recorded in the last 28 days yet.

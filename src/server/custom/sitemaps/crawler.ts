@@ -134,6 +134,15 @@ export async function crawlSitemaps(
   root: string,
   fetcher: typeof fetch = fetch,
 ): Promise<SitemapSnapshot> {
+  return (await crawlSitemapPages(host, root, fetcher)).snapshot;
+}
+
+/** Same crawl, also returning the unique page URLs (for index coverage). */
+export async function crawlSitemapPages(
+  host: string,
+  root: string,
+  fetcher: typeof fetch = fetch,
+): Promise<{ snapshot: SitemapSnapshot; urls: string[] }> {
   const scannedAt = new Date().toISOString();
   const pending = [validateSitemapUrl(root, host)];
   const seen = new Set<string>();
@@ -165,11 +174,14 @@ export async function crawlSitemaps(
   const complete =
     pending.length === 0 && pageUrls.size < LIMIT_URLS && errors.length === 0;
   return {
-    scannedAt,
-    sitemapCount: seen.size,
-    urlCount: pageUrls.size,
-    duplicateUrls,
-    errors: errors.slice(0, 20),
-    complete,
+    snapshot: {
+      scannedAt,
+      sitemapCount: seen.size,
+      urlCount: pageUrls.size,
+      duplicateUrls,
+      errors: errors.slice(0, 20),
+      complete,
+    },
+    urls: [...pageUrls],
   };
 }

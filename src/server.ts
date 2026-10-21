@@ -260,6 +260,11 @@ export default {
         await runScheduledAiVisibility();
       }),
       withPgClient(() => sendFirstAuditEmails()),
+      withPgClient(async () => {
+        const { runScheduledIndexCoverage } =
+          await import("@/server/custom/sitemaps/indexCoverage");
+        await runScheduledIndexCoverage(env.KV);
+      }),
     ]);
     for (const result of checks)
       if (result.status === "rejected") throw result.reason;
