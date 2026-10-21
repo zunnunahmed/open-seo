@@ -95,6 +95,7 @@ jobs:
           GOOGLE_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TREG_TOKEN: ${{ secrets.TREG_API_TOKEN }}
         run: |
           python3 - <<'PY'
           import os
