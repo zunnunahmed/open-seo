@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Isolated treg transport. Never expose TREG_API_TOKEN to browser code.
  * Calls are opt-in and are NEVER retried automatically (provider may charge).
@@ -32,22 +34,16 @@ export function parseSerpstatBacklinksSummary(
   target: string,
   now = new Date(),
 ): TregBacklinksSummary {
-  if (typeof body !== "object" || body === null) {
-    throw new Error("Invalid treg backlink response");
-  }
-  const response = body as Record<string, unknown>;
+  const response = z.object({
+    error: z.unknown().optional(),
+    result: z.object({
+      data: z.record(z.string(), z.unknown()),
+    }),
+  }).parse(body);
   if (response.error != null) {
     throw new Error("treg provider returned an error");
   }
-  const result = response.result;
-  if (typeof result !== "object" || result === null) {
-    throw new Error("Missing provider result");
-  }
-  const data = (result as Record<string, unknown>).data;
-  if (typeof data !== "object" || data === null || Array.isArray(data)) {
-    throw new Error("Invalid Serpstat backlink summary data");
-  }
-  const item = data as Record<string, unknown>;
+  const item = response.result.data;
   // Different Serpstat revisions may use different field names. Prefer no
   // number over an invented number when a known key is unavailable.
   return {
