@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isProviderAllowed, parseSeoProviderPreference } from "./projectPreference";
+import {
+  isProviderAllowed,
+  parseSeoProviderPreference,
+} from "./projectPreference";
 
 describe("per-project SEO provider preference", () => {
   it.each(["", "unexpected", "dataforseo", null, undefined])(
-    "defaults to DataForSEO for %s", (value) => {
+    "defaults to DataForSEO for %s",
+    (value) => {
       expect(parseSeoProviderPreference(value)).toBe("dataforseo");
     },
   );
