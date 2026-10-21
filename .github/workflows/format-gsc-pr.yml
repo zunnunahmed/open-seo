@@ -1,0 +1,35 @@
+name: Format GSC Categorization PR
+on:
+  push:
+    branches:
+      - feature/gsc-url-categories
+    paths:
+      - .github/workflows/format-gsc-pr.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/gsc-url-categories
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format only changed GSC files
+        run: pnpm exec prettier --write src/client/features/search-performance/SearchPerformanceColumns.tsx src/client/features/search-performance/SearchPerformancePage.tsx src/client/features/search-performance/SearchPerformanceParts.tsx src/client/features/search-performance/urlCategories.ts src/client/features/search-performance/urlCategories.test.ts
+      - name: Commit formatted files
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add src/client/features/search-performance
+          if ! git diff --cached --quiet; then
+            git commit -m "Format GSC categorization changes"
+            git push
+          fi
