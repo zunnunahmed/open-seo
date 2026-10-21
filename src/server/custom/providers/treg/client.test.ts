@@ -36,7 +36,7 @@ describe("treg backlinks pilot", () => {
   });
 
   it("sends token only in a server-side header and never retries", async () => {
-    const request = vi.fn(
+    const request = vi.fn<typeof fetch>(
       async () =>
         new Response(
           JSON.stringify({ result: { data: { backlinks: 5 } } }),
@@ -45,37 +45,33 @@ describe("treg backlinks pilot", () => {
     );
     await fetchTregBacklinksSummary("example.com", {
       token: "private-test-token",
-      fetchImpl: request as typeof fetch,
+      fetchImpl: request,
     });
     expect(request).toHaveBeenCalledTimes(1);
-    const [url, options] = request.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
+    const [url, options] = request.mock.calls[0] ?? [];
+    expect(options).toBeDefined();
     expect(url).toBe("https://treg.to/call/serpstat.web.backlinks.summary");
-    expect((options.headers as Record<string, string>)["X-Treg-Token"]).toBe(
-      "private-test-token",
-    );
-    expect(options.body).not.toContain("private-test-token");
+    expect(new Headers(options?.headers).get("X-Treg-Token")).toBe("private-test-token");
+    expect(String(options?.body)).not.toContain("private-test-token");
   });
 
   it("rejects path, URL, and invalid scope before calling provider", async () => {
-    const request = vi.fn();
+    const request = vi.fn<typeof fetch>(async () => new Response("unused"));
     await expect(
       fetchTregBacklinksSummary("https://example.com/", {
         token: "test",
-        fetchImpl: request as typeof fetch,
+        fetchImpl: request,
       }),
     ).rejects.toThrow("bare domain");
     expect(request).not.toHaveBeenCalled();
   });
 
   it("does not retry on a provider failure", async () => {
-    const request = vi.fn(async () => new Response("denied", { status: 429 }));
+    const request = vi.fn<typeof fetch>(async () => new Response("denied", { status: 429 }));
     await expect(
       fetchTregBacklinksSummary("example.com", {
         token: "test",
-        fetchImpl: request as typeof fetch,
+        fetchImpl: request,
       }),
     ).rejects.toThrow("HTTP 429");
     expect(request).toHaveBeenCalledTimes(1);
