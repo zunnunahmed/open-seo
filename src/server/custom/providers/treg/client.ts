@@ -3,7 +3,7 @@
  * Calls are opt-in and are NEVER retried automatically (provider may charge).
  */
 const TREG_BACKLINKS_ENDPOINT = "serpstat.web.backlinks.summary";
-export const TREG_BACKLINKS_ESTIMATED_USD = 0.0025;
+const TREG_BACKLINKS_ESTIMATED_USD = 0.0025;
 
 type TregBacklinksSummary = {
   provider: "serpstat-via-treg";
