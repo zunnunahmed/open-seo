@@ -96,11 +96,24 @@ async function fetchSitemapXml(
   url: string,
   fetcher: typeof fetch,
 ): Promise<unknown> {
-  const response = await fetcher(url, {
-    redirect: "error",
-    signal: AbortSignal.timeout(12000),
-    headers: { Accept: "application/xml,text/xml" },
-  });
+  // Resolve redirects explicitly so no off-domain request is followed.
+  const sourceHost = new URL(url).hostname;
+  let current = url;
+  let response: Response | undefined;
+  for (let hop = 0; hop < 4; hop++) {
+    response = await fetcher(current, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(12000),
+      headers: { Accept: "application/xml,text/xml" },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    const location = response.headers.get("location");
+    if (!location)
+      throw new Error(`HTTP ${response.status} missing Location header`);
+    current = validateSitemapUrl(new URL(location, current).href, sourceHost);
+    if (hop === 3) throw new Error("Too many sitemap redirects");
+  }
+  if (!response) throw new Error("No sitemap response");
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const claimed = Number(response.headers.get("content-length") ?? 0);
   if (claimed > MAX_BYTES) throw new Error("Sitemap exceeds size limit");

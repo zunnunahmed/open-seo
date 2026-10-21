@@ -97,11 +97,31 @@ export function SitemapSettings({
         <p className="text-sm text-muted-foreground">
           Latest check:{" "}
           {new Date(query.data.history[0].scannedAt).toLocaleString()} ·{" "}
-          {query.data.history[0].urlCount.toLocaleString()} URLs ·{" "}
+          {query.data.history[0].complete
+            ? `${query.data.history[0].urlCount.toLocaleString()} URLs`
+            : `${query.data.history[0].urlCount.toLocaleString()} URLs detected (unverified)`}{" "}
+          ·{" "}
           {query.data.history[0].complete
             ? "Complete"
             : "Partial / check errors"}
         </p>
+      ) : null}
+      {query.data?.history[0] && !query.data.history[0].complete ? (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 p-3 text-sm"
+        >
+          <p className="font-medium">
+            Sitemap scan was incomplete; 0 is not a confirmed page count.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {query.data.history[0].errors.map((message, index) => (
+              <li key={`${index}-${message}`} className="break-words">
+                {message}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
     </section>
   );
