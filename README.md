@@ -20,6 +20,7 @@ This repository is **Zunnun's customized fork** of [every-app/open-seo](https://
 - **GSC Insights exports:** Category distribution chart, summary CSV, SVG chart, and one **.xlsx workbook with five category worksheets**. Current export source is limited to the first 1,000 returned page URLs, and excludes missing sitemap-only URLs.
 - **Project-level SEO data providers:** Save DataForSEO / treg / Both preference per project. The current treg research path covers Backlinks; it does not replace all OpenSEO modules.
 - **treg (Serpstat) Backlinks:** Manually requested summary, detailed referring domains/backlinks, per-project saved list snapshots, and CSV export. Individual provider queries can incur charges.
+- **Sitemap monitoring and Google index coverage:** Monthly count of sitemap-listed URLs (works with or without a project domain). With Search Console connected, sitemap URLs are checked with the URL Inspection API, up to 500 a day per project, showing indexed / not indexed / not checked, the not-indexed reasons, and a CSV export.
 - **Cloudflare self-host:** Production deployments are performed only through the manually confirmed GitHub workflow.
 
 ### Upstream Update Manager

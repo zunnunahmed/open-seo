@@ -10,6 +10,7 @@ import {
 } from "@/client/components/ui/tabs";
 import { DashboardKeywords } from "./DashboardKeywords";
 import { DashboardSitemapMonitor } from "./DashboardSitemapMonitor";
+import { DashboardIndexCoverage } from "./DashboardIndexCoverage";
 import { DashboardBacklinks } from "./DashboardBacklinks";
 import { DashboardNewQueries } from "./DashboardNewQueries";
 import { DashboardLinkActivity } from "./DashboardLinkActivity";
@@ -102,6 +103,11 @@ export function DashboardPage({
       key: "sitemap",
       hasData: true,
       node: <DashboardSitemapMonitor projectId={projectId} />,
+    },
+    {
+      key: "indexCoverage",
+      hasData: gscConnected,
+      node: <DashboardIndexCoverage projectId={projectId} />,
     },
     {
       key: "newQueries",
