@@ -1,0 +1,19 @@
+name: Deploy GSC Category Workbook Once
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/deploy-gsc-workbook-once.yml]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch approved Cloudflare deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh workflow run selfhost-cloudflare-manual.yml --repo "$GH_REPO" --ref main -f operation=deploy -f confirm_deploy=DEPLOY
