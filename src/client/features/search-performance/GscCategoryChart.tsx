@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Button } from "@/client/components/ui/button";
 import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { SearchPerformanceTableRow } from "@/client/features/search-performance/SearchPerformanceColumns";
+import { buildCategoryWorkbook } from "@/client/features/search-performance/categoryWorkbook";
 import { exportRows } from "@/client/lib/exportRows";
 
 const ORDER = ["Performance", "Good", "Fair", "Weak", "Dead"] as const;
@@ -43,6 +44,43 @@ export function GscCategoryChart({
         rangeLabel,
       ]),
     });
+  const downloadWorkbook = () => {
+    const headings = [
+      "URL",
+      "Clicks",
+      "Impressions",
+      "CTR",
+      "Average position",
+      "SEO action",
+    ];
+    const sheets = ORDER.map((category) => ({
+      name: category,
+      rows: [
+        headings,
+        ...rows
+          .filter((row) => classifyGscUrl(row.clicks).category === category)
+          .map((row) => [
+            row.key,
+            row.clicks,
+            row.impressions,
+            row.ctr,
+            row.position,
+            classifyGscUrl(row.clicks).action,
+          ]),
+      ],
+    }));
+    const content = buildCategoryWorkbook(sheets);
+    const url = URL.createObjectURL(
+      new Blob([new Uint8Array(content)], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gsc-urls-by-category-${rangeLabel}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   const downloadSvg = () => {
     const bars = summary
       .map((r, i) => {
@@ -78,7 +116,10 @@ export function GscCategoryChart({
             . No sitemap-only URLs included.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={downloadWorkbook}>
+            Download Excel (5 tabs)
+          </Button>
           <Button
             size="sm"
             variant="outline"
