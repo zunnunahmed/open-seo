@@ -1,0 +1,17 @@
+name: Validate Upstream Review Once
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/validate-upstream-review-once.yml]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch weekly reviewer for first validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run upstream-update-review.yml --repo "$GH_REPO" --ref main
