@@ -16,6 +16,7 @@ import { DataTableTabs } from "@/client/components/table/DataTableToolbar";
 import { TabsTrigger } from "@/client/components/ui/tabs";
 import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConnectionCard";
 import { DimensionSection } from "@/client/features/search-performance/SearchPerformanceDimensionSection";
+import { GscCategoryChart } from "@/client/features/search-performance/GscCategoryChart";
 import { SearchPerformanceSelects } from "@/client/features/search-performance/SearchPerformanceSelects";
 import { SearchPerformanceLoadingState } from "@/client/features/search-performance/SearchPerformanceLoadingState";
 import {
@@ -129,6 +130,14 @@ export function SearchPerformancePage({
       previousQuery.queryKey[2] === dimension
         ? previous
         : undefined,
+  });
+
+  const categoriesQuery = useQuery({
+    queryKey: ["gsc-category-distribution", projectId, filterInput],
+    queryFn: () => exportSearchPerformanceTable({
+      data: { projectId, dimension: "page", ...filterInput },
+    }),
+    enabled: report?.connected === true && tab === "pages",
   });
 
   // Warm the Queries tab (first page) as soon as the report connects so the tab
@@ -315,6 +324,19 @@ export function SearchPerformancePage({
                   1–99; Dead 0. Dead applies only to URLs returned by GSC, not
                   missing sitemap pages.
                 </p>
+              ) : null}
+              {tab === "pages" && categoriesQuery.data ? (
+                <GscCategoryChart
+                  rows={categoriesQuery.data.rows}
+                  rangeLabel={`${report.range.startDate}-to-${report.range.endDate}`}
+                  totalCount={categoriesQuery.data.rows.length}
+                />
+              ) : null}
+              {tab === "pages" && categoriesQuery.isPending ? (
+                <p className="px-4 py-3 text-sm text-muted-foreground">Loading URL category chart…</p>
+              ) : null}
+              {tab === "pages" && categoriesQuery.isError ? (
+                <p className="px-4 py-3 text-sm text-destructive">Could not load category chart. The Pages table is still available.</p>
               ) : null}
               {showFilters ? filtersPanel : null}
               {reportQuery.isPlaceholderData ? (
