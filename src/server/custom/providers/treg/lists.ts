@@ -48,7 +48,7 @@ export function parseTregList(body:unknown, kind:TregListKind, domain:string, fe
       linkCount:null,
     }).filter(x=>x.source.length>0),
     total:reply.result.summary_info?.total??null,
-    estimatedCostUsd:0.005,
+    estimatedCostUsd:kind==="backlinks"?0.01:0.01,
   };
 }
 export async function fetchTregList(kind:TregListKind,domain:string,token:string,fetchImpl:typeof fetch=fetch):Promise<TregListSnapshot>{
@@ -56,7 +56,7 @@ export async function fetchTregList(kind:TregListKind,domain:string,token:string
   const method=kind==="domains"?"SerpstatBacklinksProcedure.getRefDomains":"SerpstatBacklinksProcedure.getNewBacklinks";
   const response=await fetchImpl(`https://treg.to/call/${endpoint}`,{
     method:"POST",headers:{"Content-Type":"application/json","X-Treg-Token":token},
-    body:JSON.stringify({method,id:"1",params:{query:domain,searchType:"domain",page:1,size:100}}),
+    body:JSON.stringify({method,id:"1",params:{query:domain,searchType:"domain",page:1,size:20}}),
     signal:AbortSignal.timeout(20000),
   });
   if(!response.ok)throw new Error(`treg HTTP ${response.status}`);
