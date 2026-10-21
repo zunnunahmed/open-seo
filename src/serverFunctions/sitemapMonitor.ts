@@ -7,7 +7,7 @@ import {
   validateSitemapUrl,
   type SitemapSnapshot,
 } from "@/server/custom/sitemaps/crawler";
-import { saveSitemapUrls } from "@/server/custom/sitemaps/indexCoverage";
+import { saveSitemapUrls } from "@/server/custom/sitemaps/indexCoverageStore";
 
 const key = (id: string) => `custom:sitemaps:config:${id}`;
 const historyKey = (id: string) => `custom:sitemaps:history:${id}`;

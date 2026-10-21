@@ -3,8 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { GscConnectionRepository } from "@/server/features/gsc/repositories/GscConnectionRepository";
+import { createProjectInspector } from "@/server/custom/sitemaps/indexCoverage";
 import {
-  createProjectInspector,
   DAILY_LIMIT,
   inspectBatch,
   readResults,
@@ -12,7 +12,7 @@ import {
   readUrls,
   summarizeCoverage,
   TICK_LIMIT,
-} from "@/server/custom/sitemaps/indexCoverage";
+} from "@/server/custom/sitemaps/indexCoverageStore";
 
 const request = z.object({ projectId: z.string().min(1) });
 

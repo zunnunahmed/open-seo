@@ -9,16 +9,7 @@ import {
   readState,
   saveSitemapUrls,
   summarizeCoverage,
-} from "./indexCoverage";
-
-vi.mock("@/server/features/gsc/repositories/GscConnectionRepository", () => ({
-  GscConnectionRepository: { getByProjectId: vi.fn() },
-}));
-// The real client imports the database; keep its error classes only.
-vi.mock("@/server/lib/gscClient", async () => ({
-  ...(await import("@/server/lib/gscErrors")),
-  createGscClient: vi.fn(),
-}));
+} from "./indexCoverageStore";
 
 function fakeKv() {
   const store = new Map<string, string>();
