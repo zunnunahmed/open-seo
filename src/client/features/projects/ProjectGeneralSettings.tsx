@@ -1,3 +1,4 @@
+import { SitemapSettings } from "./SitemapSettings";
 import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +35,7 @@ export function ProjectGeneralSettings({ projectId }: { projectId: string }) {
           <div className="space-y-8">
             {/* key resets the form's local state when switching between projects */}
             <GeneralSection key={project.id} project={project} />
+            <SitemapSettings key={`sitemap-${project.id}`} projectId={project.id} domain={project.domain} />
             <DangerSection project={project} canArchive={projects.length > 1} />
           </div>
         );
