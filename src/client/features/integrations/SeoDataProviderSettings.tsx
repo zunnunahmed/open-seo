@@ -12,6 +12,10 @@ const SECTION = "seo-data-providers";
 const OPTIONS = ["dataforseo", "treg", "both"] as const;
 type Choice = (typeof OPTIONS)[number];
 
+function parseChoice(value: string): Choice {
+  return value === "treg" || value === "both" ? value : "dataforseo";
+}
+
 function readChoice(
   sections: { slug: string; content: string }[] | undefined,
 ): Choice {
@@ -102,7 +106,7 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
                       name={`seo-provider-${projectId}`}
                       value={value}
                       checked={choice === value}
-                      onChange={() => setChoice(value as Choice)}
+                      onChange={() => setChoice(parseChoice(value))}
                       className="mt-1"
                     />
                     <span>
