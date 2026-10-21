@@ -38,6 +38,10 @@ import {
 } from "@/server/lib/dataforseo/serp";
 import { fetchLighthouseResult } from "@/server/lib/dataforseo/lighthouse";
 import {
+  CLUSTER_SERP_DEPTH,
+  postClusterSerpTasks,
+} from "@/server/custom/clustering/dataforseo";
+import {
   fetchLlmAggregatedMetrics,
   fetchLlmCrossAggregatedMetrics,
   fetchLlmMentionsSearch,
@@ -257,6 +261,14 @@ export const dataforseoPricing = {
         clampSerpDepth(input.depth ?? SERP_ANALYSIS_DEPTH),
         "live",
         input.keyword,
+      ),
+    ),
+    // Fork: queued top-10 SERPs for keyword clustering, billed at post time.
+    clusterTaskPost: priced(postClusterSerpTasks, (input) =>
+      input.tasks.reduce(
+        (sum, task) =>
+          sum + serpUsd(CLUSTER_SERP_DEPTH, "queued", task.keyword),
+        0,
       ),
     ),
     rankCheck: priced(fetchRankCheckSerp, (input) =>
