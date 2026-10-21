@@ -134,9 +134,10 @@ export function SearchPerformancePage({
 
   const categoriesQuery = useQuery({
     queryKey: ["gsc-category-distribution", projectId, filterInput],
-    queryFn: () => exportSearchPerformanceTable({
-      data: { projectId, dimension: "page", ...filterInput },
-    }),
+    queryFn: () =>
+      exportSearchPerformanceTable({
+        data: { projectId, dimension: "page", ...filterInput },
+      }),
     enabled: report?.connected === true && tab === "pages",
   });
 
@@ -332,10 +333,15 @@ export function SearchPerformancePage({
                 />
               ) : null}
               {tab === "pages" && categoriesQuery.isPending ? (
-                <p className="px-4 py-3 text-sm text-muted-foreground">Loading URL category chart…</p>
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  Loading URL category chart…
+                </p>
               ) : null}
               {tab === "pages" && categoriesQuery.isError ? (
-                <p className="px-4 py-3 text-sm text-destructive">Could not load category chart. The Pages table is still available.</p>
+                <p className="px-4 py-3 text-sm text-destructive">
+                  Could not load category chart. The Pages table is still
+                  available.
+                </p>
               ) : null}
               {showFilters ? filtersPanel : null}
               {reportQuery.isPlaceholderData ? (
