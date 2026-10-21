@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProjectSeoProviderPreference } from "@/serverFunctions/projectContext";
 import { TregBacklinksSummaryCard } from "./TregBacklinksSummaryCard";
+import { TregSavedLists } from "./TregSavedLists";
 import type { SortingState, Updater } from "@tanstack/react-table";
 import { BackLink, PageHeader } from "@/client/components/PageHeader";
 import { BacklinksSearchCard } from "./BacklinksSearchCard";
@@ -161,10 +162,13 @@ export function BacklinksPage({
           </p>
         ) : null}
         {providerQuery.data === "treg" || providerQuery.data === "both" ? (
-          <TregBacklinksSummaryCard
-            projectId={projectId}
-            target={searchState.target}
-          />
+          <>
+            <TregBacklinksSummaryCard
+              projectId={projectId}
+              target={searchState.target}
+            />
+            <TregSavedLists projectId={projectId} target={searchState.target} />
+          </>
         ) : null}
         {showDataForSeo ? (
           <BacklinksBody
