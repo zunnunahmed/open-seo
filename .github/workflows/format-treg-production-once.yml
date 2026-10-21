@@ -29,3 +29,5 @@ jobs:
             git commit -m "Format treg production integration"
             git push
           fi
+
+# Re-run after JSX syntax correction
