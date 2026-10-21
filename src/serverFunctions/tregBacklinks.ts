@@ -11,6 +11,15 @@ const schema = z.object({
   domain: z.string().min(4).max(253),
   acknowledgeCost: z.literal(true),
 });
+const summarySchema = z.object({
+  provider: z.literal("serpstat-via-treg"),
+  target: z.string(),
+  backlinks: z.number().nullable(),
+  referringDomains: z.number().nullable(),
+  authority: z.number().nullable(),
+  fetchedAt: z.string(),
+  estimatedCostUsd: z.number(),
+});
 const DAILY_LIMIT = 25;
 const TTL_SECONDS = 24 * 60 * 60;
 
@@ -36,7 +45,7 @@ export const runTregBacklinksSummary = createServerFn({ method: "POST" })
     const key = `custom:treg:v1:${context.projectId}:${domain}`;
     const cached = await env.KV.get(key);
     if (cached) {
-      return { ...JSON.parse(cached) as Awaited<ReturnType<typeof fetchTregBacklinksSummary>>, cached: true };
+      return { ...summarySchema.parse(JSON.parse(cached) as unknown), cached: true };
     }
     // Best-effort daily guard; KV counters are not atomic across concurrent
     // requests. Paid call is always an explicit button press, never automatic.
