@@ -99,7 +99,7 @@ export async function fetchTregList(
   });
   if (!response.ok) throw new Error(`treg HTTP ${response.status}`);
   return parseTregList(
-    (await response.json()) as unknown,
+    await response.json(),
     kind,
     domain,
     new Date().toISOString(),
