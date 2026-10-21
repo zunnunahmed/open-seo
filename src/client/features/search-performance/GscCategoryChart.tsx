@@ -41,7 +41,7 @@ export function GscCategoryChart({rows,rangeLabel,totalCount}:{
   return <section className="space-y-3 border-b border-border px-4 py-4" aria-label="URL category distribution">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-base font-semibold">URL category distribution</h2>
-      <p className="text-xs text-muted-foreground">Based on {total.toLocaleString()} GSC-returned page URLs for the selected filters and date range{totalCount>total?" (export result may be capped)":""}. No sitemap-only URLs included.</p></div>
+      <p className="text-xs text-muted-foreground">Based on {total.toLocaleString()} GSC-returned page URLs for the selected filters and date range{total >= 1000 ? " (first 1,000 GSC export rows; not the full site)":""}. No sitemap-only URLs included.</p></div>
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={()=>void downloadCsv()}>Download CSV</Button>
         <Button size="sm" variant="outline" onClick={downloadSvg}>Download chart SVG</Button>
