@@ -76,16 +76,20 @@ export function buildDimensionColumns(
       cell: ({ getValue }) => formatCtr(getValue()),
       meta: rightAligned,
     }),
-    ...(keyLabel === "Page" ? [
-      dimensionHelper.display({
-        id: "performanceCategory", header: "Category",
-        cell: ({ row }) => classifyGscUrl(row.original.clicks).category,
-      }),
-      dimensionHelper.display({
-        id: "seoAction", header: "SEO action",
-        cell: ({ row }) => classifyGscUrl(row.original.clicks).action,
-      }),
-    ] : []),
+    ...(keyLabel === "Page"
+      ? [
+          dimensionHelper.display({
+            id: "performanceCategory",
+            header: "Category",
+            cell: ({ row }) => classifyGscUrl(row.original.clicks).category,
+          }),
+          dimensionHelper.display({
+            id: "seoAction",
+            header: "SEO action",
+            cell: ({ row }) => classifyGscUrl(row.original.clicks).action,
+          }),
+        ]
+      : []),
     dimensionHelper.accessor("position", {
       header: ({ column }) => (
         <SortableHeader column={column} label="Position" align="right" />

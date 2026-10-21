@@ -81,7 +81,12 @@ function dimensionExportTable(
       row.impressions,
       row.ctr,
       row.position,
-      ...(isPage ? [classifyGscUrl(row.clicks).category, classifyGscUrl(row.clicks).action] : []),
+      ...(isPage
+        ? [
+            classifyGscUrl(row.clicks).category,
+            classifyGscUrl(row.clicks).action,
+          ]
+        : []),
     ]),
   };
 }

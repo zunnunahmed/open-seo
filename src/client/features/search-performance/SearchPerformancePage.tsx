@@ -310,7 +310,10 @@ export function SearchPerformancePage({
 
               {tab === "pages" ? (
                 <p className="px-4 pt-3 text-xs text-muted-foreground">
-                  URL categories use clicks in the selected date range: Performance &gt;1,000; Good 500–1,000; Fair 100–499; Weak 1–99; Dead 0. Dead applies only to URLs returned by GSC, not missing sitemap pages.
+                  URL categories use clicks in the selected date range:
+                  Performance &gt;1,000; Good 500–1,000; Fair 100–499; Weak
+                  1–99; Dead 0. Dead applies only to URLs returned by GSC, not
+                  missing sitemap pages.
                 </p>
               ) : null}
               {showFilters ? filtersPanel : null}
