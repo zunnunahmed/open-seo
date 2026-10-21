@@ -33,7 +33,7 @@ function stringField(v: unknown): string | null {
 function numberField(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
-export function parseTregList(
+function parseTregList(
   body: unknown,
   kind: TregListKind,
   domain: string,
