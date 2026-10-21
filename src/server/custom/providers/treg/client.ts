@@ -53,9 +53,9 @@ export function parseSerpstatBacklinksSummary(
   return {
     provider: "serpstat-via-treg",
     target,
-    backlinks: asCount(item.externalLinks ?? item.external_links),
-    referringDomains: asCount(item.referringDomains ?? item.referring_domains),
-    authority: asCount(item.sdr ?? item.SDR),
+    backlinks: asCount(item.backlinks),
+    referringDomains: asCount(item.referring_domains),
+    authority: asCount(item.sersptat_domain_rank),
     fetchedAt: now.toISOString(),
     estimatedCostUsd: TREG_BACKLINKS_ESTIMATED_USD,
   };
