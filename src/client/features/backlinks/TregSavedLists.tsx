@@ -8,7 +8,12 @@ import type {
 } from "@/server/custom/providers/treg/lists";
 
 function csvEscape(v: unknown): string {
-  const string = v == null ? "" : typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? String(v) : JSON.stringify(v);
+  const string =
+    v == null
+      ? ""
+      : typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+        ? String(v)
+        : JSON.stringify(v);
   return '"' + string.replaceAll('"', '""') + '"';
 }
 function exportCsv(data: TregListSnapshot) {
