@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/server/features/project-context/repositories/ProjectContextRepository", () => ({
-  ProjectContextRepository: { listSections: vi.fn(async () => []) },
-}));
+vi.mock(
+  "@/server/features/project-context/repositories/ProjectContextRepository",
+  () => ({
+    ProjectContextRepository: { listSections: vi.fn(async () => []) },
+  }),
+);
 import {
   isProviderAllowed,
   parseSeoProviderPreference,
