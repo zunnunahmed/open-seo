@@ -1,4 +1,7 @@
 import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getProjectSeoProviderPreference } from "@/serverFunctions/projectContext";
+import { TregBacklinksSummaryCard } from "./TregBacklinksSummaryCard";
 import type { SortingState, Updater } from "@tanstack/react-table";
 import { BackLink, PageHeader } from "@/client/components/PageHeader";
 import { BacklinksSearchCard } from "./BacklinksSearchCard";
@@ -24,6 +27,11 @@ export function BacklinksPage({
   navigate,
 }: BacklinksPageProps) {
   const filters = useBacklinksFilters();
+  const providerQuery = useQuery({
+    queryKey: ["seo-provider-preferences", projectId],
+    queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
+  });
+  const showDataForSeo = providerQuery.isSuccess && providerQuery.data !== "treg";
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -55,7 +63,12 @@ export function BacklinksPage({
     [sorting, updateSearch],
   );
 
-  const data = useBacklinksPageData({ projectId, searchState, filters });
+  const data = useBacklinksPageData({
+    projectId,
+    searchState,
+    filters,
+    enabled: showDataForSeo,
+  });
 
   const domainExpansion = useBacklinksDomainExpansion({
     projectId,
@@ -139,6 +152,15 @@ export function BacklinksPage({
           }}
         />
 
+        {providerQuery.isPending ? (
+          <p role="status">Loading project data provider settings…</p>
+        ) : providerQuery.isError ? (
+          <p role="alert">Could not load provider settings. Research queries are paused.</p>
+        ) : null}
+        {providerQuery.data === "treg" || providerQuery.data === "both" ? (
+          <TregBacklinksSummaryCard projectId={projectId} target={searchState.target} />
+        ) : null}
+        {showDataForSeo ? (
         <BacklinksBody
           projectId={projectId}
           history={history}
