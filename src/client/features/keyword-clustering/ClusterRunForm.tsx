@@ -4,7 +4,9 @@ import { FileSpreadsheet, Upload, X } from "lucide-react";
 import Papa from "papaparse";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
+import { Checkbox } from "@/client/components/ui/checkbox";
 import { Input } from "@/client/components/ui/input";
+import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
 import { ProjectMarketFields } from "@/client/features/projects/ProjectMarketFields";
@@ -168,15 +170,14 @@ export function ClusterRunForm({
         {activeMarket ? (
           <ProjectMarketFields value={activeMarket} onChange={setMarket} />
         ) : null}
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
+        <Label className="font-normal">
+          <Checkbox
             checked={fetchVolume}
-            onChange={(e) => setFetchVolume(e.target.checked)}
+            onCheckedChange={(checked) => setFetchVolume(checked)}
           />
-          Look up search volume and CPC for keywords without them (
-          {missingVolume.toLocaleString()})
-        </label>
+          Look up search volume and CPC for keywords without them
+          {missingVolume ? ` (${missingVolume.toLocaleString()} keywords)` : ""}
+        </Label>
         <p className={tooMany ? "text-destructive" : "text-muted-foreground"}>
           {parsed.keywords.length.toLocaleString()} unique keywords
           {parsed.duplicates

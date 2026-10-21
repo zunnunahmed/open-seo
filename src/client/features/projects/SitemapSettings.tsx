@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { SectionHeader } from "@/client/components/PageHeader";
 import { Button } from "@/client/components/ui/button";
+import { Checkbox } from "@/client/components/ui/checkbox";
+import { Input } from "@/client/components/ui/input";
+import { Label } from "@/client/components/ui/label";
 import {
   configureSitemapMonitor,
   getSitemapMonitor,
@@ -53,105 +58,127 @@ export function SitemapSettings({
       void client.invalidateQueries({ queryKey: ["indexCoverage", projectId] });
     },
   });
+  const latest = query.data?.history[0];
   return (
-    <section className="space-y-3 border-t border-border pt-6">
-      <h2 className="text-lg font-semibold">Sitemap monitoring</h2>
-      <p className="text-sm text-muted-foreground">
-        Count unique URLs listed in this website's XML sitemap and any nested
-        sitemaps. Enabled projects are checked on the first day of each month.
-        This is a sitemap inventory, not an HTML crawl or Google indexed-pages
-        count.
-      </p>
-      <label className="block space-y-1 text-sm">
-        <span className="font-medium">Sitemap URL</span>
-        <input
-          type="url"
-          className="w-full rounded-md border bg-background px-3 py-2"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com/sitemap.xml"
+    <>
+      <section className="space-y-4 border-t border-border pt-8">
+        <SectionHeader
+          title="Sitemap monitoring"
+          hint="Counts unique URLs in this website's XML sitemap and any nested sitemaps, on the first day of each month. This is a sitemap inventory, not an HTML crawl or Google's indexed-page count."
         />
-      </label>
-      {!domain ? (
-        <p className="text-xs text-muted-foreground">
-          No project domain is set, so the sitemap URL's domain is monitored.
-        </p>
-      ) : null}
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-        />
-        Automatically check each month
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={indexCoverage}
-          onChange={(e) => setIndexCoverage(e.target.checked)}
-        />
-        Check Google indexing daily (up to 500 URLs a day via Search Console)
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          disabled={(!domain && !url.trim()) || save.isPending}
-          onClick={() => save.mutate()}
-        >
-          Save sitemap settings
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!query.data?.config || scan.isPending}
-          onClick={() => scan.mutate()}
-        >
-          {scan.isPending ? "Checking…" : "Check sitemap now"}
-        </Button>
-      </div>
-      {save.isError || scan.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          {(save.error ?? scan.error)?.message}
-        </p>
-      ) : null}
-      {save.isSuccess ? (
-        <p role="status" className="text-sm">
-          Sitemap settings saved.
-        </p>
-      ) : null}
-      {query.data?.history[0] ? (
-        <p className="text-sm text-muted-foreground">
-          Latest check:{" "}
-          {new Date(query.data.history[0].scannedAt).toLocaleString()} ·{" "}
-          {query.data.history[0].complete
-            ? `${query.data.history[0].urlCount.toLocaleString()} URLs`
-            : `${query.data.history[0].urlCount.toLocaleString()} URLs detected (unverified)`}{" "}
-          ·{" "}
-          {query.data.history[0].complete
-            ? "Complete"
-            : "Partial / check errors"}
-        </p>
-      ) : null}
-      {query.data?.history[0] && !query.data.history[0].complete ? (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 p-3 text-sm"
-        >
-          <p className="font-medium">
-            Sitemap scan was incomplete; 0 is not a confirmed page count.
-          </p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {query.data.history[0].errors.map((message, index) => (
-              <li key={`${index}-${message}`} className="break-words">
-                {message}
-              </li>
-            ))}
-          </ul>
+        <div className="space-y-1.5">
+          <Label htmlFor={`sitemap-url-${projectId}`}>Sitemap URL</Label>
+          <Input
+            id={`sitemap-url-${projectId}`}
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com/sitemap.xml"
+          />
+          {!domain ? (
+            <p className="text-xs text-muted-foreground">
+              No project domain is set, so the sitemap URL&rsquo;s domain is
+              monitored.
+            </p>
+          ) : null}
         </div>
-      ) : null}
-      <div className="space-y-2 pt-2">
-        <h3 className="font-medium">Google index coverage</h3>
-        <IndexCoverageSummary projectId={projectId} showActions />
-      </div>
-    </section>
+        <div className="space-y-2.5">
+          <Label className="font-normal">
+            <Checkbox
+              checked={enabled}
+              onCheckedChange={(checked) => setEnabled(checked)}
+            />
+            Check the sitemap automatically each month
+          </Label>
+          <Label className="font-normal">
+            <Checkbox
+              checked={indexCoverage}
+              onCheckedChange={(checked) => setIndexCoverage(checked)}
+            />
+            Check Google indexing daily (up to 500 URLs a day via Search
+            Console)
+          </Label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            disabled={(!domain && !url.trim()) || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? "Saving…" : "Save sitemap settings"}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!query.data?.config || scan.isPending}
+            onClick={() => scan.mutate()}
+          >
+            <RefreshCw
+              className={`size-4 ${scan.isPending ? "animate-spin" : ""}`}
+            />
+            {scan.isPending ? "Checking…" : "Check sitemap now"}
+          </Button>
+          {save.isSuccess && !save.isPending ? (
+            <span role="status" className="text-sm text-muted-foreground">
+              Saved.
+            </span>
+          ) : null}
+        </div>
+        {save.isError || scan.isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {(save.error ?? scan.error)?.message}
+          </p>
+        ) : null}
+        {latest ? (
+          latest.complete ? (
+            <p className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-success" aria-hidden />
+              <span>
+                <span className="font-medium tabular-nums">
+                  {latest.urlCount.toLocaleString()} URLs
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  in {latest.sitemapCount.toLocaleString()}{" "}
+                  {latest.sitemapCount === 1 ? "sitemap" : "sitemaps"} · checked{" "}
+                  {new Date(latest.scannedAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </span>
+            </p>
+          ) : (
+            <div
+              role="alert"
+              className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+            >
+              <AlertTriangle
+                className="mt-0.5 size-4 shrink-0 text-destructive"
+                aria-hidden
+              />
+              <div className="min-w-0">
+                <p className="font-medium">
+                  The last check was incomplete:{" "}
+                  {latest.urlCount.toLocaleString()} URLs found, not a confirmed
+                  count.
+                </p>
+                <ul className="mt-1.5 list-disc space-y-1 pl-5 text-muted-foreground">
+                  {latest.errors.map((message, index) => (
+                    <li key={`${index}-${message}`} className="break-words">
+                      {message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )
+        ) : null}
+      </section>
+      <section className="space-y-4 border-t border-border pt-8">
+        <SectionHeader
+          title="Google index coverage"
+          hint="Sitemap URLs checked with Search Console URL Inspection."
+        />
+        <IndexCoverageSummary projectId={projectId} variant="full" />
+      </section>
+    </>
   );
 }
