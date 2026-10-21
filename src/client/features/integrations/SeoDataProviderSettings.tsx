@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
-import { getProjectContext, updateProjectContext } from "@/serverFunctions/projectContext";
+import {
+  getProjectContext,
+  updateProjectContext,
+} from "@/serverFunctions/projectContext";
 
 const SECTION = "seo-data-providers";
 const OPTIONS = ["dataforseo", "treg", "both"] as const;
@@ -67,7 +70,11 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
           {query.isError ? (
             <p role="alert" className="text-destructive">
               Could not load project settings.
-              <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void query.refetch()}
+              >
                 Try again
               </Button>
             </p>
@@ -78,11 +85,18 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
               <fieldset className="space-y-3">
                 <legend className="font-medium">Preferred providers</legend>
                 {[
-                  ["dataforseo", "DataForSEO only", "Use the current OpenSEO provider."],
+                  [
+                    "dataforseo",
+                    "DataForSEO only",
+                    "Use the current OpenSEO provider.",
+                  ],
                   ["treg", "treg only", "Prefer treg when supported."],
                   ["both", "Both", "Choose a source by capability and cost."],
                 ].map(([value, title, description]) => (
-                  <label key={value} className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
+                  <label
+                    key={value}
+                    className="flex cursor-pointer items-start gap-3 rounded-md border p-3"
+                  >
                     <input
                       type="radio"
                       name={`seo-provider-${projectId}`}
@@ -93,7 +107,9 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
                     />
                     <span>
                       <span className="block font-medium">{title}</span>
-                      <span className="block text-muted-foreground">{description}</span>
+                      <span className="block text-muted-foreground">
+                        {description}
+                      </span>
                     </span>
                   </label>
                 ))}
