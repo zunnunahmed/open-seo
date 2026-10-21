@@ -5,15 +5,16 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "Validate setup, or explicitly request deployment after Cloudflare/Alchemy bootstrap"
+        description: "Validate, bootstrap Alchemy state store, or deploy OpenSEO"
         type: choice
         required: true
         default: validate
         options:
           - validate
+          - bootstrap
           - deploy
       confirm_deploy:
-        description: "Type DEPLOY to permit changes to Cloudflare (only for deploy operation)"
+        description: "Type BOOTSTRAP or DEPLOY to authorize Cloudflare changes"
         required: false
         default: ""
 
@@ -46,6 +47,22 @@ jobs:
           test -f deploy/.env.selfhost.example
           node -e "const p=require('./package.json');if(!p.scripts['deploy:selfhost'])process.exit(1)"
           echo 'OpenSEO self-host script found. No Cloudflare changes made.'
+      - name: Require confirmation for Alchemy bootstrap
+        if: ${{ inputs.operation == 'bootstrap' }}
+        env:
+          CONFIRM: ${{ inputs.confirm_deploy }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "$CONFIRM" != "BOOTSTRAP" ]; then echo "::error::Type BOOTSTRAP to authorize state-store creation"; exit 1; fi
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then echo "::error::Missing Cloudflare token or account ID"; exit 1; fi
+          echo 'Bootstrap is a Cloudflare-changing operation. Requires Workers, Secrets Store and account permissions.'
+      - name: Bootstrap Alchemy Cloudflare state store
+        if: ${{ inputs.operation == 'bootstrap' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm alchemy cloudflare bootstrap
       - name: Check explicit permission and required secrets
         if: ${{ inputs.operation == 'deploy' }}
         env:
@@ -59,7 +76,7 @@ jobs:
           for name in CF_TOKEN CF_ACCOUNT DFS_KEY ALLOWED_EMAILS; do
             if [ -z "${!name}" ]; then echo "::error::Missing required secret: $name"; exit 1; fi
           done
-          echo 'Required secrets provided. Alchemy bootstrap and permissions must already be configured.'
+          echo 'Required secrets provided. Bootstrap must have completed successfully before deploy.'
       - name: Create private self-host environment file
         if: ${{ inputs.operation == 'deploy' }}
         env:
