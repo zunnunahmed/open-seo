@@ -6,7 +6,7 @@ import { exportRows } from "@/client/lib/exportRows";
 
 const ORDER = ["Performance", "Good", "Fair", "Weak", "Dead"] as const;
 
-export function aggregatePageCategories(
+function aggregatePageCategories(
   rows: Pick<SearchPerformanceTableRow, "clicks">[],
 ) {
   const counts: Record<(typeof ORDER)[number], number> = {
