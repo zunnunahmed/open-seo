@@ -6,6 +6,7 @@ import {
   getSitemapMonitor,
   scanSitemapNow,
 } from "@/serverFunctions/sitemapMonitor";
+import { IndexCoverageSummary } from "./IndexCoverageSummary";
 export function SitemapSettings({
   projectId,
   domain,
@@ -21,24 +22,36 @@ export function SitemapSettings({
   });
   const [url, setUrl] = useState("");
   const [enabled, setEnabled] = useState(true);
+  const [indexCoverage, setIndexCoverage] = useState(true);
   useEffect(() => {
     if (query.data?.config) {
       setUrl(query.data.config.sitemapUrl);
       setEnabled(query.data.config.enabled);
+      setIndexCoverage(query.data.config.indexCoverage);
     } else if (domain) {
       setUrl(`https://${domain}/sitemap.xml`);
     }
   }, [query.data, domain]);
   const save = useMutation({
-    mutationFn: () =>
-      configureSitemapMonitor({
-        data: { projectId, sitemapUrl: url, enabled },
-      }),
+    mutationFn: async () => {
+      const result = await configureSitemapMonitor({
+        data: { projectId, sitemapUrl: url.trim(), enabled, indexCoverage },
+      });
+      if (!result.ok) throw new Error(result.error);
+      return result.config;
+    },
     onSuccess: () => void client.invalidateQueries({ queryKey }),
   });
   const scan = useMutation({
-    mutationFn: () => scanSitemapNow({ data: { projectId } }),
-    onSuccess: () => void client.invalidateQueries({ queryKey }),
+    mutationFn: async () => {
+      const result = await scanSitemapNow({ data: { projectId } });
+      if (!result.ok) throw new Error(result.error);
+      return result.snapshot;
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey });
+      void client.invalidateQueries({ queryKey: ["indexCoverage", projectId] });
+    },
   });
   return (
     <section className="space-y-3 border-t border-border pt-6">
@@ -57,9 +70,13 @@ export function SitemapSettings({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/sitemap.xml"
-          disabled={!domain}
         />
       </label>
+      {!domain ? (
+        <p className="text-xs text-muted-foreground">
+          No project domain is set, so the sitemap URL's domain is monitored.
+        </p>
+      ) : null}
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -68,9 +85,17 @@ export function SitemapSettings({
         />
         Automatically check each month
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={indexCoverage}
+          onChange={(e) => setIndexCoverage(e.target.checked)}
+        />
+        Check Google indexing daily (up to 500 URLs a day via Search Console)
+      </label>
       <div className="flex flex-wrap gap-2">
         <Button
-          disabled={!domain || save.isPending}
+          disabled={(!domain && !url.trim()) || save.isPending}
           onClick={() => save.mutate()}
         >
           Save sitemap settings
@@ -123,6 +148,10 @@ export function SitemapSettings({
           </ul>
         </div>
       ) : null}
+      <div className="space-y-2 pt-2">
+        <h3 className="font-medium">Google index coverage</h3>
+        <IndexCoverageSummary projectId={projectId} showActions />
+      </div>
     </section>
   );
 }

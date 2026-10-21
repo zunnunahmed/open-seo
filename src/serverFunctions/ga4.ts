@@ -134,6 +134,13 @@ export const getGa4DashboardReport = createServerFn({ method: "POST" })
       ) {
         throw new AppError("RATE_LIMITED");
       }
+      // The remaining report errors carry fixed, user-safe copy (e.g. the Data
+      // API is not enabled). Return it so the card can say what is wrong; a
+      // thrown error reaches the client only as a bare code.
+      if (error instanceof Ga4ReportError) {
+        console.error("[ga4] dashboard report failed:", error.code);
+        return { connected: true as const, unavailable: error.message };
+      }
       throw error;
     }
   });
