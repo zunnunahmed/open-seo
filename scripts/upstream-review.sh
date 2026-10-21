@@ -104,4 +104,7 @@ if [[ "${STATUS}" == "conflicts" ]]; then
   TITLE="[Upstream Review — CONFLICTS] OpenSEO ${TODAY}"
 fi
 gh pr create --base "${BASE_BRANCH}" --head "${BRANCH}" --title "${TITLE}" --body-file "${REPORT}"
+# GitHub does not trigger pull_request workflows for PRs created with GITHUB_TOKEN.
+# Explicit dispatch runs the existing CI against this review branch without merging.
+gh workflow run ci.yml --ref "${BRANCH}"
 echo "Created review PR for upstream ${UPSTREAM_SHA:0:12}; status: ${STATUS}" >> "${GITHUB_STEP_SUMMARY}"
