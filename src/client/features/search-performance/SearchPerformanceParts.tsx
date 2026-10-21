@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -72,6 +73,7 @@ function dimensionExportTable(
       "Impressions",
       "CTR",
       "Position",
+      ...(isPage ? ["Category", "SEO action"] : []),
     ],
     rows: rows.map((row) => [
       row.key,
@@ -79,6 +81,7 @@ function dimensionExportTable(
       row.impressions,
       row.ctr,
       row.position,
+      ...(isPage ? [classifyGscUrl(row.clicks).category, classifyGscUrl(row.clicks).action] : []),
     ]),
   };
 }
