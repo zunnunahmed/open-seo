@@ -80,7 +80,8 @@ function collectPages(
       if (
         url.hostname.toLowerCase() !== host.toLowerCase() ||
         !["https:", "http:"].includes(url.protocol)
-      ) continue;
+      )
+        continue;
       if (pageUrls.has(url.href)) duplicates++;
       else pageUrls.add(url.href);
       if (pageUrls.size >= LIMIT_URLS) break;
@@ -91,7 +92,10 @@ function collectPages(
   return duplicates;
 }
 
-async function fetchSitemapXml(url: string, fetcher: typeof fetch): Promise<unknown> {
+async function fetchSitemapXml(
+  url: string,
+  fetcher: typeof fetch,
+): Promise<unknown> {
   const response = await fetcher(url, {
     redirect: "error",
     signal: AbortSignal.timeout(12000),
@@ -102,9 +106,13 @@ async function fetchSitemapXml(url: string, fetcher: typeof fetch): Promise<unkn
   if (claimed > MAX_BYTES) throw new Error("Sitemap exceeds size limit");
   const body = await response.text();
   if (body.length > MAX_BYTES) throw new Error("Sitemap exceeds size limit");
-  const parser = new XMLParser({ ignoreAttributes: true, processEntities: false });
+  const parser = new XMLParser({
+    ignoreAttributes: true,
+    processEntities: false,
+  });
   const parsed: unknown = parser.parse(body);
-  if (!xmlRecord.safeParse(parsed).success) throw new Error("Invalid XML sitemap");
+  if (!xmlRecord.safeParse(parsed).success)
+    throw new Error("Invalid XML sitemap");
   return parsed;
 }
 
@@ -119,7 +127,11 @@ export async function crawlSitemaps(
   const pageUrls = new Set<string>();
   const errors: string[] = [];
   let duplicateUrls = 0;
-  while (pending.length && seen.size < LIMIT_SITEMAPS && pageUrls.size < LIMIT_URLS) {
+  while (
+    pending.length &&
+    seen.size < LIMIT_SITEMAPS &&
+    pageUrls.size < LIMIT_URLS
+  ) {
     const next = pending.shift();
     if (!next || seen.has(next)) continue;
     seen.add(next);
@@ -132,12 +144,19 @@ export async function crawlSitemaps(
         duplicateUrls += collectPages(urlset, host, pageUrls, errors);
       else throw new Error("XML is not a sitemapindex or urlset");
     } catch (error) {
-      errors.push(`${next}: ${error instanceof Error ? error.message : "Failed"}`);
+      errors.push(
+        `${next}: ${error instanceof Error ? error.message : "Failed"}`,
+      );
     }
   }
-  const complete = pending.length === 0 && pageUrls.size < LIMIT_URLS && errors.length === 0;
+  const complete =
+    pending.length === 0 && pageUrls.size < LIMIT_URLS && errors.length === 0;
   return {
-    scannedAt, sitemapCount: seen.size, urlCount: pageUrls.size,
-    duplicateUrls, errors: errors.slice(0, 20), complete,
+    scannedAt,
+    sitemapCount: seen.size,
+    urlCount: pageUrls.size,
+    duplicateUrls,
+    errors: errors.slice(0, 20),
+    complete,
   };
 }
