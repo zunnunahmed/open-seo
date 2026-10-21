@@ -30,7 +30,7 @@ const historySchema = z.array(
     complete: z.boolean(),
   }),
 );
-export type SitemapConfig = z.infer<typeof configSchema>;
+type SitemapConfig = z.infer<typeof configSchema>;
 function normalizeDomain(value: string): string {
   const hostname = new URL(`https://${value}`).hostname.toLowerCase();
   if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(hostname))
