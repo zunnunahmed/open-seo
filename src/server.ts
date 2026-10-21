@@ -205,7 +205,8 @@ export default {
     _ctx: ExecutionContext,
   ) {
     if (controller.cron === MONTHLY_SITEMAP_CRON) {
-      const { runScheduledSitemapMonitoring } = await import("@/serverFunctions/sitemapMonitor");
+      const { runScheduledSitemapMonitoring } =
+        await import("@/serverFunctions/sitemapMonitor");
       await runScheduledSitemapMonitoring(env.KV);
       return;
     }

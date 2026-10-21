@@ -98,7 +98,11 @@ export function DashboardPage({
   // Search Console always renders: connected shows the report, otherwise the
   // connect pitch. It sits ahead of the optional GA4 pitch.
   const cards = [
-    {key:"sitemap",hasData:true,node:<DashboardSitemapMonitor projectId={projectId}/>},
+    {
+      key: "sitemap",
+      hasData: true,
+      node: <DashboardSitemapMonitor projectId={projectId} />,
+    },
     {
       key: "newQueries",
       hasData: gscConnected,
