@@ -71,23 +71,37 @@ jobs:
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DFS_KEY: ${{ secrets.DATAFORSEO_API_KEY }}
           ALLOWED_EMAILS: ${{ secrets.ACCESS_ALLOWED_EMAILS }}
+          GOOGLE_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
           if [ "$CONFIRM" != "DEPLOY" ]; then echo "::error::Enter DEPLOY to authorize a deployment"; exit 1; fi
           for name in CF_TOKEN CF_ACCOUNT DFS_KEY ALLOWED_EMAILS; do
             if [ -z "${!name}" ]; then echo "::error::Missing required secret: $name"; exit 1; fi
           done
+          if [ -n "$GOOGLE_ID" ] || [ -n "$GOOGLE_SECRET" ] || [ -n "$AUTH_SECRET" ]; then
+            for name in GOOGLE_ID GOOGLE_SECRET AUTH_SECRET; do
+              if [ -z "${!name}" ]; then echo "::error::Google OAuth requires all three secrets ($name missing)"; exit 1; fi
+            done
+            if [ "${#AUTH_SECRET}" -lt 32 ]; then echo "::error::BETTER_AUTH_SECRET must be at least 32 characters"; exit 1; fi
+          fi
           echo 'Required secrets provided. Bootstrap must have completed successfully before deploy.'
       - name: Create private self-host environment file
         if: ${{ inputs.operation == 'deploy' }}
         env:
           DFS_KEY: ${{ secrets.DATAFORSEO_API_KEY }}
           ALLOWED_EMAILS: ${{ secrets.ACCESS_ALLOWED_EMAILS }}
+          GOOGLE_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
         run: |
           python3 - <<'PY'
           import os
           from pathlib import Path
           values = {'DATAFORSEO_API_KEY': os.environ['DFS_KEY'],
                     'ACCESS_ALLOWED_EMAILS': os.environ['ALLOWED_EMAILS']}
+          if os.environ.get('GOOGLE_ID'):
+              values.update(GOOGLE_CLIENT_ID=os.environ['GOOGLE_ID'], GOOGLE_CLIENT_SECRET=os.environ['GOOGLE_SECRET'], BETTER_AUTH_SECRET=os.environ['AUTH_SECRET'])
           if any(('\n' in v or '\r' in v) for v in values.values()):
               raise SystemExit('Unexpected newline in secret')
           Path('.env.selfhost').write_text(''.join(f'{k}={v}\n' for k,v in values.items()))
