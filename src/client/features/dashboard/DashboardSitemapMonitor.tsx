@@ -24,6 +24,8 @@ export function DashboardSitemapMonitor({ projectId }: { projectId: string }) {
   const change =
     current && previous ? current.urlCount - previous.urlCount : null;
   const max = Math.max(1, ...history.map((s) => s.urlCount));
+  const chronological: typeof history = [];
+  for (const item of history.slice(0, 12)) chronological.unshift(item);
   return (
     <section className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -79,10 +81,7 @@ export function DashboardSitemapMonitor({ projectId }: { projectId: string }) {
               )
               .join("; ")}
           >
-            {history
-              .slice(0, 12)
-              .sort((a, b) => Date.parse(a.scannedAt) - Date.parse(b.scannedAt))
-              .map((s) => (
+            {chronological.map((s) => (
                 <div
                   key={s.scannedAt}
                   className="grid grid-cols-[75px_1fr_55px] items-center gap-2 text-xs"
