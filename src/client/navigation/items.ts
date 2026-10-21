@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Link2,
   MessageSquare,
+  Network,
   Search,
   TrendingUp,
 } from "lucide-react";
@@ -28,6 +29,11 @@ const projectNavItems = [
     to: "/p/$projectId/keywords" as const,
     label: "Keyword Research",
     icon: Search,
+  },
+  {
+    to: "/p/$projectId/keyword-clustering" as const,
+    label: "Keyword Clustering",
+    icon: Network,
   },
   {
     to: "/p/$projectId/saved" as const,
@@ -128,6 +134,7 @@ export function getProjectNavGroups(projectId: string) {
       label: "Research",
       items: [
         byPath("/p/$projectId/keywords"),
+        byPath("/p/$projectId/keyword-clustering"),
         byPath("/p/$projectId/domain"),
         byPath("/p/$projectId/backlinks"),
       ],

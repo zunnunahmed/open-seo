@@ -52,6 +52,7 @@ import {
   postRankCheckTasks,
 } from "@/server/lib/dataforseo/serp";
 import { fetchLighthouseResult } from "@/server/lib/dataforseo/lighthouse";
+import { postClusterSerpTasks } from "@/server/custom/clustering/dataforseo";
 import {
   fetchLlmAggregatedMetrics,
   fetchLlmCrossAggregatedMetrics,
@@ -226,6 +227,14 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
         postRankCheckTasks,
         dataforseoPricing.serp.rankCheckTaskPost,
         "rank_tracking",
+      ),
+      // Fork: up to 100 queued top-10 SERPs for keyword clustering; one
+      // metered charge per batch, collection is free.
+      clusterTaskPost: meter(
+        customer,
+        postClusterSerpTasks,
+        dataforseoPricing.serp.clusterTaskPost,
+        "keyword_research",
       ),
       local: meter(
         customer,

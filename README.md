@@ -20,6 +20,7 @@ This repository is **Zunnun's customized fork** of [every-app/open-seo](https://
 - **GSC Insights exports:** Category distribution chart, summary CSV, SVG chart, and one **.xlsx workbook with five category worksheets**. Current export source is limited to the first 1,000 returned page URLs, and excludes missing sitemap-only URLs.
 - **Project-level SEO data providers:** Save DataForSEO / treg / Both preference per project. The current treg research path covers Backlinks; it does not replace all OpenSEO modules.
 - **treg (Serpstat) Backlinks:** Manually requested summary, detailed referring domains/backlinks, per-project saved list snapshots, and CSV export. Individual provider queries can incur charges.
+- **SERP keyword clustering (Research → Keyword Clustering):** Paste or upload up to 5,000 keywords. Their top-10 Google results come from DataForSEO's standard queue (about $0.0006 per keyword, with the cost confirmed before starting), and keywords are grouped by shared URLs in soft, strict or balanced mode. Threshold changes are instant and free. Shows cluster volume, likely page type, SERP features, top domains, competitor coverage, your ranking page and cannibalization, with CSV exports. A project domain is optional.
 - **Cloudflare self-host:** Production deployments are performed only through the manually confirmed GitHub workflow.
 
 ### Upstream Update Manager
