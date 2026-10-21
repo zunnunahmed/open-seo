@@ -81,7 +81,7 @@ export function DashboardSitemapMonitor({ projectId }: { projectId: string }) {
           >
             {history
               .slice(0, 12)
-              .toReversed()
+              .sort((a, b) => Date.parse(a.scannedAt) - Date.parse(b.scannedAt))
               .map((s) => (
                 <div
                   key={s.scannedAt}
