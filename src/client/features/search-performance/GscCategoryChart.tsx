@@ -45,7 +45,14 @@ export function GscCategoryChart({
       ]),
     });
   const downloadWorkbook = () => {
-    const headings = ["URL", "Clicks", "Impressions", "CTR", "Average position", "SEO action"];
+    const headings = [
+      "URL",
+      "Clicks",
+      "Impressions",
+      "CTR",
+      "Average position",
+      "SEO action",
+    ];
     const sheets = ORDER.map((category) => ({
       name: category,
       rows: [
@@ -63,9 +70,11 @@ export function GscCategoryChart({
       ],
     }));
     const content = buildCategoryWorkbook(sheets);
-    const url = URL.createObjectURL(new Blob([new Uint8Array(content)], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }));
+    const url = URL.createObjectURL(
+      new Blob([new Uint8Array(content)], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+    );
     const link = document.createElement("a");
     link.href = url;
     link.download = `gsc-urls-by-category-${rangeLabel}.xlsx`;
