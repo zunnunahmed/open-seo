@@ -163,7 +163,10 @@ export function BacklinksPage({
         ) : null}
         {providerQuery.data === "treg" || providerQuery.data === "both" ? (
           <>
-            <TregBacklinksSummaryCard projectId={projectId} target={searchState.target} />
+            <TregBacklinksSummaryCard
+              projectId={projectId}
+              target={searchState.target}
+            />
             <TregSavedLists projectId={projectId} target={searchState.target} />
           </>
         ) : null}
