@@ -16,7 +16,8 @@ export function TregBacklinksSummaryCard({
       }),
   });
   const domain = target.toLowerCase().trim();
-  const validDomain = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(domain);
+  const validDomain =
+    /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(domain);
   // A new domain must never display the previous target's research.
   const result = mutation.data?.target === domain ? mutation.data : null;
 
@@ -37,7 +38,9 @@ export function TregBacklinksSummaryCard({
           disabled={mutation.isPending}
           onClick={() => mutation.mutate(domain)}
         >
-          {mutation.isPending ? "Checking…" : "Run treg summary (up to $0.0025)"}
+          {mutation.isPending
+            ? "Checking…"
+            : "Run treg summary (up to $0.0025)"}
         </Button>
       )}
       {mutation.isError ? (
@@ -50,7 +53,8 @@ export function TregBacklinksSummaryCard({
       {result ? (
         <div className="space-y-2 text-sm" aria-live="polite">
           <p className="text-muted-foreground">
-            Source: Serpstat via treg · {result.cached ? "Cached" : "New API request"} ·{" "}
+            Source: Serpstat via treg ·{" "}
+            {result.cached ? "Cached" : "New API request"} ·{" "}
             {new Date(result.fetchedAt).toLocaleString()}
           </p>
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -62,14 +66,16 @@ export function TregBacklinksSummaryCard({
               <div key={String(label)}>
                 <dt className="text-muted-foreground">{label}</dt>
                 <dd className="font-medium tabular-nums">
-                  {typeof value === "number" ? value.toLocaleString() : "Not reported"}
+                  {typeof value === "number"
+                    ? value.toLocaleString()
+                    : "Not reported"}
                 </dd>
               </div>
             ))}
           </dl>
           <p className="text-xs text-muted-foreground">
-            Provider figures can differ from DataForSEO; do not treat them
-            as identical metrics.
+            Provider figures can differ from DataForSEO; do not treat them as
+            identical metrics.
           </p>
         </div>
       ) : null}
