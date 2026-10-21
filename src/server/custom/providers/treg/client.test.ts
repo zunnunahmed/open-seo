@@ -57,7 +57,7 @@ describe("treg backlinks pilot", () => {
     expect(new Headers(options?.headers).get("X-Treg-Token")).toBe(
       "private-test-token",
     );
-    expect(String(options?.body)).not.toContain("private-test-token");
+    expect(JSON.stringify(options?.body)).not.toContain("private-test-token");
   });
 
   it("rejects path, URL, and invalid scope before calling provider", async () => {
