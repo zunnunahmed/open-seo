@@ -82,27 +82,27 @@ export function DashboardSitemapMonitor({ projectId }: { projectId: string }) {
               .join("; ")}
           >
             {chronological.map((s) => (
-                <div
-                  key={s.scannedAt}
-                  className="grid grid-cols-[75px_1fr_55px] items-center gap-2 text-xs"
-                >
-                  <span>
-                    {new Date(s.scannedAt).toLocaleDateString(undefined, {
-                      month: "short",
-                      year: "2-digit",
-                    })}
-                  </span>
-                  <div className="h-3 rounded bg-muted">
-                    <div
-                      className="h-3 rounded bg-primary"
-                      style={{ width: `${(100 * s.urlCount) / max}%` }}
-                    />
-                  </div>
-                  <span className="text-right tabular-nums">
-                    {s.urlCount.toLocaleString()}
-                  </span>
+              <div
+                key={s.scannedAt}
+                className="grid grid-cols-[75px_1fr_55px] items-center gap-2 text-xs"
+              >
+                <span>
+                  {new Date(s.scannedAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    year: "2-digit",
+                  })}
+                </span>
+                <div className="h-3 rounded bg-muted">
+                  <div
+                    className="h-3 rounded bg-primary"
+                    style={{ width: `${(100 * s.urlCount) / max}%` }}
+                  />
                 </div>
-              ))}
+                <span className="text-right tabular-nums">
+                  {s.urlCount.toLocaleString()}
+                </span>
+              </div>
+            ))}
           </div>
           {!current.complete ? (
             <p role="status" className="text-xs text-destructive">
