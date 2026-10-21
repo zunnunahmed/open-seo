@@ -1,0 +1,31 @@
+name: Format treg Backlinks Pilot Once
+on:
+  push:
+    branches: [feature/treg-backlinks-pilot]
+    paths: [.github/workflows/format-treg-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/treg-backlinks-pilot
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write docs/CUSTOM_UPDATE_SAFE_ARCHITECTURE.md src/server/custom/providers/treg/client.ts src/server/custom/providers/treg/client.test.ts
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add docs/CUSTOM_UPDATE_SAFE_ARCHITECTURE.md src/server/custom/providers/treg
+          if ! git diff --cached --quiet; then
+            git commit -m "Format treg backlinks pilot"
+            git push
+          fi
