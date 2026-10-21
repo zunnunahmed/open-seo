@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
 import {
-  getProjectContext,
+  getProjectSeoProviderPreference,
   updateProjectContext,
 } from "@/serverFunctions/projectContext";
 
