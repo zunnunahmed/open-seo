@@ -108,7 +108,8 @@ async function fetchSitemapXml(
     });
     if (![301, 302, 303, 307, 308].includes(response.status)) break;
     const location = response.headers.get("location");
-    if (!location) throw new Error(`HTTP ${response.status} missing Location header`);
+    if (!location)
+      throw new Error(`HTTP ${response.status} missing Location header`);
     current = validateSitemapUrl(new URL(location, current).href, sourceHost);
     if (hop === 3) throw new Error("Too many sitemap redirects");
   }
