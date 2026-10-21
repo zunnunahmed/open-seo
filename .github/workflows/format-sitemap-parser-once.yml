@@ -1,0 +1,28 @@
+name: Format Sitemap Parser Once
+on:
+  push:
+    branches: [feature/monthly-sitemap-monitoring]
+    paths: [.github/workflows/format-sitemap-parser-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/monthly-sitemap-monitoring
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write src/server/custom/sitemaps/crawler.ts
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add src/server/custom/sitemaps/crawler.ts
+          if ! git diff --cached --quiet; then git commit -m "Format safe sitemap crawler"; git push; fi
