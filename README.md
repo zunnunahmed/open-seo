@@ -10,6 +10,32 @@ Connect with any agent like Claude Code, OpenClaw or Hermes. We have pre-built s
 
 <img width="100%" alt="openseo-keyword-research" src="https://github.com/user-attachments/assets/8ebdc439-3e72-41ab-8bde-8cda771ef2e8" />
 
+## This Fork: Custom SEO Features and Updates
+
+This repository is **Zunnun's customized fork** of [every-app/open-seo](https://github.com/every-app/open-seo). The upstream project and its original documentation are preserved; changes below apply specifically to this fork.
+
+### Custom features
+
+- **GSC URL categories:** Performance (>1,000 clicks), Good (500–1,000), Fair (100–499), Weak (1–99), Dead (0 clicks among GSC-returned page URLs), plus suggested SEO actions.
+- **GSC Insights exports:** Category distribution chart, summary CSV, SVG chart, and one **.xlsx workbook with five category worksheets**. Current export source is limited to the first 1,000 returned page URLs, and excludes missing sitemap-only URLs.
+- **Project-level SEO data providers:** Save DataForSEO / treg / Both preference per project. The current treg research path covers Backlinks; it does not replace all OpenSEO modules.
+- **treg (Serpstat) Backlinks:** Manually requested summary, detailed referring domains/backlinks, per-project saved list snapshots, and CSV export. Individual provider queries can incur charges.
+- **Cloudflare self-host:** Production deployments are performed only through the manually confirmed GitHub workflow.
+
+### Upstream Update Manager
+
+[Full update procedure](./docs/UPSTREAM_UPDATE_MANAGER.md) · [Weekly workflow](./.github/workflows/upstream-update-review.yml) · [Update-safe architecture](./docs/CUSTOM_UPDATE_SAFE_ARCHITECTURE.md)
+
+The automated workflow checks **every Monday at 03:17 UTC** for changes to `every-app/open-seo`:
+
+1. Compare upstream `main` with this fork's `main`.
+2. If there are new upstream changes, prepare a temporary `sync/upstream-*` review branch, summarize files touching custom integrations, and attempt a merge into the **review branch only**.
+3. If conflicts occur, abort the merge and open a **blocked, report-only PR** listing conflicts. Do not merge such a PR into production.
+4. Open a pull request for review and dispatch CI on the review branch. Review migrations, security, GSC/GA4 OAuth, DataForSEO/treg routing, and existing custom exports.
+5. **Never automatically merge, approve or deploy.** Merge only after manual review and approval, then run [Cloudflare self-host deployment](./.github/workflows/selfhost-cloudflare-manual.yml) with operation `deploy` and confirmation `DEPLOY`.
+
+GitHub Actions must be permitted to create pull requests under repository Actions settings. Initial manual execution on 2026-10-21 succeeded and reported no new upstream changes to review.
+
 ## Hosted Version
 
 Try OpenSEO for free on our website. If you want to support the project, a hosted subscription is $10/month.
