@@ -329,7 +329,6 @@ export function SearchPerformancePage({
                 <GscCategoryChart
                   rows={categoriesQuery.data.rows}
                   rangeLabel={`${report.range.startDate}-to-${report.range.endDate}`}
-                  totalCount={categoriesQuery.data.rows.length}
                 />
               ) : null}
               {tab === "pages" && categoriesQuery.isPending ? (
