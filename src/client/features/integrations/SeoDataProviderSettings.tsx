@@ -16,13 +16,6 @@ function parseChoice(value: string): Choice {
   return value === "treg" || value === "both" ? value : "dataforseo";
 }
 
-function readChoice(
-  sections: { slug: string; content: string }[] | undefined,
-): Choice {
-  const stored = sections?.find((section) => section.slug === SECTION)?.content;
-  return OPTIONS.find((option) => option === stored) ?? "dataforseo";
-}
-
 /**
  * Per-project preference only. Existing API calls still use DataForSEO until
  * provider-aware billing/routing is reviewed and explicitly enabled.
@@ -33,9 +26,9 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
   const queryKey = ["seo-provider-preferences", projectId];
   const query = useQuery({
     queryKey,
-    queryFn: () => getProjectContext({ data: { projectId } }),
+    queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
   });
-  const saved = readChoice(query.data?.customSections);
+  const saved = query.data ?? "dataforseo";
   const [choice, setChoice] = useState<Choice>("dataforseo");
 
   useEffect(() => {
