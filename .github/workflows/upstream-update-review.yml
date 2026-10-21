@@ -1,0 +1,41 @@
+name: OpenSEO Upstream Update Review
+
+# Reviews upstream weekly. Never merges or deploys.
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-review
+  cancel-in-progress: false
+
+jobs:
+  upstream-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out fork's main with full history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Review upstream and open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPSTREAM_REPO: every-app/open-seo
+          BASE_BRANCH: main
+        run: bash scripts/upstream-review.sh
+
+      - name: Safety reminder
+        if: always()
+        run: |
+          echo "This workflow never merges into main or deploys Cloudflare." >> "$GITHUB_STEP_SUMMARY"
+          echo "A PR receives the repository's existing PR-triggered CI." >> "$GITHUB_STEP_SUMMARY"
