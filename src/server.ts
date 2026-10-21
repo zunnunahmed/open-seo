@@ -195,6 +195,7 @@ export { SamChatAgent } from "./server/features/sam/SamChatAgent";
 
 // Daily OAuth KV garbage collection; must match a trigger in wrangler.jsonc.
 const MCP_OAUTH_PURGE_CRON = "17 3 * * *";
+const MONTHLY_SITEMAP_CRON = "0 4 1 * *";
 
 export default {
   fetch,
@@ -203,6 +204,12 @@ export default {
     env: Env,
     _ctx: ExecutionContext,
   ) {
+    if (controller.cron === MONTHLY_SITEMAP_CRON) {
+      const { runScheduledSitemapMonitoring } =
+        await import("@/serverFunctions/sitemapMonitor");
+      await runScheduledSitemapMonitoring(env.KV);
+      return;
+    }
     if (controller.cron === MCP_OAUTH_PURGE_CRON) {
       // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
       if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {

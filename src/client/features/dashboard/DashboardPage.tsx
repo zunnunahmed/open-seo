@@ -9,6 +9,7 @@ import {
   TabsContent,
 } from "@/client/components/ui/tabs";
 import { DashboardKeywords } from "./DashboardKeywords";
+import { DashboardSitemapMonitor } from "./DashboardSitemapMonitor";
 import { DashboardBacklinks } from "./DashboardBacklinks";
 import { DashboardNewQueries } from "./DashboardNewQueries";
 import { DashboardLinkActivity } from "./DashboardLinkActivity";
@@ -97,6 +98,11 @@ export function DashboardPage({
   // Search Console always renders: connected shows the report, otherwise the
   // connect pitch. It sits ahead of the optional GA4 pitch.
   const cards = [
+    {
+      key: "sitemap",
+      hasData: true,
+      node: <DashboardSitemapMonitor projectId={projectId} />,
+    },
     {
       key: "newQueries",
       hasData: gscConnected,

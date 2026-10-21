@@ -14,6 +14,7 @@
 ## GitHub permissions required
 
 GitHub Actions → General → Workflow permissions:
+
 - Ensure the repository permits workflows to create pull requests. Depending on organization policy, enable **Allow GitHub Actions to create and approve pull requests**. The reviewer itself never approves or merges.
 - The workflow requests `contents: write`, `pull-requests: write`, and `actions: write`; it receives no Cloudflare or Google secrets.
 
