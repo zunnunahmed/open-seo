@@ -10,7 +10,7 @@ describe("treg backlinks pilot", () => {
       parseSerpstatBacklinksSummary(
         {
           result: {
-            data: { externalLinks: 120, referringDomains: 18, sdr: 37 },
+            data: { backlinks: 120, referring_domains: 18, sersptat_domain_rank: 37 },
           },
         },
         "example.com",
@@ -39,7 +39,7 @@ describe("treg backlinks pilot", () => {
     const request = vi.fn(
       async () =>
         new Response(
-          JSON.stringify({ result: { data: { externalLinks: 5 } } }),
+          JSON.stringify({ result: { data: { backlinks: 5 } } }),
           { status: 200 },
         ),
     );
