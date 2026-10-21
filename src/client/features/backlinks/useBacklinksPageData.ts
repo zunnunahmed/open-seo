@@ -34,6 +34,7 @@ type UseBacklinksPageDataArgs = {
   projectId: string;
   searchState: BacklinksSearchState;
   filters: BacklinksFiltersState;
+  enabled?: boolean;
 };
 
 // Five-minute client staleness on top of the server's 6h R2 cache, so window
@@ -74,6 +75,7 @@ export function useBacklinksPageData({
   projectId,
   searchState,
   filters,
+  enabled = true,
 }: UseBacklinksPageDataArgs) {
   const searchCardInitialValues = useMemo(
     () => ({
@@ -85,7 +87,7 @@ export function useBacklinksPageData({
 
   const { target, scope, tab, page, pageSize, sort, order, view } = searchState;
   const rowsMode = view === "all" ? "as_is" : "one_per_domain";
-  const targetReady = Boolean(target);
+  const targetReady = enabled && Boolean(target);
   const baseQueryKeyParts = [projectId, scope, target] as const;
   const pageInputBase = { projectId, target, scope, page, pageSize };
   // Keep the current table on screen while paging, sorting or filtering the
