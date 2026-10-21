@@ -10,7 +10,11 @@ describe("treg backlinks pilot", () => {
       parseSerpstatBacklinksSummary(
         {
           result: {
-            data: { backlinks: 120, referring_domains: 18, sersptat_domain_rank: 37 },
+            data: {
+              backlinks: 120,
+              referring_domains: 18,
+              sersptat_domain_rank: 37,
+            },
           },
         },
         "example.com",
@@ -38,10 +42,9 @@ describe("treg backlinks pilot", () => {
   it("sends token only in a server-side header and never retries", async () => {
     const request = vi.fn<typeof fetch>(
       async () =>
-        new Response(
-          JSON.stringify({ result: { data: { backlinks: 5 } } }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ result: { data: { backlinks: 5 } } }), {
+          status: 200,
+        }),
     );
     await fetchTregBacklinksSummary("example.com", {
       token: "private-test-token",
@@ -51,7 +54,9 @@ describe("treg backlinks pilot", () => {
     const [url, options] = request.mock.calls[0] ?? [];
     expect(options).toBeDefined();
     expect(url).toBe("https://treg.to/call/serpstat.web.backlinks.summary");
-    expect(new Headers(options?.headers).get("X-Treg-Token")).toBe("private-test-token");
+    expect(new Headers(options?.headers).get("X-Treg-Token")).toBe(
+      "private-test-token",
+    );
     expect(String(options?.body)).not.toContain("private-test-token");
   });
 
@@ -67,7 +72,9 @@ describe("treg backlinks pilot", () => {
   });
 
   it("does not retry on a provider failure", async () => {
-    const request = vi.fn<typeof fetch>(async () => new Response("denied", { status: 429 }));
+    const request = vi.fn<typeof fetch>(
+      async () => new Response("denied", { status: 429 }),
+    );
     await expect(
       fetchTregBacklinksSummary("example.com", {
         token: "test",

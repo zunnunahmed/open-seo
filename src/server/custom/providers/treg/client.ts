@@ -34,12 +34,14 @@ export function parseSerpstatBacklinksSummary(
   target: string,
   now = new Date(),
 ): TregBacklinksSummary {
-  const response = z.object({
-    error: z.unknown().optional(),
-    result: z.object({
-      data: z.record(z.string(), z.unknown()),
-    }),
-  }).parse(body);
+  const response = z
+    .object({
+      error: z.unknown().optional(),
+      result: z.object({
+        data: z.record(z.string(), z.unknown()),
+      }),
+    })
+    .parse(body);
   if (response.error != null) {
     throw new Error("treg provider returned an error");
   }
