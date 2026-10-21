@@ -74,6 +74,7 @@ jobs:
           GOOGLE_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          TREG_TOKEN: ${{ secrets.TREG_API_TOKEN }}
         run: |
           if [ "$CONFIRM" != "DEPLOY" ]; then echo "::error::Enter DEPLOY to authorize a deployment"; exit 1; fi
           for name in CF_TOKEN CF_ACCOUNT DFS_KEY ALLOWED_EMAILS; do
@@ -100,6 +101,9 @@ jobs:
           from pathlib import Path
           values = {'DATAFORSEO_API_KEY': os.environ['DFS_KEY'],
                     'ACCESS_ALLOWED_EMAILS': os.environ['ALLOWED_EMAILS']}
+          if os.environ.get('TREG_TOKEN'):
+              values['TREG_API_TOKEN'] = os.environ['TREG_TOKEN']
+              values['CUSTOM_TREG_ENABLED'] = 'true'
           if os.environ.get('GOOGLE_ID'):
               values.update(GOOGLE_CLIENT_ID=os.environ['GOOGLE_ID'], GOOGLE_CLIENT_SECRET=os.environ['GOOGLE_SECRET'], BETTER_AUTH_SECRET=os.environ['AUTH_SECRET'])
           if any(('\n' in v or '\r' in v) for v in values.values()):

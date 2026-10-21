@@ -1,4 +1,7 @@
 import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getProjectSeoProviderPreference } from "@/serverFunctions/projectContext";
+import { TregBacklinksSummaryCard } from "./TregBacklinksSummaryCard";
 import type { SortingState, Updater } from "@tanstack/react-table";
 import { BackLink, PageHeader } from "@/client/components/PageHeader";
 import { BacklinksSearchCard } from "./BacklinksSearchCard";
@@ -24,6 +27,12 @@ export function BacklinksPage({
   navigate,
 }: BacklinksPageProps) {
   const filters = useBacklinksFilters();
+  const providerQuery = useQuery({
+    queryKey: ["seo-provider-preferences", projectId],
+    queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
+  });
+  const showDataForSeo =
+    providerQuery.isSuccess && providerQuery.data !== "treg";
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -55,7 +64,12 @@ export function BacklinksPage({
     [sorting, updateSearch],
   );
 
-  const data = useBacklinksPageData({ projectId, searchState, filters });
+  const data = useBacklinksPageData({
+    projectId,
+    searchState,
+    filters,
+    enabled: showDataForSeo,
+  });
 
   const domainExpansion = useBacklinksDomainExpansion({
     projectId,
@@ -139,46 +153,61 @@ export function BacklinksPage({
           }}
         />
 
-        <BacklinksBody
-          projectId={projectId}
-          history={history}
-          historyLoaded={historyLoaded}
-          data={data}
-          searchState={searchState}
-          filters={filters}
-          sorting={sorting}
-          domainExpansion={domainExpansion}
-          searchTabs={searchTabs}
-          onPageChange={(nextPage) =>
-            updateSearch({ page: nextPage === 1 ? undefined : nextPage })
-          }
-          onPageSizeChange={(nextPageSize) =>
-            updateSearch({
-              size:
-                nextPageSize === DEFAULT_BACKLINKS_PAGE_SIZE
-                  ? undefined
-                  : nextPageSize,
-              page: undefined,
-            })
-          }
-          onRemoveHistoryItem={removeHistoryItem}
-          onSortingChange={handleSortingChange}
-          onTabChange={(tab) =>
-            updateSearch({
-              tab: tab === "backlinks" ? undefined : tab,
-              page: undefined,
-              sort: undefined,
-              order: undefined,
-            })
-          }
-          onViewChange={(view) => updateSearch({ view, page: undefined })}
-          onHideSpamChange={(hideSpam) =>
-            updateSearch({
-              includeSpam: hideSpam ? undefined : true,
-              page: undefined,
-            })
-          }
-        />
+        {providerQuery.isPending ? (
+          <p role="status">Loading project data provider settings…</p>
+        ) : providerQuery.isError ? (
+          <p role="alert">
+            Could not load provider settings. Research queries are paused.
+          </p>
+        ) : null}
+        {providerQuery.data === "treg" || providerQuery.data === "both" ? (
+          <TregBacklinksSummaryCard
+            projectId={projectId}
+            target={searchState.target}
+          />
+        ) : null}
+        {showDataForSeo ? (
+          <BacklinksBody
+            projectId={projectId}
+            history={history}
+            historyLoaded={historyLoaded}
+            data={data}
+            searchState={searchState}
+            filters={filters}
+            sorting={sorting}
+            domainExpansion={domainExpansion}
+            searchTabs={searchTabs}
+            onPageChange={(nextPage) =>
+              updateSearch({ page: nextPage === 1 ? undefined : nextPage })
+            }
+            onPageSizeChange={(nextPageSize) =>
+              updateSearch({
+                size:
+                  nextPageSize === DEFAULT_BACKLINKS_PAGE_SIZE
+                    ? undefined
+                    : nextPageSize,
+                page: undefined,
+              })
+            }
+            onRemoveHistoryItem={removeHistoryItem}
+            onSortingChange={handleSortingChange}
+            onTabChange={(tab) =>
+              updateSearch({
+                tab: tab === "backlinks" ? undefined : tab,
+                page: undefined,
+                sort: undefined,
+                order: undefined,
+              })
+            }
+            onViewChange={(view) => updateSearch({ view, page: undefined })}
+            onHideSpamChange={(hideSpam) =>
+              updateSearch({
+                includeSpam: hideSpam ? undefined : true,
+                page: undefined,
+              })
+            }
+          />
+        ) : null}
       </div>
     </div>
   );
