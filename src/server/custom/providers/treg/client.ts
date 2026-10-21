@@ -2,12 +2,10 @@
  * Isolated treg transport. Never expose TREG_API_TOKEN to browser code.
  * Calls are opt-in and are NEVER retried automatically (provider may charge).
  */
-import { getOptionalEnvValue } from "@/server/lib/runtime-env";
+const TREG_BACKLINKS_ENDPOINT = "serpstat.web.backlinks.summary";
+const TREG_BACKLINKS_ESTIMATED_USD = 0.0025;
 
-export const TREG_BACKLINKS_ENDPOINT = "serpstat.web.backlinks.summary";
-export const TREG_BACKLINKS_ESTIMATED_USD = 0.0025;
-
-export type TregBacklinksSummary = {
+type TregBacklinksSummary = {
   provider: "serpstat-via-treg";
   target: string;
   backlinks: number | null;
@@ -98,14 +96,3 @@ export async function fetchTregBacklinksSummary(
   );
 }
 
-/** Explicit opt-in; the existing DataForSEO workflow never calls this. */
-export async function getOptionalTregBacklinksSummary(
-  target: string,
-): Promise<TregBacklinksSummary> {
-  if ((await getOptionalEnvValue("CUSTOM_TREG_ENABLED")) !== "true") {
-    throw new Error("treg pilot disabled");
-  }
-  const token = await getOptionalEnvValue("TREG_API_TOKEN");
-  if (!token) throw new Error("TREG_API_TOKEN is not configured");
-  return fetchTregBacklinksSummary(target, { token });
-}
