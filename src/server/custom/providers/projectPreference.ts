@@ -1,7 +1,7 @@
 import { ProjectContextRepository } from "@/server/features/project-context/repositories/ProjectContextRepository";
 
-export type SeoProviderPreference = "dataforseo" | "treg" | "both";
-export const SEO_PROVIDER_SECTION_KEY = "custom:seo-data-providers";
+type SeoProviderPreference = "dataforseo" | "treg" | "both";
+const SEO_PROVIDER_SECTION_KEY = "custom:seo-data-providers";
 
 export function parseSeoProviderPreference(
   value: string | null | undefined,
