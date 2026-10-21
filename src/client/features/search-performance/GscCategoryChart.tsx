@@ -3,7 +3,6 @@ import { Button } from "@/client/components/ui/button";
 import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { SearchPerformanceTableRow } from "@/client/features/search-performance/SearchPerformanceColumns";
 import { buildCategoryWorkbook } from "@/client/features/search-performance/categoryWorkbook";
-import { downloadFile } from "@/client/lib/download";
 import { exportRows } from "@/client/lib/exportRows";
 
 const ORDER = ["Performance", "Good", "Fair", "Weak", "Dead"] as const;
@@ -64,11 +63,14 @@ export function GscCategoryChart({
       ],
     }));
     const content = buildCategoryWorkbook(sheets);
-    downloadFile(
-      content,
-      `gsc-urls-by-category-${rangeLabel}.xlsx`,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    );
+    const url = URL.createObjectURL(new Blob([new Uint8Array(content)], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `gsc-urls-by-category-${rangeLabel}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
   const downloadSvg = () => {
     const bars = summary
