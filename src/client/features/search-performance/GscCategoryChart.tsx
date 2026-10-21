@@ -12,10 +12,9 @@ export function aggregatePageCategories(rows: Pick<SearchPerformanceTableRow,"cl
   return ORDER.map(category=>({category,count:counts[category]}));
 }
 
-export function GscCategoryChart({rows,rangeLabel,totalCount}:{
+export function GscCategoryChart({rows,rangeLabel}:{
   rows:SearchPerformanceTableRow[];
   rangeLabel:string;
-  totalCount:number;
 }) {
   const summary=useMemo(()=>aggregatePageCategories(rows),[rows]);
   const largest=Math.max(1,...summary.map(x=>x.count));
