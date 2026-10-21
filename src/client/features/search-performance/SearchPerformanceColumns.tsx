@@ -1,3 +1,4 @@
+import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { MutableRefObject } from "react";
 import { makeSelectionColumn } from "@/client/components/table/DataTable";
@@ -75,6 +76,16 @@ export function buildDimensionColumns(
       cell: ({ getValue }) => formatCtr(getValue()),
       meta: rightAligned,
     }),
+    ...(keyLabel === "Page" ? [
+      dimensionHelper.display({
+        id: "performanceCategory", header: "Category",
+        cell: ({ row }) => classifyGscUrl(row.original.clicks).category,
+      }),
+      dimensionHelper.display({
+        id: "seoAction", header: "SEO action",
+        cell: ({ row }) => classifyGscUrl(row.original.clicks).action,
+      }),
+    ] : []),
     dimensionHelper.accessor("position", {
       header: ({ column }) => (
         <SortableHeader column={column} label="Position" align="right" />
