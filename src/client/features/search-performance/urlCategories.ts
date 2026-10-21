@@ -1,15 +1,15 @@
 /** Click-based GSC URL performance categories for the selected report date range.
  * Thresholds are mutually exclusive. Missing GSC rows are NOT dead URLs.
  */
-export const GSC_URL_CATEGORIES = [
+const GSC_URL_CATEGORIES = [
   "Performance",
   "Good",
   "Fair",
   "Weak",
   "Dead",
 ] as const;
-export type GscUrlCategory = (typeof GSC_URL_CATEGORIES)[number];
-export type GscUrlAssessment = { category: GscUrlCategory; action: string };
+type GscUrlCategory = (typeof GSC_URL_CATEGORIES)[number];
+type GscUrlAssessment = { category: GscUrlCategory; action: string };
 
 export function classifyGscUrl(clicks: number): GscUrlAssessment {
   if (!Number.isFinite(clicks) || clicks < 0)
