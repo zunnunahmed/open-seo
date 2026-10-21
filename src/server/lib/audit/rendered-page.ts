@@ -61,10 +61,37 @@ async function readProviderJson(
  * The rendered HTML to analyze: the same first 1 MiB the direct crawl keeps,
  * which still holds the metadata and navigation the audit reads.
  */
+function stripTrailingSlashForCompare(normalized: string): string {
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.pathname.length > 1 && parsed.pathname.endsWith("/")) {
+      parsed.pathname = parsed.pathname.slice(0, -1);
+    }
+    // www vs non-www and http->https are the site's canonical redirects, not
+    // a different page substituted by the renderer.
+    parsed.protocol = "https:";
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    return parsed.toString();
+  } catch {
+    return normalized;
+  }
+}
+
 function usableHtml(url: string, finalUrl: string, html: string) {
   // The existing direct fetch records redirects one hop at a time. A browser
   // must not silently substitute another URL's content into this page row.
-  if (normalizeUrl(finalUrl, url) !== normalizeUrl(url, url)) {
+  // Compare canonically: ignore a trailing-slash difference (/about vs
+  // /about/), www and http->https upgrades, which are the site's own
+  // canonical redirects, not a wrong page.
+  const want = normalizeUrl(url, url);
+  const got = normalizeUrl(finalUrl, url);
+  if (
+    got !== want &&
+    (got === null ||
+      want === null ||
+      stripTrailingSlashForCompare(got) !==
+        stripTrailingSlashForCompare(want))
+  ) {
     throw new Error("Rendering returned a different URL");
   }
   if (!html.trim()) throw new Error("Rendered HTML is empty");
