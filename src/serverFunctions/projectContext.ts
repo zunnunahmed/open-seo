@@ -31,4 +31,6 @@ export const updateProjectContext = createServerFn({ method: "POST" })
 export const getProjectSeoProviderPreference = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(getProjectContextSchema)
-  .handler(async ({ context }) => getSeoProviderPreference(context.projectId));
+  .handler(async ({ context }) =>
+    getSeoProviderPreference(context.projectId),
+  );
