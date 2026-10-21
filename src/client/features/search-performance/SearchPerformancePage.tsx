@@ -280,7 +280,7 @@ export function SearchPerformancePage({
                     : `Striking distance (${report.strikingDistance.length})`}
                 </TabsTrigger>
                 <TabsTrigger value="queries">Queries</TabsTrigger>
-                <TabsTrigger value="pages">Pages</TabsTrigger>
+                <TabsTrigger value="pages">Pages (URL categories)</TabsTrigger>
               </DataTableTabs>
               <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
                 <Button
@@ -308,6 +308,11 @@ export function SearchPerformancePage({
                 />
               </div>
 
+              {tab === "pages" ? (
+                <p className="px-4 pt-3 text-xs text-muted-foreground">
+                  URL categories use clicks in the selected date range: Performance &gt;1,000; Good 500–1,000; Fair 100–499; Weak 1–99; Dead 0. Dead applies only to URLs returned by GSC, not missing sitemap pages.
+                </p>
+              ) : null}
               {showFilters ? filtersPanel : null}
               {reportQuery.isPlaceholderData ? (
                 <div className="p-8 text-sm" role="status">
