@@ -1,0 +1,28 @@
+name: Format treg Lists Final
+on:
+  push:
+    branches: [feature/treg-backlink-lists-snapshots]
+    paths: [.github/workflows/format-treg-lists-final.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/treg-backlink-lists-snapshots
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write src/server/custom/providers/treg/lists.ts src/serverFunctions/tregLists.ts src/client/features/backlinks/TregSavedLists.tsx src/client/features/backlinks/BacklinksPage.tsx
+      - run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add src/server/custom/providers/treg/lists.ts src/serverFunctions/tregLists.ts src/client/features/backlinks
+          if ! git diff --cached --quiet; then git commit -m "Format final treg list code"; git push; fi
