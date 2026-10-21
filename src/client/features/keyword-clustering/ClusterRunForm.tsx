@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { FileSpreadsheet, Upload, X } from "lucide-react";
 import Papa from "papaparse";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
@@ -30,6 +31,7 @@ export function ClusterRunForm({
   const [text, setText] = useState("");
   const [uploaded, setUploaded] = useState<ClusterInputKeyword[] | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [market, setMarket] = useState<{
     locationCode: number;
     languageCode: string;
@@ -86,9 +88,8 @@ export function ClusterRunForm({
       <div className="space-y-4 text-sm">
         <p className="text-muted-foreground">
           Keywords that share enough of the same top-10 Google results target
-          the same intent, so they belong on one page. Paste one keyword per
-          line (optionally followed by a tab or comma and the search volume,
-          then CPC), or upload a CSV with a keyword column.
+          the same intent, so they belong on one page. Paste up to 5,000
+          keywords or upload a CSV.
         </p>
         <label className="block space-y-1">
           <span className="font-medium">Run name (optional)</span>
@@ -99,43 +100,71 @@ export function ClusterRunForm({
             placeholder="e.g. Plumbing services AU"
           />
         </label>
-        {uploaded ? (
-          <div className="flex flex-wrap items-center gap-2 rounded-md border p-3">
-            <span>
-              {fileName}: {uploaded.length.toLocaleString()} rows
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setUploaded(null);
-                setFileName(null);
-              }}
-            >
-              Remove file
-            </Button>
-          </div>
-        ) : (
-          <label className="block space-y-1">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-end justify-between gap-2">
             <span className="font-medium">Keywords</span>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                onFile(e.target.files?.[0]);
+                // Allow choosing the same file again after removing it.
+                e.target.value = "";
+              }}
+            />
+            {!uploaded ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInput.current?.click()}
+              >
+                <Upload className="size-4" />
+                Upload CSV
+              </Button>
+            ) : null}
+          </div>
+          {uploaded ? (
+            <div className="flex items-center gap-3 rounded-md border bg-muted/40 p-3">
+              <FileSpreadsheet className="size-5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{fileName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {uploaded.length.toLocaleString()} rows read
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setUploaded(null);
+                  setFileName(null);
+                }}
+              >
+                <X className="size-4" />
+                Remove
+              </Button>
+            </div>
+          ) : (
             <Textarea
               rows={10}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              aria-label="Keywords, one per line"
               placeholder={
-                "emergency plumber sydney\t1900\nblocked drain sydney\t880"
+                "One keyword per line, for example:\nemergency plumber sydney\nblocked drain sydney, 880\nhot water repairs, 1300, 12.50"
               }
             />
-          </label>
-        )}
-        <label className="block space-y-1">
-          <span className="font-medium">Or upload CSV</span>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => onFile(e.target.files?.[0])}
-          />
-        </label>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {uploaded
+              ? "Clustering uses the keyword column from this file. Remove it to paste keywords instead."
+              : "Optional: add search volume and CPC after a comma or tab (pasting from a spreadsheet works). CSV files need a keyword or query column; volume and CPC columns are optional."}
+          </p>
+        </div>
         {activeMarket ? (
           <ProjectMarketFields value={activeMarket} onChange={setMarket} />
         ) : null}
