@@ -67,7 +67,9 @@ export async function fetchTregBacklinksSummary(
   target: string,
   options: TregRequestOptions,
 ): Promise<TregBacklinksSummary> {
-  if (!/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(target)) {
+  if (
+    !/^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(target)
+  ) {
     throw new Error("treg backlink pilot accepts a bare domain only");
   }
   if (!options.token) throw new Error("Missing treg token");
@@ -87,7 +89,8 @@ export async function fetchTregBacklinksSummary(
       signal: AbortSignal.timeout(15_000),
     },
   );
-  if (!response.ok) throw new Error(`treg request failed (HTTP ${response.status})`);
+  if (!response.ok)
+    throw new Error(`treg request failed (HTTP ${response.status})`);
   return parseSerpstatBacklinksSummary(
     await response.json(),
     target,

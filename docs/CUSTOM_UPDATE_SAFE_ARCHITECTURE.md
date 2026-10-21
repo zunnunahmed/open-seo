@@ -75,6 +75,7 @@ Important: treg's provider catalog prices and exact token authentication must be
 8. Smoke-test live site; revert to last good commit and redeploy if safe. Be aware code rollback does not automatically roll back D1 schema/data.
 
 Recommended branches:
+
 - `main`: production release source.
 - `feature/treg-provider`: new work, via pull requests.
 - `sync/upstream-YYYYMMDD`: temporary merge validation; no automatic deployment.
