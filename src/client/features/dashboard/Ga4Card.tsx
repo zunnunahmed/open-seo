@@ -89,9 +89,25 @@ export function Ga4Card({
           <Skeleton className="h-24" />
         </div>
       ) : "unavailable" in report ? (
-        <p role="alert" className="text-sm text-destructive">
-          {report.unavailable}
-        </p>
+        <div role="alert" className="space-y-2 text-sm">
+          <p className="text-destructive">{report.unavailable}</p>
+          {report.unavailable?.includes("Data API is not enabled") ? (
+            <>
+              <a
+                href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-block font-medium underline"
+              >
+                Enable the Google Analytics Data API
+              </a>
+              <p className="text-xs text-muted-foreground">
+                Enable it in the Google Cloud project that owns this
+                deployment&rsquo;s OAuth client, then reload.
+              </p>
+            </>
+          ) : null}
+        </div>
       ) : !report.totals.sessions ? (
         <p className="text-sm text-muted-foreground">
           No organic search traffic recorded in the last 28 days yet.
