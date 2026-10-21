@@ -1,3 +1,4 @@
+import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
 import { createServerFn } from "@tanstack/react-start";
 import { ProjectContextService } from "@/server/features/project-context/services/ProjectContextService";
 import { requireProjectContext } from "@/serverFunctions/middleware";
@@ -26,3 +27,10 @@ export const updateProjectContext = createServerFn({ method: "POST" })
       "user",
     ),
   );
+
+export const getProjectSeoProviderPreference = createServerFn({
+  method: "POST",
+})
+  .middleware(requireProjectContext)
+  .validator(getProjectContextSchema)
+  .handler(async ({ context }) => getSeoProviderPreference(context.projectId));
