@@ -81,7 +81,7 @@ export function DashboardSitemapMonitor({ projectId }: { projectId: string }) {
           >
             {history
               .slice(0, 12)
-              .reverse()
+              .toReversed()
               .map((s) => (
                 <div
                   key={s.scannedAt}
