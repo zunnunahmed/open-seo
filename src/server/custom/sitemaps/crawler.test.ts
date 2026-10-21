@@ -21,7 +21,7 @@ describe("sitemap monitor", () => {
         "<urlset><url><loc>https://example.com/a</loc></url><url><loc>https://example.com/c</loc></url></urlset>"],
     ]);
     const fetcher = vi.fn<typeof fetch>(async (input) => {
-      const body = pages.get(String(input));
+      const body = pages.get(input instanceof Request ? input.url : input instanceof URL ? input.href : input);
       return body ? new Response(body, {status: 200}) : new Response("", {status: 404});
     });
     const result = await crawlSitemaps("example.com", "https://example.com/sitemap.xml", fetcher);
