@@ -55,7 +55,21 @@ export const configureSitemapMonitor = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(setting)
   .handler(async ({ data, context }) => {
-    const domain = normalizeDomain(context.project.domain ?? "");
+    // Without a project domain, the sitemap URL's host becomes the monitored domain.
+    let domain: string;
+    if (context.project.domain) {
+      domain = normalizeDomain(context.project.domain);
+    } else {
+      if (!data.sitemapUrl)
+        throw new Error("Enter a sitemap URL or set a project domain");
+      let host: string;
+      try {
+        host = new URL(data.sitemapUrl).hostname;
+      } catch {
+        throw new Error("Enter a valid sitemap URL");
+      }
+      domain = normalizeDomain(host);
+    }
     const sitemapUrl = validateSitemapUrl(
       data.sitemapUrl || `https://${domain}/sitemap.xml`,
       domain,
@@ -71,7 +85,9 @@ export const scanSitemapNow = createServerFn({ method: "POST" })
     const raw = await env.KV.get(key(context.projectId));
     if (!raw) throw new Error("Configure the sitemap monitor first");
     const config = configSchema.parse(JSON.parse(raw) as unknown);
-    const domain = normalizeDomain(context.project.domain ?? "");
+    const domain = context.project.domain
+      ? normalizeDomain(context.project.domain)
+      : config.domain;
     if (domain !== config.domain)
       throw new Error("Project domain changed; update sitemap configuration");
     const previous = await history(context.projectId);

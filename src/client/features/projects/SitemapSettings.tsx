@@ -32,7 +32,7 @@ export function SitemapSettings({
   const save = useMutation({
     mutationFn: () =>
       configureSitemapMonitor({
-        data: { projectId, sitemapUrl: url, enabled },
+        data: { projectId, sitemapUrl: url.trim(), enabled },
       }),
     onSuccess: () => void client.invalidateQueries({ queryKey }),
   });
@@ -57,9 +57,13 @@ export function SitemapSettings({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/sitemap.xml"
-          disabled={!domain}
         />
       </label>
+      {!domain ? (
+        <p className="text-xs text-muted-foreground">
+          No project domain is set, so the sitemap URL's domain is monitored.
+        </p>
+      ) : null}
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -70,7 +74,7 @@ export function SitemapSettings({
       </label>
       <div className="flex flex-wrap gap-2">
         <Button
-          disabled={!domain || save.isPending}
+          disabled={(!domain && !url.trim()) || save.isPending}
           onClick={() => save.mutate()}
         >
           Save sitemap settings
