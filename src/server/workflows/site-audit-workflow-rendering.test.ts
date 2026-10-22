@@ -136,15 +136,33 @@ describe("crawlPage with JavaScript rendering", () => {
     },
   );
 
-  it("keeps a failed render as an unread page rather than auditing the HTML shell", async () => {
+  it("falls back to the direct HTML when rendering fails on a readable page", async () => {
     stubFetch({ status: 200 });
     const render = rendered();
     render.mockRejectedValue(new Error("Unable to render this page"));
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await crawl(render)).toMatchObject({
-      fetchClass: "error",
-      isHtml: false,
-      wordCount: 0,
+      title: "A page",
+      statusCode: 200,
+      fetchClass: "ok",
+      isHtml: true,
+    });
+  });
+
+  it("flags the direct HTML as a possible app shell when rendering fails on a shell", async () => {
+    const shell =
+      '<div id="root">Loading...</div><script src="/app.js"></script>';
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(shell, { headers: { "content-type": "text/html" } }),
+    );
+    const render = rendered();
+    render.mockRejectedValue(new Error("Unable to render this page"));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await crawl(render)).toMatchObject({
+      statusCode: 200,
+      fetchClass: "ok",
+      javascriptShell: true,
     });
   });
 });

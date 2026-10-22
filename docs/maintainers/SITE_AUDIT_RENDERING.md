@@ -50,11 +50,13 @@ worker. The auth mode says nothing about which renderer exists.
    require JavaScript" warning as an unrendered shell.
 
 A render that fails on every available renderer, or returns an unusable
-document (wrong final URL, empty, still loading), makes the page an unread
-`error` page. A challenge that neither renderer passes stays `blocked`. A
+document (wrong final URL, empty, still loading), falls back to the direct
+body. The direct fetch already proved the page readable, so a failed
+enhancement never turns it into an unread `error` page; if that direct body
+is only a loading shell, the same shell warning applies instead of content
+checks. A challenge that neither renderer passes stays `blocked`. A
 rendered document over 1 MiB keeps its first 1 MiB, the same bound the direct
-crawl reads. The audit never audits the unrendered shell in its place, and paid
-calls are never retried automatically.
+crawl reads. Paid calls are never retried automatically.
 
 ## Throttled Shopify storefronts
 

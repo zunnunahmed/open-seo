@@ -162,12 +162,18 @@ export async function crawlPage(
         // The renderer can be challenged where the direct fetch was not.
         fetchClass = classifyFetch(statusCode, false, body.slice(0, 4_000));
       } catch (error) {
-        // A challenge that neither renderer passed stays blocked.
-        if (!challenged && !throttled) throw error;
-        // A throttled page neither renderer read stays rate limited, and
-        // pauses or stops the crawl like any other 429.
-        if (throttled)
+        // A challenge that neither renderer passed stays blocked, and a
+        // throttled page neither renderer read stays rate limited (with the
+        // shared backoff applied above). But a readable page whose render
+        // merely failed keeps its direct body: the fetch already proved the
+        // page readable, and the app-shell check flags it if the direct HTML
+        // is only a loading shell. A failed enhancement must never turn a
+        // readable page into an unread error.
+        if (!challenged && !throttled) {
+          console.warn(`Render failed for ${url}, using direct HTML:`, error);
+        } else if (throttled) {
           await throttle.backoff(1, response.headers.get("retry-after"));
+        }
       }
     }
 
