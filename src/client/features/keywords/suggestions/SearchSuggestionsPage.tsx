@@ -144,13 +144,13 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               value={seedsText}
               onChange={(event) => setSeedsText(event.target.value)}
               placeholder={"ai automation agency\ncrm automation"}
-              rows={3}
+              rows={2}
             />
           </div>
-          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex min-w-0 flex-wrap items-end gap-4">
             {mode === "free" ? (
               <>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex w-full flex-col gap-1.5 sm:w-52">
                   <Label htmlFor="suggestion-country">Country</Label>
                   <Select
                     items={COUNTRY_OPTIONS.map((country) => ({
@@ -174,7 +174,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex w-full flex-col gap-1.5 sm:w-28">
                   <Label htmlFor="suggestion-hl">Language (HL)</Label>
                   <Input
                     id="suggestion-hl"
@@ -182,6 +182,15 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                     maxLength={5}
                     onChange={(event) => setHl(event.target.value)}
                   />
+                </div>
+                <div className="pb-0.5">
+                  <Button
+                    disabled={!canMine}
+                    pending={freeMutation.isPending}
+                    onClick={runMine}
+                  >
+                    Mine suggestions
+                  </Button>
                 </div>
               </>
             ) : null}
@@ -212,15 +221,17 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               </label>
             ))}
           </div>
-          <div>
-            <Button
-              disabled={!canMine}
-              pending={freeMutation.isPending || dfsMutation.isPending}
-              onClick={runMine}
-            >
-              {mode === "free" ? "Mine suggestions" : "Get suggestions"}
-            </Button>
-          </div>
+          {mode === "dataforseo" ? (
+            <div>
+              <Button
+                disabled={!canMine}
+                pending={dfsMutation.isPending}
+                onClick={runMine}
+              >
+                Get suggestions
+              </Button>
+            </div>
+          ) : null}
           {freeMutation.isError ? (
             <ErrorState
               title="Suggestions failed"
