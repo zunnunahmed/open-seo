@@ -267,7 +267,13 @@ export async function crawlPage(
     // error that lets the scheduler continue making requests.
     if (throttle.checkpointFailed) throw error;
     const responseTimeMs = Date.now() - startTime;
-    console.warn(`Failed to crawl ${url}:`, error);
+    // Render failures no longer reach here (readable pages fall back to the
+    // direct body), so a failure here is always the direct fetch: log the
+    // reason class, never the body, so Worker logs explain future failures.
+    console.warn(
+      `Failed to crawl ${url} (fetch, ${responseTimeMs}ms):`,
+      error instanceof Error ? error.message : error,
+    );
     return emptyPageResult({
       url,
       statusCode: 0,
