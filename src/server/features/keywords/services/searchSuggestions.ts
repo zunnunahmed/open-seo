@@ -5,14 +5,18 @@ import { sort } from "remeda";
  *
  * Expands each seed keyword with a modifier placed BEFORE and AFTER it
  * (letters a–z, question words, commercial terms) and reads the live
- * suggestions Google returns for every expansion via the public suggest
- * endpoint. Free — no DataForSEO credit involved.
+ * autocomplete suggestions for every expansion. Free — no DataForSEO credit
+ * involved.
+ *
+ * Google rate-limits datacenter IPs, so the run starts with a one-query
+ * probe per provider (Google → DuckDuckGo → Yahoo) and mines everything
+ * through the first provider that answers with data. The answering provider
+ * is reported back so the UI can label the source honestly.
  */
 
-const SUGGEST_ENDPOINT = "https://suggestqueries.google.com/complete/search";
 const REQUEST_TIMEOUT_MS = 8_000;
-/** Parallel suggest requests; the endpoint is free but rate-limits bursts. */
-const MAX_CONCURRENT_REQUESTS = 5;
+/** Parallel suggest requests; modest bursts stay under rate limits. */
+const MAX_CONCURRENT_REQUESTS = 3;
 /** Hard cap on expansions per mining run so 3 long seeds can't fan out. */
 const MAX_EXPANSIONS = 300;
 
@@ -53,6 +57,14 @@ export const SUGGESTION_MODIFIER_GROUPS = {
 export type SuggestionModifierGroup = keyof typeof SUGGESTION_MODIFIER_GROUPS;
 export type SuggestionPlacement = "before" | "after";
 
+export type SuggestSource = "google" | "duckduckgo" | "yahoo";
+
+export const SUGGEST_SOURCE_LABELS: Record<SuggestSource, string> = {
+  google: "Google",
+  duckduckgo: "DuckDuckGo",
+  yahoo: "Yahoo",
+};
+
 export type SuggestionExpansion = {
   query: string;
   placement: SuggestionPlacement;
@@ -66,6 +78,12 @@ export type SuggestionRow = {
   modifier: string;
   seed: string;
   query: string;
+};
+
+export type SuggestProbeEntry = {
+  source: SuggestSource;
+  /** "ok", "empty", "http 429", or "error". */
+  result: string;
 };
 
 /** Every modifier crossed with one seed, modifier first then seed last. */
@@ -82,28 +100,79 @@ export function expandSeed(
   ]);
 }
 
-/** Live suggestions for one query; never throws — failures read as no data. */
-async function fetchGoogleSuggestions(
+function endpointUrl(
+  source: SuggestSource,
   query: string,
   hl: string,
   gl: string,
-): Promise<string[]> {
-  const url =
-    `${SUGGEST_ENDPOINT}?` +
-    new URLSearchParams({ client: "firefox", q: query, hl, gl }).toString();
+): string {
+  if (source === "duckduckgo") {
+    return (
+      `https://duckduckgo.com/ac/?` +
+      new URLSearchParams({ q: query, kl: `${gl}-${hl}` }).toString()
+    );
+  }
+  if (source === "yahoo") {
+    return (
+      `https://search.yahoo.com/sugg/chrome?` +
+      new URLSearchParams({ output: "fxjson", command: query }).toString()
+    );
+  }
+  return (
+    `https://suggestqueries.google.com/complete/search?` +
+    new URLSearchParams({ client: "firefox", q: query, hl, gl }).toString()
+  );
+}
+
+function parseSuggestions(source: SuggestSource, json: unknown): string[] {
+  if (source === "duckduckgo") {
+    if (!Array.isArray(json)) return [];
+    return json
+      .map((entry) =>
+        typeof entry === "object" && entry !== null
+          ? (entry as { phrase?: unknown }).phrase
+          : null,
+      )
+      .filter(
+        (phrase): phrase is string =>
+          typeof phrase === "string" && phrase.length > 0,
+      );
+  }
+  // Google (client=firefox) and Yahoo (output=fxjson) both answer
+  // ["query", ["suggestion", ...], ...].
+  if (!Array.isArray(json) || !Array.isArray(json[1])) return [];
+  return (json[1] as unknown[]).filter(
+    (entry): entry is string =>
+      typeof entry === "string" && entry.length > 0,
+  );
+}
+
+export type SuggestFetchOutcome = {
+  suggestions: string[];
+  /** "ok", "empty", "http <status>", or "error". */
+  result: string;
+};
+
+/** One autocomplete lookup. Never throws — failures read as empty. */
+export async function fetchSuggestions(
+  source: SuggestSource,
+  query: string,
+  hl: string,
+  gl: string,
+): Promise<SuggestFetchOutcome> {
   try {
-    const response = await fetch(url, {
+    const response = await fetch(endpointUrl(source, query, hl, gl), {
       headers: { "User-Agent": BROWSER_USER_AGENT },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-    if (!response.ok) return [];
-    const data: unknown = await response.json();
-    if (!Array.isArray(data) || !Array.isArray(data[1])) return [];
-    return data[1].filter(
-      (entry): entry is string => typeof entry === "string" && entry.length > 0,
-    );
+    if (!response.ok) return { suggestions: [], result: `http ${response.status}` };
+    const suggestions = parseSuggestions(source, await response.json());
+    return {
+      suggestions,
+      result: suggestions.length > 0 ? "ok" : "empty",
+    };
   } catch {
-    return [];
+    return { suggestions: [], result: "error" };
   }
 }
 
@@ -116,10 +185,36 @@ export async function mineSearchSuggestions(input: {
   rows: SuggestionRow[];
   queriesRun: number;
   seedsMined: string[];
+  /** The provider that actually answered, or null when none did. */
+  source: SuggestSource | null;
+  probeLog: SuggestProbeEntry[];
 }> {
   const seeds = [...new Set(input.seeds.map((seed) => seed.trim()))].filter(
     (seed) => seed.length > 0,
   );
+
+  // Probe each provider with the raw first seed; mine through the first
+  // one that answers with data instead of hammering a blocked endpoint.
+  const sources: SuggestSource[] = ["google", "duckduckgo", "yahoo"];
+  const probeLog: SuggestProbeEntry[] = [];
+  let source: SuggestSource | null = null;
+  for (const candidate of sources) {
+    const probe = await fetchSuggestions(
+      candidate,
+      seeds[0] ?? "",
+      input.hl,
+      input.gl,
+    );
+    probeLog.push({ source: candidate, result: probe.result });
+    if (probe.result === "ok") {
+      source = candidate;
+      break;
+    }
+  }
+  if (!source) {
+    return { rows: [], queriesRun: 0, seedsMined: seeds, source: null, probeLog };
+  }
+
   const expansions = seeds
     .flatMap((seed) => expandSeed(seed, input.groups))
     .slice(0, MAX_EXPANSIONS);
@@ -130,7 +225,8 @@ export async function mineSearchSuggestions(input: {
     while (queue.length > 0) {
       const expansion = queue.shift();
       if (!expansion) return;
-      const suggestions = await fetchGoogleSuggestions(
+      const { suggestions } = await fetchSuggestions(
+        source as SuggestSource,
         expansion.query,
         input.hl,
         input.gl,
@@ -153,5 +249,7 @@ export async function mineSearchSuggestions(input: {
     ),
     queriesRun: expansions.length,
     seedsMined: seeds,
+    source,
+    probeLog,
   };
 }

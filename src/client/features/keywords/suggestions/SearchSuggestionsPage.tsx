@@ -8,6 +8,13 @@ import { Card, CardContent } from "@/client/components/ui/card";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/client/components/ui/select";
 import { Textarea } from "@/client/components/ui/textarea";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
@@ -26,6 +33,61 @@ type SuggestionRow = {
   seed: string;
   query: string;
 };
+
+type SuggestSource = "google" | "duckduckgo" | "yahoo";
+
+const SOURCE_LABELS: Record<SuggestSource, string> = {
+  google: "Google",
+  duckduckgo: "DuckDuckGo",
+  yahoo: "Yahoo",
+};
+
+const COUNTRY_OPTIONS: Array<{ code: string; name: string }> = [
+  { code: "AU", name: "Australia" },
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "CA", name: "Canada" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "IE", name: "Ireland" },
+  { code: "DE", name: "Germany" },
+  { code: "FR", name: "France" },
+  { code: "NL", name: "Netherlands" },
+  { code: "ES", name: "Spain" },
+  { code: "IT", name: "Italy" },
+  { code: "PT", name: "Portugal" },
+  { code: "CH", name: "Switzerland" },
+  { code: "AT", name: "Austria" },
+  { code: "BE", name: "Belgium" },
+  { code: "SE", name: "Sweden" },
+  { code: "NO", name: "Norway" },
+  { code: "DK", name: "Denmark" },
+  { code: "FI", name: "Finland" },
+  { code: "PL", name: "Poland" },
+  { code: "GR", name: "Greece" },
+  { code: "IN", name: "India" },
+  { code: "PK", name: "Pakistan" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "SG", name: "Singapore" },
+  { code: "MY", name: "Malaysia" },
+  { code: "PH", name: "Philippines" },
+  { code: "ID", name: "Indonesia" },
+  { code: "TH", name: "Thailand" },
+  { code: "VN", name: "Vietnam" },
+  { code: "JP", name: "Japan" },
+  { code: "KR", name: "South Korea" },
+  { code: "HK", name: "Hong Kong" },
+  { code: "TW", name: "Taiwan" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "IL", name: "Israel" },
+  { code: "TR", name: "Türkiye" },
+  { code: "ZA", name: "South Africa" },
+  { code: "NG", name: "Nigeria" },
+  { code: "KE", name: "Kenya" },
+  { code: "EG", name: "Egypt" },
+  { code: "BR", name: "Brazil" },
+  { code: "MX", name: "Mexico" },
+];
 
 const GROUP_OPTIONS: Array<{
   value: SuggestionModifierGroup;
@@ -122,8 +184,11 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     [seedsText],
   );
   const canMine = seeds.length > 0 && groups.length > 0 && !mutation.isPending;
+  const countryName =
+    COUNTRY_OPTIONS.find((c) => c.code === gl)?.name ?? gl.toUpperCase();
 
   const rows: SuggestionRow[] = mutation.data?.rows ?? [];
+  const source = mutation.data?.source ?? null;
   const columns = useMemo(buildColumns, []);
   const table = useDataTable({
     data: rows,
@@ -135,6 +200,10 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     setGroups((current) =>
       on ? [...current, group] : current.filter((g) => g !== group),
     );
+  }
+
+  function runMine() {
+    mutation.mutate({ seeds, hl, gl, groups });
   }
 
   function onExport(format: "csv" | "json" | "sheets") {
@@ -157,11 +226,11 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Search Suggestions"
-        description="Mine Google autocomplete: every modifier crossed before and after your seed. Free — no credits used."
+        description="Mine autocomplete: every modifier crossed before and after your seed. Free — no credits used."
       />
       <Card>
         <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_160px_160px]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px_160px]">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="suggestion-seeds">
                 Seed keywords (one per line, up to 3)
@@ -175,13 +244,28 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="suggestion-gl">Country (GL)</Label>
-              <Input
-                id="suggestion-gl"
+              <Label htmlFor="suggestion-country">Country</Label>
+              <Select
+                items={COUNTRY_OPTIONS.map((country) => ({
+                  value: country.code,
+                  label: country.name,
+                }))}
                 value={gl}
-                maxLength={2}
-                onChange={(event) => setGl(event.target.value)}
-              />
+                onValueChange={(next) => {
+                  if (next !== null) setGl(next);
+                }}
+              >
+                <SelectTrigger id="suggestion-country" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_OPTIONS.map((country) => (
+                    <SelectItem key={country.code} value={country.code}>
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="suggestion-hl">Language (HL)</Label>
@@ -213,13 +297,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             ))}
           </div>
           <div>
-            <Button
-              disabled={!canMine}
-              pending={mutation.isPending}
-              onClick={() =>
-                mutation.mutate({ seeds, hl, gl, groups })
-              }
-            >
+            <Button disabled={!canMine} pending={mutation.isPending} onClick={runMine}>
               Mine suggestions
             </Button>
           </div>
@@ -227,9 +305,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             <ErrorState
               title="Suggestions failed"
               message={getStandardErrorMessage(mutation.error)}
-              onRetry={() =>
-                mutation.mutate({ seeds, hl, gl, groups })
-              }
+              onRetry={runMine}
               isRetrying={mutation.isPending}
             />
           ) : null}
@@ -237,31 +313,47 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
       </Card>
 
       {mutation.data ? (
-        <DataTable
-          table={table}
-          empty={{
-            title: "No suggestions found",
-            description: `Google returned nothing for these expansions in ${gl.toUpperCase()}. Try a broader seed.`,
-          }}
-          toolbar={
-            <div className="flex w-full items-center justify-between gap-2">
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {rows.length.toLocaleString("en-US")} keywords from{" "}
-                {mutation.data.queriesRun.toLocaleString("en-US")} queries
-              </span>
-              <ExportMenu
-                actions={["sheets", "csv", "json"]}
-                onExport={onExport}
-              />
-            </div>
-          }
-        />
+        mutation.data.source === null ? (
+          <ErrorState
+            variant="card"
+            title="Suggestions are unreachable right now"
+            message={`Google, DuckDuckGo and Yahoo all returned nothing (${mutation.data.probeLog.map((p) => `${SOURCE_LABELS[p.source as SuggestSource]}: ${p.result}`).join(" · ")}). This usually means the server IP is temporarily rate-limited. Wait a few minutes and try again.`}
+            onRetry={runMine}
+            isRetrying={mutation.isPending}
+          />
+        ) : (
+          <DataTable
+            table={table}
+            empty={{
+              title: "No suggestions found",
+              description: `${SOURCE_LABELS[source as SuggestSource]} returned nothing for these expansions in ${countryName}. Try a broader seed.`,
+            }}
+            toolbar={
+              <div className="flex w-full items-center justify-between gap-2">
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {rows.length.toLocaleString("en-US")} keywords from{" "}
+                  {mutation.data.queriesRun.toLocaleString("en-US")} queries ·{" "}
+                  Source: {SOURCE_LABELS[source as SuggestSource]}
+                  {source !== "google"
+                    ? " (Google blocked this run)"
+                    : null}
+                </span>
+                {rows.length > 0 ? (
+                  <ExportMenu
+                    actions={["sheets", "csv", "json"]}
+                    onExport={onExport}
+                  />
+                ) : null}
+              </div>
+            }
+          />
+        )
       ) : (
         !mutation.isPending && (
           <EmptyState
             variant="plain"
             title="Enter a seed to mine suggestions"
-            description="Each modifier runs twice — once before and once after your seed — against live Google autocomplete."
+            description="Each modifier runs twice — once before and once after your seed — against live autocomplete."
           />
         )
       )}
