@@ -1,9 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { Badge } from "@/client/components/ui/badge";
 import { Card } from "@/client/components/ui/card";
 import { Separator } from "@/client/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/client/components/ui/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/client/components/ui/alert";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import { ScoreBadge } from "@/client/components/table/ScoreBadge";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
@@ -41,7 +45,11 @@ function buildColumns() {
       ),
       cell: ({ getValue }) =>
         getValue() === "before" ? (
-          <Badge variant="soft" size="sm" title="Modifier added before the seed">
+          <Badge
+            variant="soft"
+            size="sm"
+            title="Modifier added before the seed"
+          >
             Before
           </Badge>
         ) : (
@@ -106,9 +114,7 @@ function buildColumns() {
       meta: { cellClassName: "whitespace-nowrap text-right" },
     }),
     columnHelper.accessor("intent", {
-      header: ({ column }) => (
-        <SortableHeader column={column} label="Intent" />
-      ),
+      header: ({ column }) => <SortableHeader column={column} label="Intent" />,
       cell: ({ getValue }) => <IntentBadge intent={getValue()} />,
       meta: { cellClassName: "whitespace-nowrap" },
     }),
@@ -132,11 +138,14 @@ export function SuggestionsDfsResults({
   rows,
   metricsError,
   sourceLabel,
+  actions,
 }: {
   rows: DfsSuggestionRow[];
   metricsError: string | null;
   /** The project's provider route, e.g. "treg → Serpstat". */
   sourceLabel: string;
+  /** Extra toolbar buttons, shown before Export. */
+  actions?: ReactNode;
 }) {
   const columns = useMemo(buildColumns, []);
   const [page, setPage] = useState(0);
@@ -176,9 +185,9 @@ export function SuggestionsDfsResults({
         <Alert variant="warning">
           <AlertTitle>Volumes unavailable</AlertTitle>
           <AlertDescription>
-            Showing suggestions without volume, CPC, competition, difficulty
-            and intent ({metricsError}). The keyword list itself is complete —
-            try again for metrics.
+            Showing suggestions without volume, CPC, competition, difficulty and
+            intent ({metricsError}). The keyword list itself is complete — try
+            again for metrics.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -205,30 +214,33 @@ export function SuggestionsDfsResults({
         toolbar={
           <DataTableToolbar
             actions={
-              <ExportMenu
-                actions={["sheets", "csv", "json"]}
-                disabled={rows.length === 0}
-                onExport={(format) => {
-                  void exportRows({
-                    format,
-                    feature: "search_suggestions",
-                    headers: DFS_HEADERS,
-                    rows: rows.map((row) => [
-                      row.keyword,
-                      row.placement,
-                      row.modifier,
-                      row.searchVolume ?? "No data",
-                      row.cpc ?? "No data",
-                      row.competition ?? "No data",
-                      row.keywordDifficulty ?? "No data",
-                      row.intent,
-                      row.seed,
-                    ]),
-                    filename: "search-suggestions-dataforseo",
-                    records: rows,
-                  });
-                }}
-              />
+              <>
+                {actions}
+                <ExportMenu
+                  actions={["sheets", "csv", "json"]}
+                  disabled={rows.length === 0}
+                  onExport={(format) => {
+                    void exportRows({
+                      format,
+                      feature: "search_suggestions",
+                      headers: DFS_HEADERS,
+                      rows: rows.map((row) => [
+                        row.keyword,
+                        row.placement,
+                        row.modifier,
+                        row.searchVolume ?? "No data",
+                        row.cpc ?? "No data",
+                        row.competition ?? "No data",
+                        row.keywordDifficulty ?? "No data",
+                        row.intent,
+                        row.seed,
+                      ]),
+                      filename: "search-suggestions-dataforseo",
+                      records: rows,
+                    });
+                  }}
+                />
+              </>
             }
           >
             <span className="text-sm tabular-nums text-muted-foreground">

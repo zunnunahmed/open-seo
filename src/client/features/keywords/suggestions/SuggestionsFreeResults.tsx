@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { Badge } from "@/client/components/ui/badge";
 import { Card } from "@/client/components/ui/card";
@@ -34,7 +34,11 @@ function buildColumns() {
       ),
       cell: ({ getValue }) =>
         getValue() === "before" ? (
-          <Badge variant="soft" size="sm" title="Modifier added before the seed">
+          <Badge
+            variant="soft"
+            size="sm"
+            title="Modifier added before the seed"
+          >
             Before
           </Badge>
         ) : (
@@ -74,10 +78,13 @@ export function SuggestionsFreeResults({
   rows,
   queriesRun,
   countryName,
+  actions,
 }: {
   rows: SuggestionRow[];
   queriesRun: number;
   countryName: string;
+  /** Extra toolbar buttons, shown before Export. */
+  actions?: ReactNode;
 }) {
   const columns = useMemo(buildColumns, []);
   const [page, setPage] = useState(0);
@@ -130,25 +137,28 @@ export function SuggestionsFreeResults({
         toolbar={
           <DataTableToolbar
             actions={
-              <ExportMenu
-                actions={["sheets", "csv", "json"]}
-                disabled={rows.length === 0}
-                onExport={(format) => {
-                  void exportRows({
-                    format,
-                    feature: "search_suggestions",
-                    headers: FREE_HEADERS,
-                    rows: rows.map((row) => [
-                      row.keyword,
-                      row.placement,
-                      row.modifier,
-                      row.query,
-                    ]),
-                    filename: "search-suggestions",
-                    records: rows,
-                  });
-                }}
-              />
+              <>
+                {actions}
+                <ExportMenu
+                  actions={["sheets", "csv", "json"]}
+                  disabled={rows.length === 0}
+                  onExport={(format) => {
+                    void exportRows({
+                      format,
+                      feature: "search_suggestions",
+                      headers: FREE_HEADERS,
+                      rows: rows.map((row) => [
+                        row.keyword,
+                        row.placement,
+                        row.modifier,
+                        row.query,
+                      ]),
+                      filename: "search-suggestions",
+                      records: rows,
+                    });
+                  }}
+                />
+              </>
             }
           >
             <span className="text-sm tabular-nums text-muted-foreground">

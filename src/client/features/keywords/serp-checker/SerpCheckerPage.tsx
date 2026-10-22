@@ -1,10 +1,16 @@
 import { useState } from "react";
+import { Search } from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
 import { Input } from "@/client/components/ui/input";
-import { Label } from "@/client/components/ui/label";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/client/components/ui/input-group";
 import { EmptyState } from "@/client/components/EmptyState";
+import { LocationSelect } from "@/client/components/LocationSelect";
 import { useProjectMarket } from "@/client/features/projects/useProjectMarket";
 import { useKeywordSerpAnalysis } from "@/client/features/keywords/hooks/useKeywordSerpAnalysis";
 import { KeywordAreaField } from "@/client/features/keywords/page/KeywordAreaField";
@@ -12,22 +18,21 @@ import { SerpAnalysisCard } from "@/client/features/keywords/components/SerpAnal
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 /**
- * Standalone localized SERP checker: any query, project market by default
- * with an optional city/county/region narrowing. Each check spends
+ * Standalone localized SERP checker: any query and country (the project
+ * market by default) with an optional city/county/region narrowing. Each check spends
  * DataForSEO SERP credits (depth 20 first, 100 on demand).
  */
 export function SerpCheckerPage({ projectId }: { projectId: string }) {
   const market = useProjectMarket(projectId);
+  // Until the user picks a country, follow the project market.
+  const [pickedLocationCode, setPickedLocationCode] = useState<number>();
+  const locationCode = pickedLocationCode ?? market?.locationCode;
   const [keywordInput, setKeywordInput] = useState("");
   const [locationName, setLocationName] = useState<string | undefined>(
     undefined,
   );
 
-  const serp = useKeywordSerpAnalysis(
-    projectId,
-    market?.locationCode,
-    locationName,
-  );
+  const serp = useKeywordSerpAnalysis(projectId, locationCode, locationName);
 
   function check() {
     const keyword = keywordInput.trim();
@@ -50,51 +55,64 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
         <PageHeader
           title="SERP Checker"
           actions={<DataSourceLabel projectId={projectId} />}
-          description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
+          description="See Google's live results for any query in any country — project market by default, or narrow to a city or region. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
         />
         <Card className="overflow-visible">
           <CardContent>
+          {/* Same row as Keyword Research: query, country, city, action. */}
           <form
-            className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px_auto] lg:items-end"
+            className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-start"
             onSubmit={(event) => {
               event.preventDefault();
               check();
             }}
           >
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="serp-checker-keyword">Query</Label>
-              <Input
-                id="serp-checker-keyword"
+            <InputGroup className="h-10 w-full lg:max-w-md lg:min-w-0 lg:flex-1">
+              <InputGroupAddon>
+                <Search />
+              </InputGroupAddon>
+              <InputGroupInput
                 value={keywordInput}
                 onChange={(event) => onKeywordChange(event.target.value)}
-                placeholder="best crm for small business"
+                placeholder="Enter a query"
+                aria-label="Query"
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="serp-checker-area">
-                Area <span className="font-normal">(optional)</span>
-              </Label>
-              {market?.locationCode === undefined ? (
+            </InputGroup>
+            <div className="grid grid-cols-2 gap-2 lg:contents">
+              {locationCode === undefined ? (
                 <Input
-                  id="serp-checker-area"
                   disabled
                   placeholder="Loading market…"
+                  aria-label="Country"
+                  className="col-span-2 w-full lg:w-44 lg:shrink-0"
                 />
               ) : (
-                <KeywordAreaField
-                  locationCode={market.locationCode}
-                  value={locationName}
-                  onChange={setLocationName}
-                />
+                <>
+                  <LocationSelect
+                    value={locationCode}
+                    onChange={(code) => {
+                      setPickedLocationCode(code);
+                      // An area belongs to one country.
+                      setLocationName(undefined);
+                    }}
+                    className="col-span-2 w-full lg:w-44 lg:shrink-0"
+                  />
+                  <KeywordAreaField
+                    locationCode={locationCode}
+                    value={locationName}
+                    onChange={setLocationName}
+                  />
+                </>
               )}
+              <Button
+                type="submit"
+                className="w-full px-6 lg:w-auto lg:shrink-0"
+                disabled={!keywordInput.trim() || serp.serpLoading}
+                pending={serp.serpLoading}
+              >
+                Check SERP
+              </Button>
             </div>
-            <Button
-              type="submit"
-              disabled={!keywordInput.trim() || serp.serpLoading}
-              pending={serp.serpLoading}
-            >
-              Check SERP
-            </Button>
           </form>
           </CardContent>
         </Card>

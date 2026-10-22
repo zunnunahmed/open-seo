@@ -36,6 +36,11 @@ import {
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
 import {
+  SavedRunView,
+  SavedSuggestionRuns,
+  useSaveSuggestionRun,
+} from "./SavedSuggestionRuns";
+import {
   DataSourceLabel,
   SEO_PROVIDER_TITLES,
   seoProviderPreferenceQuery,
@@ -43,6 +48,11 @@ import {
 
 export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   const providerRoute = useQuery(seoProviderPreferenceQuery(projectId)).data;
+  const sourceLabel = providerRoute
+    ? SEO_PROVIDER_TITLES[providerRoute]
+    : "DataForSEO";
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
+  const saveMutation = useSaveSuggestionRun(projectId);
   const [mode, setMode] = useState<"free" | "dataforseo">("free");
   const [seedsText, setSeedsText] = useState("");
   const [gl, setGl] = useState("AU");
@@ -96,6 +106,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
 
   function switchMode(next: "free" | "dataforseo") {
     setMode(next);
+    setOpenRunId(null);
     freeMutation.reset();
     dfsMutation.reset();
   }
@@ -107,6 +118,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   }
 
   function runMine() {
+    setOpenRunId(null);
     if (mode === "free") {
       freeMutation.mutate({ seeds, hl, gl, groups });
     } else {
@@ -267,7 +279,19 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
 
-      {mode === "free" ? (
+      <SavedSuggestionRuns
+        projectId={projectId}
+        openRunId={openRunId}
+        onOpen={setOpenRunId}
+      />
+
+      {openRunId ? (
+        <SavedRunView
+          projectId={projectId}
+          runId={openRunId}
+          onClose={() => setOpenRunId(null)}
+        />
+      ) : mode === "free" ? (
         freeMutation.data ? (
           freeMutation.data.endpoint === null ? (
             <ErrorState
@@ -282,6 +306,25 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               rows={freeMutation.data.rows}
               queriesRun={freeMutation.data.queriesRun}
               countryName={countryName}
+              actions={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={saveMutation.isPending}
+                  onClick={() => {
+                    const data = freeMutation.data;
+                    if (!data) return;
+                    saveMutation.mutate(`${seeds.join(", ")} · ${countryName}`, {
+                      mode: "free",
+                      countryName,
+                      queriesRun: data.queriesRun,
+                      rows: data.rows,
+                    });
+                  }}
+                >
+                  Save results
+                </Button>
+              }
             />
           )
         ) : (
@@ -297,8 +340,25 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
         <SuggestionsDfsResults
           rows={dfsMutation.data.rows}
           metricsError={dfsMutation.data.metricsError}
-          sourceLabel={
-            providerRoute ? SEO_PROVIDER_TITLES[providerRoute] : "DataForSEO"
+          sourceLabel={sourceLabel}
+          actions={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={saveMutation.isPending}
+              onClick={() => {
+                const data = dfsMutation.data;
+                if (!data) return;
+                saveMutation.mutate(`${seeds.join(", ")} · ${sourceLabel}`, {
+                  mode: "paid",
+                  sourceLabel,
+                  metricsError: data.metricsError,
+                  rows: data.rows,
+                });
+              }}
+            >
+              Save results
+            </Button>
           }
         />
       ) : (
