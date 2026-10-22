@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { createColumnHelper } from "@tanstack/react-table";
+import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { Badge } from "@/client/components/ui/badge";
 import { Card } from "@/client/components/ui/card";
 import { Separator } from "@/client/components/ui/separator";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { DataTableToolbar } from "@/client/components/table/DataTableToolbar";
 import { TablePagination } from "@/client/components/table/TablePagination";
 import { ExportMenu } from "@/client/components/ExportMenu";
 import { exportRows } from "@/client/lib/exportRows";
@@ -83,15 +84,25 @@ export function SuggestionsFreeResults({
   const [pageSize, setPageSize] = useState<number>(
     PAGE_SIZES[1] as (typeof PAGE_SIZES)[number],
   );
-  const visibleRows = useMemo(
-    () => rows.slice(page * pageSize, page * pageSize + pageSize),
-    [rows, page, pageSize],
-  );
+  const [sorting, setSorting] = useState<SortingState>([]);
   const before = useMemo(
     () => rows.filter((row) => row.placement === "before").length,
     [rows],
   );
-  const table = useDataTable({ data: visibleRows, columns, withSorting: true });
+  // Sort every row, then page: sorting only the visible page would reorder
+  // 50 rows and leave the rest unsorted.
+  const table = useDataTable({
+    data: rows,
+    columns,
+    withSorting: true,
+    withPagination: true,
+    autoResetPageIndex: false,
+    state: { sorting, pagination: { pageIndex: page, pageSize } },
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      setPage(0);
+    },
+  });
 
   return (
     <div className="flex flex-col gap-4">
@@ -117,43 +128,49 @@ export function SuggestionsFreeResults({
           description: `Google returned nothing for these expansions in ${countryName}. Try a broader seed.`,
         }}
         toolbar={
-          <div className="flex w-full items-center justify-between gap-2">
+          <DataTableToolbar
+            actions={
+              <ExportMenu
+                actions={["sheets", "csv", "json"]}
+                disabled={rows.length === 0}
+                onExport={(format) => {
+                  void exportRows({
+                    format,
+                    feature: "search_suggestions",
+                    headers: FREE_HEADERS,
+                    rows: rows.map((row) => [
+                      row.keyword,
+                      row.placement,
+                      row.modifier,
+                      row.query,
+                    ]),
+                    filename: "search-suggestions",
+                    records: rows,
+                  });
+                }}
+              />
+            }
+          >
             <span className="text-sm tabular-nums text-muted-foreground">
               {rows.length === 1
                 ? "1 keyword"
                 : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
               · Source: Google
             </span>
-            <ExportMenu
-              actions={["sheets", "csv", "json"]}
-              disabled={rows.length === 0}
-              onExport={(format) => {
-                void exportRows({
-                  format,
-                  feature: "search_suggestions",
-                  headers: FREE_HEADERS,
-                  rows: rows.map((row) => [
-                    row.keyword,
-                    row.placement,
-                    row.modifier,
-                    row.query,
-                  ]),
-                  filename: "search-suggestions",
-                  records: rows,
-                });
-              }}
-            />
-          </div>
+          </DataTableToolbar>
         }
         footer={
           rows.length > 0 ? (
             <TablePagination
-              page={page}
+              page={page + 1}
               pageSize={pageSize}
               pageSizes={PAGE_SIZES}
               totalCount={rows.length}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
+              onPageChange={(next) => setPage(next - 1)}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(0);
+              }}
             />
           ) : undefined
         }

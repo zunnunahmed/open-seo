@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/client/components/PageHeader";
 import { Button } from "@/client/components/ui/button";
 import { Card, CardContent } from "@/client/components/ui/card";
@@ -35,9 +35,14 @@ import {
 } from "./suggestionOptions";
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
-import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
+import {
+  DataSourceLabel,
+  SEO_PROVIDER_TITLES,
+  seoProviderPreferenceQuery,
+} from "@/client/features/integrations/DataSourceLabel";
 
 export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
+  const providerRoute = useQuery(seoProviderPreferenceQuery(projectId)).data;
   const [mode, setMode] = useState<"free" | "dataforseo">("free");
   const [seedsText, setSeedsText] = useState("");
   const [gl, setGl] = useState("AU");
@@ -120,7 +125,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           actions={
             <DataSourceLabel projectId={projectId} prefix="Paid lookups" />
           }
-          description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with volume via DataForSEO."
+          description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with search volume."
         />
         <Card className="overflow-visible">
           <CardContent className="flex flex-col gap-4">
@@ -137,7 +142,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               size="sm"
               onClick={() => switchMode("dataforseo")}
             >
-              DataForSEO + volume
+              Paid + volume
             </Button>
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
@@ -250,7 +255,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                 const code = getErrorCode(dfsMutation.error);
                 return (
                   <ErrorState
-                    title="DataForSEO suggestions failed"
+                    title="Paid suggestions failed"
                     message={`${getStandardErrorMessage(dfsMutation.error)}${code ? ` (code: ${code})` : ""}`}
                     onRetry={runMine}
                     isRetrying={dfsMutation.isPending}
@@ -268,7 +273,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             <ErrorState
               variant="card"
               title="Google blocked this run"
-              message={`No Google suggest host answered (${freeMutation.data.probeLog.map((p) => `${ENDPOINT_LABELS[p.endpoint as SuggestEndpoint]}: ${p.result}`).join(" · ")}). Wait a few minutes and try again, or switch to the DataForSEO source above — same before/after modifiers, billed per lookup.`}
+              message={`No Google suggest host answered (${freeMutation.data.probeLog.map((p) => `${ENDPOINT_LABELS[p.endpoint as SuggestEndpoint]}: ${p.result}`).join(" · ")}). Wait a few minutes and try again, or switch to the paid source above — same before/after modifiers, billed per lookup.`}
               onRetry={runMine}
               isRetrying={freeMutation.isPending}
             />
@@ -292,12 +297,15 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
         <SuggestionsDfsResults
           rows={dfsMutation.data.rows}
           metricsError={dfsMutation.data.metricsError}
+          sourceLabel={
+            providerRoute ? SEO_PROVIDER_TITLES[providerRoute] : "DataForSEO"
+          }
         />
       ) : (
         !dfsMutation.isPending && (
           <EmptyState
             variant="plain"
-            title="Enter a seed to get DataForSEO suggestions"
+            title="Enter a seed to get paid suggestions with volume"
             description="Google autocomplete expansions crossed before and after your seed, each enriched with volume, CPC, competition, difficulty and intent."
           />
         )

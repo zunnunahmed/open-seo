@@ -18,7 +18,6 @@ import {
 import { exportClustersCsv, exportKeywordsCsv } from "./clusterExports";
 import { ClusterTable } from "./ClusterTable";
 
-const PAGE_SIZE = 50;
 const MODES: Array<{ value: ClusterMode; label: string }> = [
   { value: "balanced", label: "Balanced (recommended)" },
   { value: "strict", label: "Strict: every keyword matches every other" },
@@ -44,7 +43,6 @@ export function ClusterResults({
   const [mode, setMode] = useState<ClusterMode>("balanced");
   const [primaryBy, setPrimaryBy] = useState<ClusterPrimaryBy>("volume");
   const [competitorText, setCompetitorText] = useState("");
-  const [page, setPage] = useState(0);
 
   const clusters = useMemo(
     () => clusterKeywords(items, { threshold, mode, primaryBy, ownDomain }),
@@ -62,8 +60,6 @@ export function ClusterResults({
     )
     .filter(Boolean);
   const cannibalized = grouped.filter((c) => c.ownUrls.length > 1).length;
-  const pages = Math.max(1, Math.ceil(grouped.length / PAGE_SIZE));
-  const visible = grouped.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   return (
     <div className="space-y-4">
@@ -79,10 +75,7 @@ export function ClusterResults({
                 min={2}
                 max={6}
                 value={threshold}
-                onChange={(e) => {
-                  setThreshold(Number(e.target.value));
-                  setPage(0);
-                }}
+                onChange={(e) => setThreshold(Number(e.target.value))}
                 className="w-full"
               />
             </label>
@@ -93,7 +86,6 @@ export function ClusterResults({
                 value={mode}
                 onValueChange={(next) => {
                   if (next !== null && isMode(next)) setMode(next);
-                  setPage(0);
                 }}
               >
                 <SelectTrigger className="w-full" aria-label="Cluster mode">
@@ -179,33 +171,12 @@ export function ClusterResults({
       </CardShell>
 
       <ClusterTable
-        clusters={visible}
+        // A new threshold or mode is a new list: start again on page 1.
+        key={`${threshold}-${mode}`}
+        clusters={grouped}
         ownDomain={ownDomain}
         competitors={competitors}
       />
-      {pages > 1 ? (
-        <div className="flex items-center justify-end gap-2 text-sm">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page === 0}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <span>
-            Page {page + 1} of {pages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page + 1 >= pages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </div>
-      ) : null}
       {singles.length ? (
         <CardShell
           title={`Unclustered keywords (${singles.length.toLocaleString()})`}

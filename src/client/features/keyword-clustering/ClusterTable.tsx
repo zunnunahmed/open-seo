@@ -1,5 +1,10 @@
-import { Fragment, useState } from "react";
+import { useMemo, useState } from "react";
+import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
+import { SortableHeader } from "@/client/components/table/SortableHeader";
+import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { DataTableToolbar } from "@/client/components/table/DataTableToolbar";
+import { TablePagination } from "@/client/components/table/TablePagination";
 import {
   isDomainOrSubdomain,
   urlDomain,
@@ -56,6 +61,105 @@ function ClusterDetails({
   );
 }
 
+const columnHelper = createColumnHelper<KeywordCluster>();
+const PAGE_SIZES = [25, 50, 100] as const;
+
+function buildColumns(ownDomain: string | null, competitors: string[]) {
+  return [
+    columnHelper.accessor((cluster) => cluster.main.keyword, {
+      id: "main",
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Main keyword" />
+      ),
+      cell: ({ row }) => (
+        <div className="font-medium">
+          <span className="inline-flex items-center gap-1">
+            <ChevronRight
+              aria-hidden
+              className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                row.getIsExpanded() ? "rotate-90" : ""
+              }`}
+            />
+            {row.original.main.keyword}
+          </span>
+          {row.original.features.length ? (
+            <div className="text-xs font-normal text-muted-foreground">
+              {row.original.features.map(featureLabel).join(" Â· ")}
+            </div>
+          ) : null}
+        </div>
+      ),
+    }),
+    columnHelper.accessor((cluster) => cluster.keywords.length, {
+      id: "keywords",
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Keywords" />
+      ),
+      cell: ({ getValue }) => getValue().toLocaleString(),
+      meta: {
+        headerClassName: "text-right",
+        cellClassName: "text-right tabular-nums",
+      },
+    }),
+    columnHelper.accessor("totalVolume", {
+      header: ({ column }) => <SortableHeader column={column} label="Volume" />,
+      cell: ({ getValue }) => getValue().toLocaleString(),
+      meta: {
+        headerClassName: "text-right",
+        cellClassName: "text-right tabular-nums",
+      },
+    }),
+    columnHelper.accessor("pageType", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Page type" />
+      ),
+    }),
+    columnHelper.display({
+      id: "topDomains",
+      header: "Top domains",
+      cell: ({ row }) => {
+        const cluster = row.original;
+        const hits = competitors.filter((domain) =>
+          cluster.topDomains.some((d) => isDomainOrSubdomain(d.domain, domain)),
+        );
+        return (
+          <div className="text-xs">
+            {cluster.topDomains
+              .slice(0, 3)
+              .map((d) => d.domain)
+              .join(", ")}
+            {hits.length ? (
+              <div className="font-medium text-primary">
+                Competitors: {hits.join(", ")}
+              </div>
+            ) : null}
+          </div>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "plan",
+      header: ownDomain ? "Your page" : "Plan",
+      cell: ({ row }) => {
+        const urls = row.original.ownUrls;
+        return (
+          <span className="text-xs">
+            {urls.length > 1 ? (
+              <span className="text-destructive">
+                Cannibalization: {urls.length} pages
+              </span>
+            ) : urls.length === 1 ? (
+              urls[0]
+            ) : (
+              "New page"
+            )}
+          </span>
+        );
+      },
+    }),
+  ];
+}
+
 export function ClusterTable({
   clusters,
   ownDomain,
@@ -65,107 +169,65 @@ export function ClusterTable({
   ownDomain: string | null;
   competitors: string[];
 }) {
-  const [open, setOpen] = useState<Set<number>>(new Set());
-  const toggle = (id: number) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // competitors is a fresh array each render; key the columns on its content.
+  const competitorKey = competitors.join(",");
+  const columns = useMemo(
+    () =>
+      buildColumns(ownDomain, competitorKey ? competitorKey.split(",") : []),
+    [ownDomain, competitorKey],
+  );
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[1]);
+  const table = useDataTable({
+    data: clusters,
+    columns,
+    withSorting: true,
+    withExpanded: true,
+    withPagination: true,
+    autoResetPageIndex: false,
+    getRowId: (cluster) => String(cluster.id),
+    state: { sorting, pagination: { pageIndex: page, pageSize } },
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      setPage(0);
+    },
+  });
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <table className="w-full text-sm">
-        <thead className="border-b text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="p-3">Main keyword</th>
-            <th className="p-3 text-right">Keywords</th>
-            <th className="p-3 text-right">Volume</th>
-            <th className="p-3">Page type</th>
-            <th className="p-3">Top domains</th>
-            <th className="p-3">{ownDomain ? "Your page" : "Plan"}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {clusters.map((cluster) => {
-            const hits = competitors.filter((domain) =>
-              cluster.topDomains.some((d) =>
-                isDomainOrSubdomain(d.domain, domain),
-              ),
-            );
-            const expanded = open.has(cluster.id);
-            return (
-              <Fragment key={cluster.id}>
-                <tr
-                  className="cursor-pointer border-b hover:bg-muted/50"
-                  onClick={() => toggle(cluster.id)}
-                >
-                  <td className="p-3 font-medium">
-                    <span className="inline-flex items-center gap-1">
-                      <ChevronRight
-                        className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
-                          expanded ? "rotate-90" : ""
-                        }`}
-                      />
-                      {cluster.main.keyword}
-                    </span>
-                    {cluster.features.length ? (
-                      <div className="text-xs font-normal text-muted-foreground">
-                        {cluster.features.map(featureLabel).join(" · ")}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="p-3 text-right tabular-nums">
-                    {cluster.keywords.length}
-                  </td>
-                  <td className="p-3 text-right tabular-nums">
-                    {cluster.totalVolume.toLocaleString()}
-                  </td>
-                  <td className="p-3">{cluster.pageType}</td>
-                  <td className="p-3 text-xs">
-                    {cluster.topDomains
-                      .slice(0, 3)
-                      .map((d) => d.domain)
-                      .join(", ")}
-                    {hits.length ? (
-                      <div className="font-medium text-primary">
-                        Competitors: {hits.join(", ")}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="p-3 text-xs">
-                    {cluster.ownUrls.length > 1 ? (
-                      <span className="text-destructive">
-                        Cannibalization: {cluster.ownUrls.length} pages
-                      </span>
-                    ) : cluster.ownUrls.length === 1 ? (
-                      cluster.ownUrls[0]
-                    ) : (
-                      "New page"
-                    )}
-                  </td>
-                </tr>
-                {expanded ? (
-                  <tr className="border-b bg-muted/30">
-                    <td colSpan={6} className="p-3">
-                      <ClusterDetails cluster={cluster} ownDomain={ownDomain} />
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            );
-          })}
-          {clusters.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="p-6 text-center text-muted-foreground">
-                No clusters at this threshold. Lower the number of shared URLs
-                or switch to soft mode.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      table={table}
+      empty={{
+        title: "No clusters at this threshold",
+        description: "Lower the number of shared URLs or switch to soft mode.",
+      }}
+      onRowClick={(row) => row.toggleExpanded()}
+      renderExpandedRow={(row) => (
+        <ClusterDetails cluster={row.original} ownDomain={ownDomain} />
+      )}
+      toolbar={
+        <DataTableToolbar>
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {clusters.length.toLocaleString()} clusters Â· click a row for its
+            keywords and URLs
+          </span>
+        </DataTableToolbar>
+      }
+      footer={
+        clusters.length > 0 ? (
+          <TablePagination
+            page={page + 1}
+            pageSize={pageSize}
+            pageSizes={PAGE_SIZES}
+            totalCount={clusters.length}
+            onPageChange={(next) => setPage(next - 1)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
+          />
+        ) : undefined
+      }
+    />
   );
 }

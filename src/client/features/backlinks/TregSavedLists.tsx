@@ -1,11 +1,141 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import { Button } from "@/client/components/ui/button";
+import { SortableHeader } from "@/client/components/table/SortableHeader";
+import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { DataTableToolbar } from "@/client/components/table/DataTableToolbar";
+import { TablePagination } from "@/client/components/table/TablePagination";
 import { getTregSavedList } from "@/serverFunctions/tregLists";
 import type {
   TregListKind,
   TregListSnapshot,
 } from "@/server/custom/providers/treg/lists";
+
+type TregListRow = TregListSnapshot["rows"][number];
+const columnHelper = createColumnHelper<TregListRow>();
+const PAGE_SIZES = [25, 50, 100] as const;
+const dash = (value: string | number | null | undefined) => value ?? "—";
+
+function buildColumns(kind: TregListKind) {
+  return [
+    columnHelper.accessor("source", {
+      header: ({ column }) => <SortableHeader column={column} label="Source" />,
+      cell: ({ getValue }) => {
+        const source = getValue();
+        return source.startsWith("https://") ? (
+          <a
+            className="break-all underline"
+            href={source}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {source}
+          </a>
+        ) : (
+          <span className="break-all">{source}</span>
+        );
+      },
+    }),
+    ...(kind === "backlinks"
+      ? [
+          columnHelper.accessor("target", {
+            header: ({ column }) => (
+              <SortableHeader column={column} label="Target" />
+            ),
+            cell: ({ getValue }) => (
+              <span className="break-all">{dash(getValue())}</span>
+            ),
+          }),
+          columnHelper.accessor("anchor", {
+            header: ({ column }) => (
+              <SortableHeader column={column} label="Anchor" />
+            ),
+            cell: ({ getValue }) => dash(getValue()),
+          }),
+          columnHelper.accessor("linkType", {
+            header: ({ column }) => (
+              <SortableHeader column={column} label="Follow" />
+            ),
+            cell: ({ getValue }) => dash(getValue()),
+          }),
+        ]
+      : [
+          columnHelper.accessor("linkCount", {
+            header: ({ column }) => (
+              <SortableHeader column={column} label="Linking pages" />
+            ),
+            cell: ({ getValue }) => dash(getValue()),
+            meta: { cellClassName: "tabular-nums" },
+          }),
+        ]),
+    columnHelper.accessor("authority", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Authority" />
+      ),
+      cell: ({ getValue }) => dash(getValue()),
+      meta: { cellClassName: "tabular-nums" },
+    }),
+  ];
+}
+
+function TregListTable({
+  kind,
+  snapshot,
+}: {
+  kind: TregListKind;
+  snapshot: TregListSnapshot;
+}) {
+  const columns = useMemo(() => buildColumns(kind), [kind]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[1]);
+  const table = useDataTable({
+    data: snapshot.rows,
+    columns,
+    withSorting: true,
+    withPagination: true,
+    autoResetPageIndex: false,
+    state: { sorting, pagination: { pageIndex: page, pageSize } },
+    onSortingChange: (updater) => {
+      setSorting(updater);
+      setPage(0);
+    },
+  });
+  return (
+    <DataTable
+      table={table}
+      empty={{
+        title: "No rows in this snapshot",
+        description: "Serpstat returned nothing for this domain.",
+      }}
+      toolbar={
+        <DataTableToolbar>
+          <span className="text-sm tabular-nums text-muted-foreground">
+            Saved snapshot · {new Date(snapshot.fetchedAt).toLocaleString()} ·{" "}
+            {snapshot.rows.length} shown
+            {snapshot.total == null ? "" : ` of ${snapshot.total} reported`}
+          </span>
+        </DataTableToolbar>
+      }
+      footer={
+        snapshot.rows.length > 0 ? (
+          <TablePagination
+            page={page + 1}
+            pageSize={pageSize}
+            pageSizes={PAGE_SIZES}
+            totalCount={snapshot.rows.length}
+            onPageChange={(next) => setPage(next - 1)}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
+          />
+        ) : undefined
+      }
+    />
+  );
+}
 
 function csvEscape(v: unknown): string {
   const string =
@@ -134,60 +264,7 @@ export function TregSavedLists({
       ) : null}
       {canShow ? (
         <>
-          <p className="text-sm text-muted-foreground">
-            Saved snapshot · {new Date(snapshot.fetchedAt).toLocaleString()} ·
-            {snapshot.rows.length} shown
-            {snapshot.total == null ? "" : ` of ${snapshot.total} reported`}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-2">Source</th>
-                  {kind === "backlinks" ? (
-                    <>
-                      <th className="p-2">Target</th>
-                      <th className="p-2">Anchor</th>
-                      <th className="p-2">Follow</th>
-                    </>
-                  ) : (
-                    <th className="p-2">Linking pages</th>
-                  )}
-                  <th className="p-2">Authority</th>
-                </tr>
-              </thead>
-              <tbody>
-                {snapshot.rows.map((row, i) => (
-                  <tr key={row.source + "-" + i} className="border-b align-top">
-                    <td className="p-2 break-all">
-                      {row.source.startsWith("https://") ? (
-                        <a
-                          className="underline"
-                          href={row.source}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {row.source}
-                        </a>
-                      ) : (
-                        row.source
-                      )}
-                    </td>
-                    {kind === "backlinks" ? (
-                      <>
-                        <td className="p-2 break-all">{row.target ?? "—"}</td>
-                        <td className="p-2">{row.anchor ?? "—"}</td>
-                        <td className="p-2">{row.linkType ?? "—"}</td>
-                      </>
-                    ) : (
-                      <td className="p-2">{row.linkCount ?? "—"}</td>
-                    )}
-                    <td className="p-2">{row.authority ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TregListTable kind={kind} snapshot={snapshot} />
         </>
       ) : !mutation.isPending && valid ? (
         <p className="text-sm text-muted-foreground">
