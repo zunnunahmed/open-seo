@@ -45,7 +45,11 @@ export function createCrawlThrottle(
   const state: CrawlThrottleState = previous
     ? { ...previous }
     : {
-        intervalMs: 1_000,
+        // Minimum spacing between request starts. Low enough that fast
+        // sites crawl at several pages per second, high enough to stay
+        // polite on shared hosting; any 429 doubles it from here (up to
+        // 30 s) and it is never lowered again within the audit.
+        intervalMs: 250,
         nextRequestAt: 0,
         pausedUntil: 0,
         consecutiveRateLimits: 0,

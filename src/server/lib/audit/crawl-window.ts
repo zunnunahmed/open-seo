@@ -23,9 +23,12 @@ interface CrawlWindowLimits {
 }
 
 export const CRAWL_WINDOW: CrawlWindowLimits = {
-  initial: 2,
+  // Start polite (shared-hosting friendly), then let the adaptive window
+  // grow to max on clean, fast batches — the byte budget below still caps
+  // heavy pages, and any 429/trouble shrinks back toward min.
+  initial: 3,
   min: 1,
-  max: 2,
+  max: 8,
   budgetBytes: 8 * 1024 * 1024,
 };
 

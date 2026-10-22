@@ -53,7 +53,7 @@ describe("createCrawlThrottle", () => {
     );
     await vi.runAllTimersAsync();
     await requests;
-    expect(starts).toEqual([0, 1_000, 2_000, 3_000, 4_000]);
+    expect(starts).toEqual([0, 250, 500, 750, 1_000]);
   });
 
   it("pauses for thirty seconds on the first 429 and spaces retries", async () => {
@@ -70,7 +70,7 @@ describe("createCrawlThrottle", () => {
     expect(starts).toEqual([]);
     await vi.runAllTimersAsync();
     await requests;
-    expect(starts).toEqual([30_000, 32_000, 34_000]);
+    expect(starts).toEqual([30_000, 30_500, 31_000]);
   });
 
   it("rechecks a cooldown extended while requests are waiting", async () => {
@@ -152,7 +152,7 @@ describe("createCrawlThrottle", () => {
     });
     await vi.runAllTimersAsync();
     await request;
-    expect(startedAt).toBe(1_000);
+    expect(startedAt).toBe(250);
   });
 
   it("does not label an ordinary chunk deadline as a rate-limit stop", async () => {

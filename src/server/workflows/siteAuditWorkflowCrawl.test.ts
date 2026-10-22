@@ -156,13 +156,13 @@ describe("crawl pacing and cooldowns", () => {
     await vi.runAllTimersAsync();
     expect(await result).toEqual({ pagesCrawled: 210, completed: true });
     expect(starts).toHaveLength(210);
-    expect(starts.slice(1).every((at, i) => at - starts[i] >= 1_000)).toBe(
+    expect(starts.slice(1).every((at, i) => at - starts[i] >= 250)).toBe(
       true,
     );
     expect(mocks.claimChunk.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("never has more than two fetches in flight on a slow site", async () => {
+  it("never has more than three fetches in flight on a slow site", async () => {
     let inFlight = 0;
     let peak = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
@@ -175,7 +175,7 @@ describe("crawl pacing and cooldowns", () => {
     const result = crawl(10);
     await vi.runAllTimersAsync();
     expect(await result).toEqual({ pagesCrawled: 10, completed: true });
-    expect(peak).toBe(2);
+    expect(peak).toBe(3);
   });
 
   it("retains slower pacing across chunks after recovering from the first 429", async () => {
@@ -187,11 +187,11 @@ describe("crawl pacing and cooldowns", () => {
         headers: { "content-type": "text/html" },
       });
     });
-    const result = crawl(100);
+    const result = crawl(400);
     await vi.runAllTimersAsync();
-    expect(await result).toEqual({ pagesCrawled: 100, completed: true });
+    expect(await result).toEqual({ pagesCrawled: 400, completed: true });
     expect(starts[1]).toBe(30_000);
-    expect(starts.slice(2).every((at, i) => at - starts[i + 1] >= 2_000)).toBe(
+    expect(starts.slice(2).every((at, i) => at - starts[i + 1] >= 500)).toBe(
       true,
     );
     expect(saved.every((page) => page.fetchClass === "ok")).toBe(true);
