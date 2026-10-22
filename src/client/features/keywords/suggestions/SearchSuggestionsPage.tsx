@@ -112,13 +112,14 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     getErrorCode(dfsMutation.error) === "INSUFFICIENT_CREDITS";
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader
-        title="Search Suggestions"
-        description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with volume via DataForSEO."
-      />
-      <Card>
-        <CardContent className="flex flex-col gap-4">
+    <div className="h-full overflow-auto px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <PageHeader
+          title="Search Suggestions"
+          description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with volume via DataForSEO."
+        />
+        <Card className="overflow-visible">
+          <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={mode === "free" ? "default" : "outline"}
@@ -254,8 +255,8 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                 );
               })()
             : null}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {mode === "free" ? (
         freeMutation.data ? (
@@ -297,6 +298,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           />
         )
       )}
+      </div>
     </div>
   );
 }

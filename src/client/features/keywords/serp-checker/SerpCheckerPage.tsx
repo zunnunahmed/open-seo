@@ -44,13 +44,14 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
   const hasChecked = serp.serpKeyword !== null || serp.serpResults.length > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
-      <PageHeader
-        title="SERP Checker"
-        description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
-      />
-      <Card>
-        <CardContent>
+    <div className="h-full overflow-auto px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+        <PageHeader
+          title="SERP Checker"
+          description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
+        />
+        <Card className="overflow-visible">
+          <CardContent>
           <form
             className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_280px_auto] lg:items-end"
             onSubmit={(event) => {
@@ -93,8 +94,8 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
               Check SERP
             </Button>
           </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {!hasChecked && !serp.serpLoading ? (
         <EmptyState
@@ -119,6 +120,7 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
           onPageChange={serp.setSerpPage}
         />
       )}
+      </div>
     </div>
   );
 }
