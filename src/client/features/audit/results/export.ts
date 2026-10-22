@@ -1,3 +1,4 @@
+import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { AuditResultsData } from "@/client/features/audit/results/types";
 import { getIssueDescriptor } from "@/shared/audit-issues";
 import type { CsvValue } from "@/client/lib/csv";
@@ -60,6 +61,7 @@ const PAGES_HEADERS = [
   "Response Time (ms)",
   "Clicks (28d)",
   "Impressions (28d)",
+  "Category (28d)",
   "Indexed",
 ];
 
@@ -75,6 +77,9 @@ function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
     page.responseTimeMs,
     page.gscClicks ?? "No clicks",
     page.gscImpressions ?? "No impression",
+    page.gscClicks == null
+      ? "No data"
+      : classifyGscUrl(page.gscClicks).category,
     page.gscIndexStatus ?? "Not checked",
   ]);
 }
@@ -132,6 +137,10 @@ export function exportPages(
       responseTimeMs: page.responseTimeMs,
       gscClicks: page.gscClicks ?? null,
       gscImpressions: page.gscImpressions ?? null,
+      gscCategory:
+        page.gscClicks == null
+          ? null
+          : classifyGscUrl(page.gscClicks).category,
       gscIndexStatus: page.gscIndexStatus ?? "Not checked",
       gscIndexReason: page.gscIndexReason ?? null,
     })),

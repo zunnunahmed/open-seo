@@ -13,6 +13,7 @@ import {
   extractPathname,
   HttpStatusBadge,
 } from "@/client/features/audit/shared";
+import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { AuditResultsData } from "@/client/features/audit/results/types";
 import {
   countActiveFilters,
@@ -225,6 +226,31 @@ function buildPagesColumns({
           <span className="text-xs text-muted-foreground">No impression</span>
         ) : (
           <span className="text-xs">{value.toLocaleString("en-US")}</span>
+        );
+      },
+      sortingFn: nullableNumberSort,
+    }),
+    pageColumnHelper.accessor((row) => row.gscClicks ?? null, {
+      id: "gscCategory",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Category"
+          title="GSC click category, last 28 days: Performance, Good, Fair, Weak or Dead"
+        />
+      ),
+      cell: ({ getValue }) => {
+        const clicks = getValue();
+        if (clicks == null) {
+          return (
+            <span className="text-xs text-muted-foreground">No data</span>
+          );
+        }
+        const { category, action } = classifyGscUrl(clicks);
+        return (
+          <span className="text-xs" title={action}>
+            {category}
+          </span>
         );
       },
       sortingFn: nullableNumberSort,
