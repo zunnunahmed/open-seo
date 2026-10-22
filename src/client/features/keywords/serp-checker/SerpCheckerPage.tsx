@@ -33,13 +33,21 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
     if (keyword) serp.setSerpKeyword(keyword);
   }
 
+  function onKeywordChange(value: string) {
+    setKeywordInput(value);
+    // Don't show a previous keyword's SERP while typing a new one.
+    if (serp.serpKeyword !== null && value.trim() !== serp.serpKeyword) {
+      serp.setSerpKeyword(null);
+    }
+  }
+
   const hasChecked = serp.serpKeyword !== null || serp.serpResults.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         title="SERP Checker"
-        description="See Google's live results for any query — project market by default, or narrow to an area. Each check spends DataForSEO credits."
+        description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
       />
       <Card>
         <CardContent>
@@ -55,7 +63,7 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
               <Input
                 id="serp-checker-keyword"
                 value={keywordInput}
-                onChange={(event) => setKeywordInput(event.target.value)}
+                onChange={(event) => onKeywordChange(event.target.value)}
                 placeholder="best crm for small business"
               />
             </div>

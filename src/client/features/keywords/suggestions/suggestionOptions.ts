@@ -98,9 +98,6 @@ export const GROUP_OPTIONS: Array<{
   },
 ];
 
-export const LIMIT_OPTIONS = [100, 200, 500] as const;
-export type SuggestionLimit = (typeof LIMIT_OPTIONS)[number];
-
 /** Modifier counts per group, for cost estimates (each runs before + after). */
 export const MODIFIER_COUNTS: Record<
   SuggestionModifierGroup,

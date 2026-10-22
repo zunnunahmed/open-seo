@@ -3,6 +3,13 @@ import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/client/components/ui/select";
+import {
   clusterKeywords,
   type ClusterableKeyword,
   type ClusterMode,
@@ -81,33 +88,49 @@ export function ClusterResults({
             </label>
             <label className="space-y-1">
               <span className="font-medium">Mode</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5"
+              <Select
+                items={MODES.map((m) => ({ value: m.value, label: m.label }))}
                 value={mode}
-                onChange={(e) => {
-                  if (isMode(e.target.value)) setMode(e.target.value);
+                onValueChange={(next) => {
+                  if (next !== null && isMode(next)) setMode(next);
                   setPage(0);
                 }}
               >
-                {MODES.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full" aria-label="Cluster mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODES.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
             <label className="space-y-1">
               <span className="font-medium">Main keyword by</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5"
+              <Select
+                items={[
+                  { value: "volume", label: "Search volume (SEO)" },
+                  { value: "cpc", label: "CPC (paid search)" },
+                ]}
                 value={primaryBy}
-                onChange={(e) => {
-                  if (isPrimaryBy(e.target.value)) setPrimaryBy(e.target.value);
+                onValueChange={(next) => {
+                  if (next !== null && isPrimaryBy(next)) setPrimaryBy(next);
                 }}
               >
-                <option value="volume">Search volume (SEO)</option>
-                <option value="cpc">CPC (paid search)</option>
-              </select>
+                <SelectTrigger
+                  className="w-full"
+                  aria-label="Rank clusters by"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="volume">Search volume (SEO)</SelectItem>
+                  <SelectItem value="cpc">CPC (paid search)</SelectItem>
+                </SelectContent>
+              </Select>
             </label>
             <label className="space-y-1">
               <span className="font-medium">Compare competitors</span>

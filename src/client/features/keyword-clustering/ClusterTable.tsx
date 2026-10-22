@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   isDomainOrSubdomain,
   urlDomain,
@@ -101,7 +102,14 @@ export function ClusterTable({
                   onClick={() => toggle(cluster.id)}
                 >
                   <td className="p-3 font-medium">
-                    {expanded ? "▾" : "▸"} {cluster.main.keyword}
+                    <span className="inline-flex items-center gap-1">
+                      <ChevronRight
+                        className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${
+                          expanded ? "rotate-90" : ""
+                        }`}
+                      />
+                      {cluster.main.keyword}
+                    </span>
                     {cluster.features.length ? (
                       <div className="text-xs font-normal text-muted-foreground">
                         {cluster.features.map(featureLabel).join(" · ")}
