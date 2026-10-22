@@ -24,19 +24,9 @@ This repository is **Zunnun's customized fork** of [every-app/open-seo](https://
 - **Sitemap monitoring and Google index coverage:** Monthly count of sitemap-listed URLs (works with or without a project domain). With Search Console connected, sitemap URLs are checked with the URL Inspection API, up to 500 a day per project, showing indexed / not indexed / not checked, the not-indexed reasons, and a CSV export.
 - **Cloudflare self-host:** Production deployments are performed only through the manually confirmed GitHub workflow.
 
-### Upstream Update Manager
+### Detached from upstream
 
-[Full update procedure](./docs/UPSTREAM_UPDATE_MANAGER.md) · [Weekly workflow](./.github/workflows/upstream-update-review.yml) · [Update-safe architecture](./docs/CUSTOM_UPDATE_SAFE_ARCHITECTURE.md)
-
-The automated workflow checks **every Monday at 03:17 UTC** for changes to `every-app/open-seo`:
-
-1. Compare upstream `main` with this fork's `main`.
-2. If there are new upstream changes, prepare a temporary `sync/upstream-*` review branch, summarize files touching custom integrations, and attempt a merge into the **review branch only**.
-3. If conflicts occur, abort the merge and open a **blocked, report-only PR** listing conflicts. Do not merge such a PR into production.
-4. Open a pull request for review and dispatch CI on the review branch. Review migrations, security, GSC/GA4 OAuth, DataForSEO/treg routing, and existing custom exports.
-5. **Never automatically merge, approve or deploy.** Merge only after manual review and approval, then run [Cloudflare self-host deployment](./.github/workflows/selfhost-cloudflare-manual.yml) with operation `deploy` and confirmation `DEPLOY`.
-
-GitHub Actions must be permitted to create pull requests under repository Actions settings. Initial manual execution on 2026-10-21 succeeded and reported no new upstream changes to review.
+This fork no longer tracks `every-app/open-seo`. The weekly upstream-review workflow, its script and its procedure docs were removed on purpose: the codebase is heavily customized and upstream merges are not wanted. If you ever need an upstream change, cherry-pick it manually.
 
 ## Hosted Version
 
