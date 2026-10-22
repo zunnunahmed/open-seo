@@ -2,10 +2,7 @@ import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireProjectContext } from "@/serverFunctions/middleware";
-import {
-  getSeoProviderPreference,
-  isProviderAllowed,
-} from "@/server/custom/providers/projectPreference";
+import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
 import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 import {
   fetchTregList,
@@ -50,9 +47,8 @@ export const getTregSavedList = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(requestSchema)
   .handler(async ({ data, context }) => {
-    const preference = await getSeoProviderPreference(context.projectId);
-    if (!isProviderAllowed(preference, "treg"))
-      throw new Error("treg is not enabled for this project");
+    if ((await getSeoProviderPreference(context.projectId)) !== "treg_serpstat")
+      throw new Error("treg → Serpstat is not selected for this project.");
     const domain = requireDomain(data.domain);
     const key = `custom:treg:saved-list:v1:${context.projectId}:${domain}:${data.kind}`;
     if (!data.fetchFresh) {

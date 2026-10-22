@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   failRunIfActive: vi.fn(),
   captureServerEvent: vi.fn(),
   isHostedServerAuthMode: vi.fn(),
+  getSeoProviderPreference: vi.fn(),
+  runQueuedCheck: vi.fn(),
+  retryRankChecks: vi.fn(),
 }));
 
 vi.mock("cloudflare:workers", () => ({
@@ -33,8 +36,13 @@ vi.mock("@/server/features/rank-tracking/services/rankCheckRunGuards", () => ({
 }));
 vi.mock("@/server/workflows/rankCheckPaths", () => ({
   runLiveCheck: mocks.runLiveCheck,
-  runQueuedCheck: vi.fn(),
-  retryRankChecks: vi.fn(),
+  runQueuedCheck: mocks.runQueuedCheck,
+}));
+vi.mock("@/server/workflows/rankCheckRetries", () => ({
+  retryRankChecks: mocks.retryRankChecks,
+}));
+vi.mock("@/server/custom/providers/projectPreference", () => ({
+  getSeoProviderPreference: mocks.getSeoProviderPreference,
 }));
 vi.mock("@/server/workflows/pgStep", () => ({
   pgStep: (
@@ -79,7 +87,7 @@ const payload = {
   languageCode: "en",
   devices: "desktop" as "desktop" | "mobile" | "both",
   serpDepth: 10,
-  trigger: "manual" as const,
+  trigger: "manual" as "manual" | "scheduled",
 };
 
 function keywords(count: number) {
@@ -104,6 +112,10 @@ function runWorkflow(
     {} as WorkflowStep,
   );
 }
+
+beforeEach(() => {
+  mocks.getSeoProviderPreference.mockResolvedValue("direct_dataforseo");
+});
 
 describe("rank check workflow credit ceiling", () => {
   beforeEach(() => {
@@ -196,5 +208,30 @@ describe("rank check finalization", () => {
           "Checked 3 of 3 desktop and 0 of 3 mobile keyword(s): Invalid Field: 'location_name'.",
       }),
     );
+  });
+});
+
+describe("rank check provider route", () => {
+  beforeEach(() => {
+    mocks.getConfigById.mockResolvedValue({ isActive: true });
+    mocks.getRunById.mockResolvedValue(activeRun);
+    mocks.getKeywordsForConfig.mockResolvedValue(keywords(2));
+    mocks.getSnapshotsForRun.mockResolvedValue([]);
+    mocks.updateRun.mockResolvedValue(undefined);
+    mocks.isHostedServerAuthMode.mockResolvedValue(false);
+  });
+
+  it("checks a scheduled run live through treg, which has no queue", async () => {
+    mocks.getSeoProviderPreference.mockResolvedValue("treg_dataforseo");
+
+    await runWorkflow({ trigger: "scheduled" });
+
+    expect(mocks.createDataforseoClient).toHaveBeenCalledWith(
+      billingCustomer,
+      "treg_dataforseo",
+    );
+    expect(mocks.runLiveCheck).toHaveBeenCalled();
+    expect(mocks.runQueuedCheck).not.toHaveBeenCalled();
+    expect(mocks.retryRankChecks).not.toHaveBeenCalled();
   });
 });

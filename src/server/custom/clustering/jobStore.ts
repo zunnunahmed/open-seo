@@ -2,6 +2,12 @@ import { z } from "zod";
 import { dataforseoPricing } from "@/server/lib/dataforseo/pricing";
 import type { ClusterInputKeyword } from "@/shared/keywordClustering";
 import { getKeywordDataProvider } from "@/shared/keyword-locations";
+import { CLUSTER_SERP_DEPTH } from "@/server/custom/clustering/dataforseo";
+import type { SeoProviderRoute } from "@/server/custom/providers/treg/dataforseoTransport";
+import {
+  SERPSTAT_KEYWORD_USD,
+  SERPSTAT_SERP_USD,
+} from "@/server/custom/providers/treg/serpstatAsDataforseo";
 
 /**
  * R2 storage for keyword clustering jobs (strongly consistent, high write
@@ -45,6 +51,11 @@ export const metaSchema = z.object({
   failed: z.number(),
   estimatedUsd: z.object({ serps: z.number(), volume: z.number() }),
   lockUntil: z.number(),
+  // The project's provider route when the job was created; the estimate the
+  // user confirmed depends on it. Jobs from before routes were direct.
+  route: z
+    .enum(["direct_dataforseo", "treg_serpstat", "treg_dataforseo"])
+    .default("direct_dataforseo"),
 });
 type ClusterJobMeta = z.infer<typeof metaSchema>;
 const indexSchema = z.array(metaSchema);
@@ -127,20 +138,36 @@ export function estimateJobUsd(
   fetchVolume: boolean,
   locationCode: number,
   languageCode: string,
+  route: SeoProviderRoute = "direct_dataforseo",
 ) {
   let serps = 0;
-  for (let i = 0; i < keywords.length; i += CHUNK_SIZE) {
-    serps += dataforseoPricing.serp.clusterTaskPost({
-      tasks: keywords
-        .slice(i, i + CHUNK_SIZE)
-        .map((k, j) => ({ keyword: k.keyword, tag: String(i + j) })),
-      locationCode,
-      languageCode,
-    });
+  if (route === "direct_dataforseo") {
+    for (let i = 0; i < keywords.length; i += CHUNK_SIZE) {
+      serps += dataforseoPricing.serp.clusterTaskPost({
+        tasks: keywords
+          .slice(i, i + CHUNK_SIZE)
+          .map((k, j) => ({ keyword: k.keyword, tag: String(i + j) })),
+        locationCode,
+        languageCode,
+      });
+    }
+  } else if (route === "treg_serpstat") {
+    serps = keywords.length * SERPSTAT_SERP_USD;
+  } else {
+    // treg has no queued SERP endpoint, so treg routes fetch each SERP live.
+    for (const k of keywords)
+      serps += dataforseoPricing.serp.live({
+        keyword: k.keyword,
+        locationCode,
+        languageCode,
+        depth: CLUSTER_SERP_DEPTH,
+      });
   }
   const missing = fetchVolume
     ? keywords.filter((k) => k.volume == null).length
     : 0;
+  if (route === "treg_serpstat")
+    return { serps, volume: missing * SERPSTAT_KEYWORD_USD };
   const useAds = getKeywordDataProvider(locationCode) === "google_ads";
   let volume = 0;
   for (let i = 0; i < missing; i += 700) {
@@ -165,6 +192,7 @@ export async function createJob(
     fetchVolume: boolean;
     locationCode: number;
     languageCode: string;
+    route: SeoProviderRoute;
   },
 ): Promise<ClusterJobMeta> {
   const id = crypto.randomUUID();
@@ -200,8 +228,10 @@ export async function createJob(
       needsVolume,
       input.locationCode,
       input.languageCode,
+      input.route,
     ),
     lockUntil: 0,
+    route: input.route,
   };
   await writeJson(bucket, metaKey(projectId, id), meta);
   let removed: ClusterJobMeta[] = [];

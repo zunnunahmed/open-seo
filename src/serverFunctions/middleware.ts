@@ -4,6 +4,8 @@ import { AppError } from "@/server/lib/errors";
 import { errorHandlingMiddleware } from "@/middleware/errorHandling";
 import type { EnsuredUserContext } from "@/middleware/ensure-user/types";
 import { ensureUserMiddleware } from "@/middleware/ensureUser";
+import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
+import { runWithSeoProviderRoute } from "@/server/custom/providers/treg/dataforseoTransport";
 
 const ensuredUserContextSchema: z.ZodType<EnsuredUserContext> = z.object({
   userId: z.string(),
@@ -59,4 +61,18 @@ export const requireProjectContext = [
       },
     });
   }),
+] as const;
+
+/**
+ * Project context plus the project's SEO data provider route, so DataForSEO
+ * clients created in the handler send their requests the way the project
+ * chose (direct, or through treg).
+ */
+export const requireProjectSeoRoute = [
+  createMiddleware({ type: "function" })
+    .middleware(requireProjectContext)
+    .server(async ({ next, context }) => {
+      const route = await getSeoProviderPreference(context.projectId);
+      return runWithSeoProviderRoute(route, () => next());
+    }),
 ] as const;

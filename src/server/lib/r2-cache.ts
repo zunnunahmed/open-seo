@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { sortBy } from "remeda";
+import { activeSeoProviderRoute } from "@/server/custom/providers/treg/dataforseoTransport";
 
 /**
  * Cache TTL constants in seconds.
@@ -26,8 +27,15 @@ export async function buildCacheKey(
   prefix: string,
   params: Record<string, unknown>,
 ): Promise<string> {
+  // Serpstat data differs from DataForSEO's, so a treg → Serpstat project
+  // keeps its own entries. DataForSEO direct or through treg is the same data
+  // and shares them.
+  const keyed =
+    activeSeoProviderRoute() === "treg_serpstat"
+      ? { ...params, provider: "serpstat" }
+      : params;
   const raw = JSON.stringify(
-    Object.fromEntries(sortBy(Object.entries(params), ([key]) => key)),
+    Object.fromEntries(sortBy(Object.entries(keyed), ([key]) => key)),
   );
 
   return `${prefix}:${await sha256Hex(raw)}`;

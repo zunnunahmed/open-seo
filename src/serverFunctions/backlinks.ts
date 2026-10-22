@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { BacklinksService } from "@/server/features/backlinks/services/BacklinksService";
-import { requireProjectContext } from "@/serverFunctions/middleware";
+import { requireProjectSeoRoute } from "@/serverFunctions/middleware";
 import {
   backlinksOverviewInputSchema,
   backlinksRowsPageRequestSchema,
@@ -14,7 +14,7 @@ const WEB_SPAM_OPTIONS = { hideSpam: false };
 export const getBacklinksOverview = createServerFn({
   method: "POST",
 })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(backlinksOverviewInputSchema)
   .handler(async ({ data, context }) => {
     const profile = await BacklinksService.profileOverview(
@@ -30,7 +30,7 @@ export const getBacklinksOverview = createServerFn({
 export const getBacklinksRows = createServerFn({
   method: "POST",
 })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(backlinksRowsPageRequestSchema)
   .handler(({ data, context }) =>
     BacklinksService.profileBacklinksPage(data, context, {
@@ -41,7 +41,7 @@ export const getBacklinksRows = createServerFn({
 export const getBacklinksReferringDomains = createServerFn({
   method: "POST",
 })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(referringDomainsPageRequestSchema)
   .handler(({ data, context }) =>
     BacklinksService.profileReferringDomainsPage(
@@ -54,7 +54,7 @@ export const getBacklinksReferringDomains = createServerFn({
 export const getBacklinksTopPages = createServerFn({
   method: "POST",
 })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(topPagesPageRequestSchema)
   .handler(({ data, context }) =>
     BacklinksService.profileTopPagesPage(data, context),

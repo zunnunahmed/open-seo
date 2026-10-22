@@ -1,6 +1,11 @@
 import type { createDataforseoClient } from "@/server/lib/dataforseo/client";
 import { fetchKeywordMetricsForList } from "@/server/lib/dataforseo/keyword-metrics";
-import { fetchClusterSerpTaskResult } from "@/server/custom/clustering/dataforseo";
+import {
+  CLUSTER_SERP_DEPTH,
+  extractClusterSerp,
+  fetchClusterSerpTaskResult,
+} from "@/server/custom/clustering/dataforseo";
+import { DataforseoChargedTaskError } from "@/server/lib/dataforseo/envelope";
 import {
   chunkKey,
   getChunk,
@@ -21,6 +26,8 @@ const VOLUME_CHUNKS_PER_STEP = 7; // 700 keywords = one metrics request
 const POST_CHUNKS_PER_STEP = 3;
 const COLLECT_PER_STEP = 20;
 const COLLECT_CONCURRENCY = 5;
+// treg routes fetch SERPs live, one outgoing request each.
+const LIVE_PER_STEP = 25;
 const LOCK_MS = 60_000;
 // Queued tasks normally finish in minutes; give up on stragglers after a day.
 const TASK_TIMEOUT_MS = 24 * 60 * 60 * 1000;
@@ -29,7 +36,7 @@ const TASK_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 type DataforseoClient = Parameters<typeof fetchKeywordMetricsForList>[0] & {
   serp: Pick<
     ReturnType<typeof createDataforseoClient>["serp"],
-    "clusterTaskPost"
+    "clusterTaskPost" | "live"
   >;
 };
 type ClusterChunk = NonNullable<Awaited<ReturnType<typeof getChunk>>>;
@@ -115,6 +122,68 @@ async function stepPost(
     meta.failed += rejected;
     meta.postedChunks = n + 1;
     meta.postedAt ??= new Date().toISOString();
+  }
+}
+
+/**
+ * treg routes have no SERP queue: fetch top-10 SERPs live, a few per step,
+ * and store each result immediately so nothing is fetched (or billed) twice.
+ */
+async function stepLive(
+  bucket: Bucket,
+  projectId: string,
+  meta: ClusterJobMeta,
+  client: DataforseoClient,
+) {
+  let budget = LIVE_PER_STEP;
+  while (budget > 0 && meta.postedChunks < meta.chunkCount) {
+    const n = meta.postedChunks;
+    const chunk = await getChunk(bucket, projectId, meta.id, n);
+    if (!chunk) {
+      meta.postedChunks = n + 1;
+      continue;
+    }
+    const todo = chunk.keywords
+      .map((k) => k.keyword)
+      .filter((k) => !chunk.serps[k] && !chunk.failed[k]);
+    const batch = todo.slice(0, budget);
+    budget -= batch.length;
+    let done = 0;
+    let failed = 0;
+    let firstError: unknown = null;
+    const queue = [...batch];
+    const worker = async () => {
+      while (queue.length) {
+        const keyword = queue.shift();
+        if (!keyword) return;
+        try {
+          const items = await client.serp.live({
+            keyword,
+            locationCode: meta.locationCode,
+            languageCode: meta.languageCode,
+            depth: CLUSTER_SERP_DEPTH,
+            creditFeature: "keyword_research",
+          });
+          chunk.serps[keyword] = extractClusterSerp(items);
+          done++;
+        } catch (error) {
+          // A rejected task is final for that keyword; anything else (auth,
+          // balance, outage) leaves it pending for a later step.
+          if (error instanceof DataforseoChargedTaskError) {
+            chunk.failed[keyword] = error.message;
+            failed++;
+          } else firstError ??= error;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: COLLECT_CONCURRENCY }, worker));
+    await writeJson(bucket, chunkKey(projectId, meta.id, n), chunk);
+    meta.completed += done;
+    meta.failed += failed;
+    meta.postedAt ??= new Date().toISOString();
+    if (firstError && done === 0 && failed === 0) throw firstError;
+    if (batch.length === todo.length && !firstError) meta.postedChunks = n + 1;
+    else break;
   }
 }
 
@@ -221,7 +290,9 @@ export async function advanceJob(
       await stepVolume(bucket, projectId, meta, client);
     } else if (meta.postedChunks < meta.chunkCount) {
       phase = "posting";
-      await stepPost(bucket, projectId, meta, client);
+      if (meta.route === "direct_dataforseo")
+        await stepPost(bucket, projectId, meta, client);
+      else await stepLive(bucket, projectId, meta, client);
     } else {
       phase = "collecting";
       collected = await stepCollect(

@@ -47,6 +47,9 @@ function fakeClient() {
         async (input: { tasks: Array<{ keyword: string; tag: string }> }) =>
           input.tasks.map((t) => ({ tag: t.tag, taskId: `task-${++task}` })),
       ),
+      live: vi.fn(async (_input: { keyword: string }) => [
+        { type: "organic", rank_group: 1, url: "https://a.com/x" },
+      ]),
     },
   };
 }
@@ -57,13 +60,17 @@ const keywords = Array.from({ length: 150 }, (_, i) => ({
   cpc: null,
 }));
 
-async function newJob(bucket: ReturnType<typeof fakeBucket>) {
+async function newJob(
+  bucket: ReturnType<typeof fakeBucket>,
+  route: "direct_dataforseo" | "treg_dataforseo" = "direct_dataforseo",
+) {
   return createJob(bucket, "p1", {
     name: "Test",
     keywords,
     fetchVolume: false,
     locationCode: 2036,
     languageCode: "en",
+    route,
   });
 }
 
@@ -118,6 +125,24 @@ describe("keyword clustering jobs", () => {
     // Posting never repeats after the chunks are recorded.
     expect(client.serp.clusterTaskPost).toHaveBeenCalledTimes(2);
     expect((await listJobs(bucket, "p1"))[0].status).toBe("done");
+  });
+
+  it("fetches each SERP live once on a treg route, without the queue", async () => {
+    const bucket = fakeBucket();
+    const client = fakeClient();
+    const job = await newJob(bucket, "treg_dataforseo");
+
+    let step = await advanceJob(bucket, "p1", job.id, client, { start: true });
+    for (let i = 0; i < 20 && step.phase !== "done"; i++)
+      step = await advanceJob(bucket, "p1", job.id, client);
+
+    expect(step.phase).toBe("done");
+    expect(step.job.completed).toBe(150);
+    expect(client.serp.live).toHaveBeenCalledTimes(150);
+    expect(client.serp.clusterTaskPost).not.toHaveBeenCalled();
+    expect(
+      (await getChunk(bucket, "p1", job.id, 1))?.serps["keyword 149"],
+    ).toEqual({ urls: ["a.com/x"], features: [] });
   });
 
   it("tells a second tab to wait while a step holds the lease", async () => {

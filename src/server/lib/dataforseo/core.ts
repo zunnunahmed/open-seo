@@ -8,6 +8,11 @@ import {
   type DataforseoResponseLike,
   type DataforseoTaskLike,
 } from "@/server/lib/dataforseo/envelope";
+import {
+  activeSeoProviderRoute,
+  fetchDataforseoViaTreg,
+} from "@/server/custom/providers/treg/dataforseoTransport";
+import { fetchDataforseoViaSerpstat } from "@/server/custom/providers/treg/serpstatAsDataforseo";
 
 const API_BASE = "https://api.dataforseo.com";
 const MAX_DATAFORSEO_ERROR_PAYLOAD_LENGTH = 1600;
@@ -167,25 +172,44 @@ type DataforseoRequestOptions = {
   signal?: AbortSignal;
 };
 
+/**
+ * A treg route answers in DataForSEO's own response shape: treg → DataForSEO
+ * relays the request unchanged, treg → Serpstat translates it.
+ */
+function fetchOnTregRoute(
+  method: "GET" | "POST",
+  path: string,
+  body: unknown,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return activeSeoProviderRoute() === "treg_serpstat"
+    ? fetchDataforseoViaSerpstat(method, path, body)
+    : fetchDataforseoViaTreg(method, path, body, signal);
+}
+
 async function requestDataforseo<TTask extends DataforseoTaskLike>(
   method: "GET" | "POST",
   path: string,
   body: unknown,
   options: DataforseoRequestOptions,
 ): Promise<DataforseoResponseLike<TTask> | null> {
-  const doFetch = createAuthenticatedFetch(
-    options.classify,
-    options.maxServerErrorRetries,
-  );
-  const response = await doFetch(`${options.baseUrl ?? API_BASE}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
-    },
-    body: method === "POST" ? JSON.stringify(body) : undefined,
-    signal: options.signal,
-  });
+  const response =
+    activeSeoProviderRoute() === "direct_dataforseo"
+      ? await createAuthenticatedFetch(
+          options.classify,
+          options.maxServerErrorRetries,
+        )(`${options.baseUrl ?? API_BASE}${path}`, {
+          method,
+          headers: {
+            Accept: "application/json",
+            ...(method === "POST"
+              ? { "Content-Type": "application/json" }
+              : {}),
+          },
+          body: method === "POST" ? JSON.stringify(body) : undefined,
+          signal: options.signal,
+        })
+      : await fetchOnTregRoute(method, path, body, options.signal);
   const text = await response.text();
   if (text === "") return null;
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the task type is the caller's claim about the payload; billing metadata and item fields are validated downstream (envelope.ts + section Zod schemas)
@@ -223,6 +247,8 @@ export function dataforseoPostResponse(
   tasks: unknown[],
   options: DataforseoRequestOptions & { signal?: AbortSignal } = {},
 ): Promise<Response> {
+  if (activeSeoProviderRoute() !== "direct_dataforseo")
+    return fetchOnTregRoute("POST", path, tasks, options.signal);
   const doFetch = createAuthenticatedFetch(
     options.classify,
     options.maxServerErrorRetries,

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireProjectContext } from "@/serverFunctions/middleware";
+import { requireProjectSeoRoute } from "@/serverFunctions/middleware";
 import {
   domainOverviewSchema,
   domainKeywordSuggestionsSchema,
@@ -18,7 +18,7 @@ async function getDomainE2eFixtures() {
 }
 
 export const getDomainOverview = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(domainOverviewSchema)
   .handler(async ({ data, context }) => {
     const input = {
@@ -35,7 +35,7 @@ export const getDomainOverview = createServerFn({ method: "POST" })
   });
 
 export const getDomainKeywordSuggestions = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(domainKeywordSuggestionsSchema)
   .handler(async ({ data, context }) =>
     DomainService.getSuggestedKeywords(
@@ -50,7 +50,7 @@ export const getDomainKeywordSuggestions = createServerFn({ method: "POST" })
   );
 
 export const getDomainKeywordsPage = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(domainKeywordsPageRequestSchema)
   .handler(async ({ data, context }) => {
     const input = {
@@ -67,7 +67,7 @@ export const getDomainKeywordsPage = createServerFn({ method: "POST" })
   });
 
 export const getDomainPagesPage = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(domainPagesPageRequestSchema)
   .handler(async ({ data, context }) => {
     const input = {

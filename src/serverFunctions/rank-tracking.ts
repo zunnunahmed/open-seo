@@ -7,7 +7,10 @@ import { getLatestResults } from "@/server/features/rank-tracking/services/rankT
 import { AppError, asAppError } from "@/server/lib/errors";
 import { captureServerEvent } from "@/server/lib/posthog";
 import { markOnboardingMilestone } from "@/server/email/onboarding-drip";
-import { requireProjectContext } from "@/serverFunctions/middleware";
+import {
+  requireProjectContext,
+  requireProjectSeoRoute,
+} from "@/serverFunctions/middleware";
 import {
   getConfigsSchema,
   createConfigSchema,
@@ -280,7 +283,7 @@ export const setTrackingKeywordsPinned = createServerFn({ method: "POST" })
   });
 
 export const refreshTrackingKeywordMetrics = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(refreshMetricsSchema)
   .handler(async ({ data, context }) => {
     const result = await RankTrackingService.refreshKeywordMetrics(

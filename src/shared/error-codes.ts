@@ -20,6 +20,8 @@ const ERROR_CODES = [
   "DATAFORSEO_AUTH_FAILED",
   "RATE_LIMITED",
   "UPSTREAM_UNAVAILABLE",
+  "PROVIDER_ROUTE_UNSUPPORTED",
+  "TREG_REQUEST_FAILED",
   "CONFLICT",
   "INTERNAL_ERROR",
 ] as const;
@@ -43,6 +45,9 @@ const NON_REPORTABLE_ERROR_CODES = new Set<ErrorCode>([
   "AUDIT_PAGE_LIMIT_EXCEEDED",
   "AUDIT_ALREADY_RUNNING",
   "AUDIT_RENDERING_UNAVAILABLE",
+  // The project's provider route deliberately refuses a request it can't
+  // serve; that's a settings choice, not a fault.
+  "PROVIDER_ROUTE_UNSUPPORTED",
   // An external provider (DataForSEO) failing on its own side. Nothing in the
   // app to fix, and it drowned real exceptions. Note the error handlers only
   // log what they capture, so every throw site warns on its own line to keep

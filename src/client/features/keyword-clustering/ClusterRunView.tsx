@@ -24,10 +24,15 @@ function progressOf(job: Job) {
       value: job.volumeChunksDone / job.chunkCount,
     };
   if (job.postedChunks < job.chunkCount)
-    return {
-      label: "Sending keywords to DataForSEO",
-      value: job.postedChunks / job.chunkCount,
-    };
+    return job.route === "direct_dataforseo"
+      ? {
+          label: "Sending keywords to DataForSEO",
+          value: job.postedChunks / job.chunkCount,
+        }
+      : {
+          label: "Fetching Google results through treg",
+          value: (job.completed + job.failed) / job.total,
+        };
   return {
     label: "Collecting Google results",
     value: (job.completed + job.failed) / job.total,
@@ -157,7 +162,8 @@ export function ClusterRunView({
       <CardShell title={job.name}>
         <div className="space-y-3 text-sm">
           <p>
-            {job.total.toLocaleString()} keywords. Estimated DataForSEO cost:{" "}
+            {job.total.toLocaleString()} keywords. Estimated{" "}
+            {job.route === "direct_dataforseo" ? "DataForSEO" : "treg"} cost:{" "}
             <strong>{usd(total)}</strong> (top-10 Google results{" "}
             {usd(job.estimatedUsd.serps)}
             {job.estimatedUsd.volume
@@ -166,9 +172,12 @@ export function ClusterRunView({
             ). This is an upper bound.
           </p>
           <p className="text-muted-foreground">
-            Results use DataForSEO&rsquo;s standard queue and usually take 5–30
-            minutes. Keep this tab open; if you leave, reopen the run to
-            continue.
+            {job.route === "direct_dataforseo"
+              ? "Results use DataForSEO’s standard queue and usually take 5–30 minutes."
+              : job.route === "treg_serpstat"
+                ? "This project uses Serpstat through treg: country-level desktop results, fetched a few at a time."
+                : "This project routes through treg, which has no SERP queue, so each result is fetched live at the higher live price."}{" "}
+            Keep this tab open; if you leave, reopen the run to continue.
           </p>
           <Button disabled={running} onClick={() => void run(true)}>
             Start clustering ({usd(total)})

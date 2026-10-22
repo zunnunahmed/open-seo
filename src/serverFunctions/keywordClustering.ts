@@ -1,9 +1,16 @@
 import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireProjectContext } from "@/serverFunctions/middleware";
+import {
+  requireProjectContext,
+  requireProjectSeoRoute,
+} from "@/serverFunctions/middleware";
 import { createDataforseoClient } from "@/server/lib/dataforseo/client";
 import { advanceJob } from "@/server/custom/clustering/jobs";
+import {
+  activeSeoProviderRoute,
+  runWithSeoProviderRoute,
+} from "@/server/custom/providers/treg/dataforseoTransport";
 import {
   createJob,
   deleteJob,
@@ -27,7 +34,7 @@ export const listClusterJobs = createServerFn({ method: "POST" })
 
 /** Free: stores the cleaned list and returns the cost estimate to confirm. */
 export const createClusterJob = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(
     projectRequest.extend({
       name: z.string().trim().max(120),
@@ -62,6 +69,7 @@ export const createClusterJob = createServerFn({ method: "POST" })
       fetchVolume: data.fetchVolume,
       locationCode: data.locationCode,
       languageCode: data.languageCode,
+      route: activeSeoProviderRoute(),
     });
     return { ok: true as const, job };
   });
@@ -70,15 +78,22 @@ export const createClusterJob = createServerFn({ method: "POST" })
 export const advanceClusterJob = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(jobRequest.extend({ start: z.boolean().optional() }))
-  .handler(async ({ data, context }) =>
-    advanceJob(
-      env.R2,
-      context.projectId,
-      data.jobId,
-      createDataforseoClient(context),
-      { start: data.start },
-    ),
-  );
+  .handler(async ({ data, context }) => {
+    // A job keeps the route it was estimated on, even if the project's
+    // provider setting changes while it runs.
+    const route =
+      (await getJob(env.R2, context.projectId, data.jobId))?.route ??
+      "direct_dataforseo";
+    return runWithSeoProviderRoute(route, () =>
+      advanceJob(
+        env.R2,
+        context.projectId,
+        data.jobId,
+        createDataforseoClient(context, route),
+        { start: data.start },
+      ),
+    );
+  });
 
 export const getClusterJob = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)

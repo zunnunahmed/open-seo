@@ -10,25 +10,30 @@ import {
 
 const SECTION = "seo-data-providers";
 const OPTIONS = [
-  "direct_dataforseo",
-  "treg_serpstat",
-  "treg_dataforseo",
-  "both",
+  {
+    value: "direct_dataforseo",
+    title: "Direct DataForSEO",
+    description: "Use the connected DataForSEO account directly.",
+  },
+  {
+    value: "treg_serpstat",
+    title: "treg → Serpstat",
+    description:
+      "Serpstat data through treg, billed to the treg balance. Country-level data only.",
+  },
+  {
+    value: "treg_dataforseo",
+    title: "treg → DataForSEO",
+    description:
+      "The same DataForSEO data through treg, billed to the treg balance. Queued SERP jobs run live (higher cost).",
+  },
 ] as const;
-type Choice = (typeof OPTIONS)[number];
-
-function parseChoice(value: string): Choice {
-  if (value === "treg") return "treg_serpstat";
-  if (value === "dataforseo") return "direct_dataforseo";
-  return OPTIONS.includes(value as Choice)
-    ? (value as Choice)
-    : "direct_dataforseo";
-}
+type Choice = (typeof OPTIONS)[number]["value"];
 
 /**
- * Per-project preference only. Existing API calls still use DataForSEO until
- * provider-aware billing/routing is reviewed and explicitly enabled.
- * Persists using existing project-context storage to avoid a live D1 migration.
+ * Per-project SEO data route. Research server functions read it through the
+ * requireProjectSeoRoute middleware. Persists using existing project-context
+ * storage to avoid a live D1 migration.
  */
 export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
@@ -90,28 +95,7 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
             <>
               <fieldset className="space-y-3">
                 <legend className="font-medium">Preferred providers</legend>
-                {[
-                  [
-                    "direct_dataforseo",
-                    "Direct DataForSEO",
-                    "Use the connected DataForSEO account directly.",
-                  ],
-                  [
-                    "treg_serpstat",
-                    "treg → Serpstat",
-                    "Use treg's Serpstat route where supported.",
-                  ],
-                  [
-                    "treg_dataforseo",
-                    "treg → DataForSEO",
-                    "Use treg's DataForSEO route where supported.",
-                  ],
-                  [
-                    "both",
-                    "Both available",
-                    "Keep both routes available; each workflow chooses explicitly.",
-                  ],
-                ].map(([value, title, description]) => (
+                {OPTIONS.map(({ value, title, description }) => (
                   <label
                     key={value}
                     className="flex cursor-pointer items-start gap-3 rounded-md border p-3"
@@ -121,7 +105,7 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
                       name={`seo-provider-${projectId}`}
                       value={value}
                       checked={choice === value}
-                      onChange={() => setChoice(parseChoice(value))}
+                      onChange={() => setChoice(value)}
                       className="mt-1"
                     />
                     <span>

@@ -15,6 +15,7 @@ import {
 import { retryRankChecks } from "@/server/workflows/rankCheckRetries";
 import { pgStep } from "@/server/workflows/pgStep";
 import { createDataforseoClient } from "@/server/lib/dataforseo";
+import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
 import { captureServerEvent } from "@/server/lib/posthog";
 import { sendCreditsExhaustedEvent } from "@/server/email/onboarding-drip";
 import { AppError } from "@/server/lib/errors";
@@ -56,7 +57,7 @@ async function prepareRankCheckKeywords(input: {
   billingCustomer: BillingCustomerContext;
   devices: RankCheckParams["devices"];
   serpDepth: number;
-  trigger: RankCheckParams["trigger"];
+  queued: boolean;
   keywordIds?: string[];
   maxCostCredits?: number;
 }) {
@@ -90,7 +91,7 @@ async function prepareRankCheckKeywords(input: {
     trackingKeywords.map((kw) => kw.keyword),
     input.devices,
     input.serpDepth,
-    input.trigger === "scheduled" ? "queued" : "live",
+    input.queued ? "queued" : "live",
   );
   if (input.maxCostCredits != null && costCredits > input.maxCostCredits) {
     throw new AppError(
@@ -316,13 +317,19 @@ export class RankCheckWorkflow extends WorkflowEntrypoint<
           configId,
           projectId,
         });
-        return { isActive: cfg?.isActive ?? false };
+        return {
+          isActive: cfg?.isActive ?? false,
+          route: await getSeoProviderPreference(projectId),
+        };
       },
     );
     if (!configCheck.isActive) {
       await failRunIfActive(runId, "Config has been archived");
       return;
     }
+    // treg has no SERP queue, so a treg route checks every keyword live.
+    const route = configCheck.route;
+    const queued = trigger === "scheduled" && route === "direct_dataforseo";
 
     try {
       console.log(
@@ -340,14 +347,14 @@ export class RankCheckWorkflow extends WorkflowEntrypoint<
             billingCustomer,
             devices,
             serpDepth,
-            trigger,
+            queued,
             keywordIds,
             maxCostCredits,
           }),
       );
 
       const keywords = prepareResult.keywords;
-      const client = createDataforseoClient(billingCustomer);
+      const client = createDataforseoClient(billingCustomer, route);
 
       console.log(`[rank-check] ${runId} loaded ${keywords.length} keywords`);
 
@@ -367,13 +374,14 @@ export class RankCheckWorkflow extends WorkflowEntrypoint<
         };
         // Scheduled checks use DataForSEO's task queue (~30% of live cost);
         // manual checks stay on the live endpoint for instant results.
-        // Retries always go through the queue.
-        if (trigger === "scheduled") {
+        // Retries always go through the queue, which treg routes don't have.
+        if (queued) {
           await runQueuedCheck(step, checkContext);
         } else {
           await runLiveCheck(step, checkContext);
         }
-        await retryRankChecks(step, checkContext, configId);
+        if (route === "direct_dataforseo")
+          await retryRankChecks(step, checkContext, configId);
       } catch (error) {
         // Batch failure — snapshots for completed batches are already
         // persisted incrementally. Continue to finalization.

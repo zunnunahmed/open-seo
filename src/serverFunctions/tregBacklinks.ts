@@ -2,11 +2,7 @@ import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireProjectContext } from "@/serverFunctions/middleware";
-import {
-  getSeoProviderPreference,
-  isProviderAllowed,
-  isTregRoute,
-} from "@/server/custom/providers/projectPreference";
+import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
 import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 import { fetchTregBacklinksSummary } from "@/server/custom/providers/treg/client";
 
@@ -31,14 +27,10 @@ export const runTregBacklinksSummary = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(schema)
   .handler(async ({ data, context }) => {
-    const choice = await getSeoProviderPreference(context.projectId);
-    if (!isProviderAllowed(choice, "treg")) {
-      throw new Error("treg is not selected for this project.");
-    }
-    if (!isTregRoute(choice, "serpstat")) {
-      throw new Error(
-        "This project selects treg → DataForSEO, but the Backlinks treg adapter currently supports Serpstat only.",
-      );
+    if (
+      (await getSeoProviderPreference(context.projectId)) !== "treg_serpstat"
+    ) {
+      throw new Error("treg → Serpstat is not selected for this project.");
     }
     if ((await getOptionalEnvValue("CUSTOM_TREG_ENABLED")) !== "true") {
       throw new Error("treg research is not enabled on this deployment.");

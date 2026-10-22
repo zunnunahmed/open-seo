@@ -14,8 +14,14 @@ import {
   updateSavedKeywordTagsSchema,
 } from "@/types/schemas/keywords";
 import { KeywordResearchService } from "@/server/features/keywords/services/KeywordResearchService";
-import { mineDataforseoSuggestions, mineSearchSuggestions } from "@/server/features/keywords/services/searchSuggestions";
-import { requireProjectContext } from "@/serverFunctions/middleware";
+import {
+  mineDataforseoSuggestions,
+  mineSearchSuggestions,
+} from "@/server/features/keywords/services/searchSuggestions";
+import {
+  requireProjectContext,
+  requireProjectSeoRoute,
+} from "@/serverFunctions/middleware";
 import { resolveMarket } from "@/shared/keyword-locations";
 
 function shouldUseKeywordE2eFixtures() {
@@ -27,7 +33,7 @@ async function getKeywordE2eFixtures() {
 }
 
 export const researchKeywords = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(researchKeywordsSchema)
   .handler(async ({ data, context }) => {
     const input = {
@@ -114,7 +120,7 @@ export const removeSavedKeywords = createServerFn({
   });
 
 export const refreshSavedKeywordMetrics = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(refreshSavedKeywordMetricsSchema)
   .handler(async ({ context }) => {
     return KeywordResearchService.refreshSavedKeywordMetrics(
@@ -124,7 +130,7 @@ export const refreshSavedKeywordMetrics = createServerFn({ method: "POST" })
   });
 
 export const getSerpAnalysis = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(serpAnalysisSchema)
   .handler(async ({ data, context }) =>
     KeywordResearchService.getSerpAnalysis(
@@ -139,7 +145,7 @@ export const getSerpAnalysis = createServerFn({ method: "POST" })
 
 /** Free Google autocomplete mining: no DataForSEO credit involved. */
 export const getSearchSuggestions = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(searchSuggestionsSchema)
   .handler(async ({ data }) => {
     return mineSearchSuggestions({
@@ -152,7 +158,7 @@ export const getSearchSuggestions = createServerFn({ method: "POST" })
 
 /** DataForSEO keyword_suggestions per seed, billed under keyword_research. */
 export const getDataforseoSuggestions = createServerFn({ method: "POST" })
-  .middleware(requireProjectContext)
+  .middleware(requireProjectSeoRoute)
   .validator(searchSuggestionsDataforseoSchema)
   .handler(async ({ data, context }) => {
     const market = resolveMarket(data, context.project);

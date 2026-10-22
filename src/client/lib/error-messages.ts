@@ -42,6 +42,10 @@ const STANDARD_MESSAGES: Record<ErrorCode, string> = {
   RATE_LIMITED: "Too many requests. Please wait and try again.",
   UPSTREAM_UNAVAILABLE:
     "The data provider is temporarily unavailable. Please retry in a moment.",
+  PROVIDER_ROUTE_UNSUPPORTED:
+    "This feature isn't available on the project's selected SEO data provider route. Choose another route in Integrations → SEO data providers.",
+  TREG_REQUEST_FAILED:
+    "treg could not complete the request. Check that treg is enabled (CUSTOM_TREG_ENABLED, TREG_API_TOKEN) and the treg balance is funded.",
   CONFLICT: "This request conflicts with existing data.",
   INTERNAL_ERROR: UNEXPECTED_ERROR_MESSAGE,
 };

@@ -66,13 +66,18 @@ import {
   postAiTrackingTasks,
 } from "@/server/lib/dataforseo/ai-tracking";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
+import {
+  activeSeoProviderRoute,
+  runWithSeoProviderRoute,
+  type SeoProviderRoute,
+} from "@/server/custom/providers/treg/dataforseoTransport";
 import { AppError } from "@/server/lib/errors";
 
 export { mapDataforseoPathToCreditFeature };
 
 /**
  * Wraps a section fetcher with billing metering. Each entry on the client is
- * `meter(customer, fetchX, dataforseoPricing.section.x, defaultFeature?)`,
+ * `meter(scope, fetchX, dataforseoPricing.section.x, defaultFeature?)`,
  * which returns a function with the fetcher's own input type and resolves to
  * its unwrapped `.data`.
  *
@@ -85,37 +90,54 @@ export { mapDataforseoPathToCreditFeature };
  * read named fields rather than spreading the input.
  */
 function meter<I, T>(
-  customer: BillingCustomerContext,
+  { customer, route }: MeterScope,
   fetcher: (input: I) => Promise<DataforseoApiResponse<T>>,
   estimateRawUsd: (input: I) => number,
   defaultFeature?: CreditFeature,
 ): (input: I & { creditFeature?: CreditFeature }) => Promise<T> {
   return (input) =>
-    meterDataforseoCall(
-      customer,
-      () => fetcher(input),
-      creditsForProviderUsd(estimateRawUsd(input)),
-      input.creditFeature ?? defaultFeature,
+    runWithSeoProviderRoute(route, () =>
+      meterDataforseoCall(
+        customer,
+        () => fetcher(input),
+        creditsForProviderUsd(estimateRawUsd(input)),
+        input.creditFeature ?? defaultFeature,
+      ),
     );
 }
 
-export function createDataforseoClient(customer: BillingCustomerContext) {
+type MeterScope = {
+  customer: BillingCustomerContext;
+  route: SeoProviderRoute;
+};
+
+/**
+ * `route` defaults to the request's project route (set by the
+ * withSeoProviderRoute middleware). Workflows pass it explicitly: their steps
+ * do not inherit the request scope. Each call re-enters the route, so a client
+ * built outside a step still routes correctly inside one.
+ */
+export function createDataforseoClient(
+  customer: BillingCustomerContext,
+  route: SeoProviderRoute = activeSeoProviderRoute(),
+) {
+  const scope: MeterScope = { customer, route };
   return {
     business: {
       businessListings: meter(
-        customer,
+        scope,
         fetchBusinessListingsSearch,
         dataforseoPricing.business.businessListings,
         "local_seo",
       ),
       questionsAnswers: meter(
-        customer,
+        scope,
         fetchQuestionsAnswers,
         dataforseoPricing.business.questionsAnswers,
         "local_seo",
       ),
       myBusinessInfo: meter(
-        customer,
+        scope,
         fetchMyBusinessInfo,
         dataforseoPricing.business.myBusinessInfo,
         "local_seo",
@@ -123,13 +145,13 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       // task_post is where DataForSEO charges; collection runs unmetered
       // through fetchBusinessDataTaskResult (see index.ts).
       reviewsTaskPost: meter(
-        customer,
+        scope,
         postGoogleReviewsTask,
         dataforseoPricing.business.reviewsTaskPost,
         "local_seo",
       ),
       updatesTaskPost: meter(
-        customer,
+        scope,
         postMyBusinessUpdatesTask,
         dataforseoPricing.business.updatesTaskPost,
         "local_seo",
@@ -137,80 +159,72 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
     },
     backlinks: {
       summary: meter(
-        customer,
+        scope,
         fetchBacklinksSummary,
         dataforseoPricing.backlinks.summary,
       ),
-      rows: meter(
-        customer,
-        fetchBacklinksRows,
-        dataforseoPricing.backlinks.rows,
-      ),
+      rows: meter(scope, fetchBacklinksRows, dataforseoPricing.backlinks.rows),
       referringDomains: meter(
-        customer,
+        scope,
         fetchReferringDomains,
         dataforseoPricing.backlinks.referringDomains,
       ),
       domainPages: meter(
-        customer,
+        scope,
         fetchDomainPagesSummary,
         dataforseoPricing.backlinks.domainPages,
       ),
       history: meter(
-        customer,
+        scope,
         fetchBacklinksHistory,
         dataforseoPricing.backlinks.history,
       ),
     },
     keywords: {
       related: meter(
-        customer,
+        scope,
         fetchRelatedKeywords,
         dataforseoPricing.keywords.related,
       ),
       suggestions: meter(
-        customer,
+        scope,
         fetchKeywordSuggestions,
         dataforseoPricing.keywords.suggestions,
       ),
-      ideas: meter(
-        customer,
-        fetchKeywordIdeas,
-        dataforseoPricing.keywords.ideas,
-      ),
+      ideas: meter(scope, fetchKeywordIdeas, dataforseoPricing.keywords.ideas),
       // Google Ads endpoints for countries Labs doesn't support.
       adsIdeas: meter(
-        customer,
+        scope,
         fetchAdsKeywordIdeas,
         dataforseoPricing.keywords.adsIdeas,
       ),
       adsSearchVolume: meter(
-        customer,
+        scope,
         fetchAdsSearchVolume,
         dataforseoPricing.keywords.adsSearchVolume,
       ),
     },
     domain: {
       rankOverview: meter(
-        customer,
+        scope,
         fetchDomainRankOverview,
         dataforseoPricing.domain.rankOverview,
       ),
       rankedKeywords: meter(
-        customer,
+        scope,
         fetchRankedKeywords,
         dataforseoPricing.domain.rankedKeywords,
       ),
       relevantPages: meter(
-        customer,
+        scope,
         fetchRelevantPages,
         dataforseoPricing.domain.relevantPages,
       ),
     },
     serp: {
-      live: meter(customer, fetchLiveSerp, dataforseoPricing.serp.live),
+      live: meter(scope, fetchLiveSerp, dataforseoPricing.serp.live),
       autocomplete: meter(
-        customer,
+        scope,
         fetchGoogleAutocomplete,
         dataforseoPricing.serp.autocomplete,
         "keyword_research",
@@ -218,19 +232,21 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       // A rank check batch shares one credit hold and one settle across its
       // live calls (see meterDataforseoCalls). Resolves per call, in order.
       rankCheckBatch: (inputs: Parameters<typeof fetchRankCheckSerp>[0][]) =>
-        meterDataforseoCalls(
-          customer,
-          inputs.map((input) => () => fetchRankCheckSerp(input)),
-          inputs.map((input) =>
-            creditsForProviderUsd(dataforseoPricing.serp.rankCheck(input)),
+        runWithSeoProviderRoute(route, () =>
+          meterDataforseoCalls(
+            customer,
+            inputs.map((input) => () => fetchRankCheckSerp(input)),
+            inputs.map((input) =>
+              creditsForProviderUsd(dataforseoPricing.serp.rankCheck(input)),
+            ),
+            "rank_tracking",
           ),
-          "rank_tracking",
         ),
       // Posts up to 100 queued rank check tasks; one metered charge covers the
       // whole batch (DataForSEO bills task_post at post time, collection is
       // free).
       rankCheckTaskPost: meter(
-        customer,
+        scope,
         postRankCheckTasks,
         dataforseoPricing.serp.rankCheckTaskPost,
         "rank_tracking",
@@ -238,13 +254,13 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       // Fork: up to 100 queued top-10 SERPs for keyword clustering; one
       // metered charge per batch, collection is free.
       clusterTaskPost: meter(
-        customer,
+        scope,
         postClusterSerpTasks,
         dataforseoPricing.serp.clusterTaskPost,
         "keyword_research",
       ),
       local: meter(
-        customer,
+        scope,
         fetchLocalSerp,
         dataforseoPricing.serp.local,
         "local_seo",
@@ -252,7 +268,7 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       // One queued Maps task per rank grid point; one metered charge covers
       // them all (DataForSEO bills task_post, collection is free).
       localTaskPost: meter(
-        customer,
+        scope,
         postLocalSerpTasks,
         dataforseoPricing.serp.localTaskPost,
         "local_seo",
@@ -263,54 +279,54 @@ export function createDataforseoClient(customer: BillingCustomerContext) {
       // their own feature by passing `creditFeature` in the input; defaults to
       // rank_tracking when omitted.
       keywordOverview: meter(
-        customer,
+        scope,
         fetchKeywordOverview,
         dataforseoPricing.labs.keywordOverview,
         "rank_tracking",
       ),
       serpCompetitors: meter(
-        customer,
+        scope,
         fetchSerpCompetitors,
         dataforseoPricing.labs.serpCompetitors,
       ),
     },
     lighthouse: {
       live: meter(
-        customer,
+        scope,
         fetchLighthouseResult,
         dataforseoPricing.lighthouse.live,
       ),
     },
     aiSearch: {
       mentionsSearch: meter(
-        customer,
+        scope,
         fetchLlmMentionsSearch,
         dataforseoPricing.aiSearch.mentionsSearch,
       ),
       aggregatedMetrics: meter(
-        customer,
+        scope,
         fetchLlmAggregatedMetrics,
         dataforseoPricing.aiSearch.aggregatedMetrics,
       ),
       topPages: meter(
-        customer,
+        scope,
         fetchLlmTopPages,
         dataforseoPricing.aiSearch.topPages,
       ),
       crossAggregatedMetrics: meter(
-        customer,
+        scope,
         fetchLlmCrossAggregatedMetrics,
         dataforseoPricing.aiSearch.crossAggregatedMetrics,
       ),
       llmResponse: meter(
-        customer,
+        scope,
         fetchLlmResponse,
         dataforseoPricing.aiSearch.llmResponse,
       ),
       // Posts up to 100 tracked prompts for one engine; one metered charge
       // covers the batch (DataForSEO bills task_post, collection is free).
       trackingTaskPost: meter(
-        customer,
+        scope,
         postAiTrackingTasks,
         dataforseoPricing.aiSearch.trackingTaskPost,
         "ai_prompt_responses",

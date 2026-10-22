@@ -32,10 +32,9 @@ export function BacklinksPage({
     queryKey: ["seo-provider-preferences", projectId],
     queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
   });
+  // treg → DataForSEO serves the same DataForSEO backlinks through treg.
   const showDataForSeo =
-    providerQuery.isSuccess &&
-    (providerQuery.data === "direct_dataforseo" ||
-      providerQuery.data === "both");
+    providerQuery.isSuccess && providerQuery.data !== "treg_serpstat";
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -163,8 +162,7 @@ export function BacklinksPage({
             Could not load provider settings. Research queries are paused.
           </p>
         ) : null}
-        {providerQuery.data === "treg_serpstat" ||
-        providerQuery.data === "both" ? (
+        {providerQuery.data === "treg_serpstat" ? (
           <>
             <TregBacklinksSummaryCard
               projectId={projectId}
