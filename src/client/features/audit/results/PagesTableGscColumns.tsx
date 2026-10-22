@@ -1,5 +1,6 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
+import { Badge } from "@/client/components/ui/badge";
 import {
   nullableNumberSort,
   type PageRow,
@@ -7,6 +8,14 @@ import {
 import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 
 const gscColumnHelper = createColumnHelper<PageRow>();
+
+const CATEGORY_BADGE = {
+  Performance: "success",
+  Good: "info",
+  Fair: "secondary",
+  Weak: "warning",
+  Dead: "destructive",
+} as const;
 
 /**
  * Search Console columns for the audit Pages table: 28-day clicks and
@@ -17,11 +26,12 @@ export function buildGscColumns(): ColumnDef<PageRow>[] {
   return [
     gscColumnHelper.accessor((row) => row.gscClicks ?? null, {
       id: "gscClicks",
-      meta: { cellClassName: "whitespace-nowrap" },
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       header: ({ column }) => (
         <SortableHeader
           column={column}
           label="Clicks"
+          align="right"
           title="Search Console clicks, last 28 days"
         />
       ),
@@ -30,18 +40,19 @@ export function buildGscColumns(): ColumnDef<PageRow>[] {
         return value == null ? (
           <span className="text-xs text-muted-foreground">No clicks</span>
         ) : (
-          <span className="text-xs">{value.toLocaleString("en-US")}</span>
+          <span className="text-xs tabular-nums">{value.toLocaleString("en-US")}</span>
         );
       },
       sortingFn: nullableNumberSort,
     }),
     gscColumnHelper.accessor((row) => row.gscImpressions ?? null, {
       id: "gscImpressions",
-      meta: { cellClassName: "whitespace-nowrap" },
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       header: ({ column }) => (
         <SortableHeader
           column={column}
           label="Impressions"
+          align="right"
           title="Search Console impressions, last 28 days"
         />
       ),
@@ -50,7 +61,7 @@ export function buildGscColumns(): ColumnDef<PageRow>[] {
         return value == null ? (
           <span className="text-xs text-muted-foreground">No impression</span>
         ) : (
-          <span className="text-xs">{value.toLocaleString("en-US")}</span>
+          <span className="text-xs tabular-nums">{value.toLocaleString("en-US")}</span>
         );
       },
       sortingFn: nullableNumberSort,
@@ -132,9 +143,9 @@ export function buildGscColumns(): ColumnDef<PageRow>[] {
         }
         const { category, action } = classifyGscUrl(clicks);
         return (
-          <span className="text-xs" title={action}>
+          <Badge variant={CATEGORY_BADGE[category]} size="sm" title={action}>
             {category}
-          </span>
+          </Badge>
         );
       },
       sortingFn: nullableNumberSort,
@@ -156,22 +167,26 @@ export function buildGscColumns(): ColumnDef<PageRow>[] {
             .gscIndexReason ?? undefined;
         if (value === "Indexed") {
           return (
-            <span className="text-xs text-success" title={reason}>
+            <Badge variant="success" size="sm" title={reason}>
               Indexed
-            </span>
+            </Badge>
           );
         }
         if (value === "Not indexed") {
           return (
-            <span className="text-xs text-destructive" title={reason}>
+            <Badge variant="destructive" size="sm" title={reason}>
               Not indexed
-            </span>
+            </Badge>
           );
         }
         return (
-          <span className="text-xs text-muted-foreground" title={reason}>
+          <Badge
+            variant={value === "Check failed" ? "warning" : "outline"}
+            size="sm"
+            title={reason}
+          >
             {value}
-          </span>
+          </Badge>
         );
       },
     }),

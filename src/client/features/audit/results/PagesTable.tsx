@@ -162,21 +162,27 @@ function buildPagesColumns({
       meta: { cellClassName: "max-w-[360px] min-w-[200px]" },
     }),
     pageColumnHelper.accessor("h1Count", {
-      header: ({ column }) => <SortableHeader column={column} label="H1" />,
-      meta: { cellClassName: "whitespace-nowrap" },
+      header: ({ column }) => (
+        <SortableHeader column={column} label="H1" align="right" />
+      ),
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       cell: ({ getValue, row }) =>
         hasAnalyzedContent(row.original) ? getValue() : <EmptyCell />,
     }),
     pageColumnHelper.accessor("wordCount", {
-      header: ({ column }) => <SortableHeader column={column} label="Words" />,
-      meta: { cellClassName: "whitespace-nowrap" },
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Words" align="right" />
+      ),
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       cell: ({ getValue, row }) =>
         hasAnalyzedContent(row.original) ? getValue() : <EmptyCell />,
     }),
     pageColumnHelper.display({
       id: "images",
-      header: ({ column }) => <SortableHeader column={column} label="Images" />,
-      meta: { cellClassName: "whitespace-nowrap" },
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Images" align="right" />
+      ),
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       cell: ({ row }) => {
         if (!hasAnalyzedContent(row.original)) return <EmptyCell />;
         return row.original.imagesMissingAlt > 0 ? (
@@ -193,8 +199,10 @@ function buildPagesColumns({
         left.original.imagesTotal - right.original.imagesTotal,
     }),
     pageColumnHelper.accessor("responseTimeMs", {
-      header: ({ column }) => <SortableHeader column={column} label="Speed" />,
-      meta: { cellClassName: "whitespace-nowrap" },
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Speed" align="right" />
+      ),
+      meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
       cell: ({ getValue }) => {
         const value = getValue();
         return value ? (
