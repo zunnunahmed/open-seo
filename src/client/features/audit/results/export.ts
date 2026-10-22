@@ -61,6 +61,8 @@ const PAGES_HEADERS = [
   "Response Time (ms)",
   "Clicks (28d)",
   "Impressions (28d)",
+  "Top impression query (28d)",
+  "Top click query (28d)",
   "Category (28d)",
   "Indexed",
 ];
@@ -77,6 +79,12 @@ function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
     page.responseTimeMs,
     page.gscClicks ?? "No clicks",
     page.gscImpressions ?? "No impression",
+    page.gscTopImpressionQuery == null
+      ? "No data"
+      : `${page.gscTopImpressionQuery} (${page.gscTopImpressions ?? 0})`,
+    page.gscTopClickQuery == null
+      ? "No data"
+      : `${page.gscTopClickQuery} (${page.gscTopClicks ?? 0})`,
     page.gscClicks == null
       ? "No data"
       : classifyGscUrl(page.gscClicks).category,
@@ -137,6 +145,10 @@ export function exportPages(
       responseTimeMs: page.responseTimeMs,
       gscClicks: page.gscClicks ?? null,
       gscImpressions: page.gscImpressions ?? null,
+      gscTopImpressionQuery: page.gscTopImpressionQuery ?? null,
+      gscTopImpressions: page.gscTopImpressions ?? null,
+      gscTopClickQuery: page.gscTopClickQuery ?? null,
+      gscTopClicks: page.gscTopClicks ?? null,
       gscCategory:
         page.gscClicks == null
           ? null

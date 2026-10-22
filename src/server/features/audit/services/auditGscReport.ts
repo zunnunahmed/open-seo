@@ -141,6 +141,70 @@ function buildGscReportIssues(
   return found;
 }
 
+/** Fetch page×query Search Console rows and keep each page's top query by
+ * impressions and by clicks. Returns an empty map when GSC is not connected. */
+async function getGscTopQueries(
+  projectId: string,
+  pageCount: number,
+): Promise<
+  Map<
+    string,
+    {
+      impQuery: string;
+      impressions: number;
+      clickQuery: string;
+      clicks: number;
+    }
+  >
+> {
+  const { GscService } = await import(
+    "@/server/features/gsc/services/GscService"
+  );
+  // One row per page×query pair, so the limit scales with the audit size.
+  const rowLimit = Math.min(25000, Math.max(5000, pageCount * 200));
+  const { rows } = await GscService.getPerformance({
+    projectId,
+    dimensions: ["page", "query"],
+    dateRange: "last_28_days",
+    rowLimit,
+  });
+  const top = new Map<
+    string,
+    {
+      impQuery: string;
+      impressions: number;
+      clickQuery: string;
+      clicks: number;
+    }
+  >();
+  for (const row of rows) {
+    const pageUrl = row.keys?.[0];
+    const query = row.keys?.[1];
+    if (!pageUrl || !query) continue;
+    const key = normalizeAuditUrl(pageUrl);
+    if (!key) continue;
+    const existing = top.get(key);
+    if (!existing) {
+      top.set(key, {
+        impQuery: query,
+        impressions: row.impressions,
+        clickQuery: query,
+        clicks: row.clicks,
+      });
+    } else {
+      if (row.impressions > existing.impressions) {
+        existing.impQuery = query;
+        existing.impressions = row.impressions;
+      }
+      if (row.clicks > existing.clicks) {
+        existing.clickQuery = query;
+        existing.clicks = row.clicks;
+      }
+    }
+  }
+  return top;
+}
+
 /**
  * Attach 28-day GSC clicks/impressions, Google index status and the derived
  * report-time issues to crawled pages. Computed when results load so past
@@ -157,6 +221,10 @@ export async function enrichAuditPagesWithGsc<
     TPage & {
       gscClicks: number | null;
       gscImpressions: number | null;
+      gscTopImpressionQuery: string | null;
+      gscTopImpressions: number | null;
+      gscTopClickQuery: string | null;
+      gscTopClicks: number | null;
       gscIndexStatus: string;
       gscIndexReason: string | null;
     }
@@ -174,6 +242,16 @@ export async function enrichAuditPagesWithGsc<
     gscConnected = true;
   } catch (error) {
     console.warn(`Audit ${auditId}: GSC page metrics unavailable:`, error);
+  }
+
+  // Best-effort top queries per page (last 28 days). Failing independently
+  // of the page totals so one bad call cannot take down the other.
+  let gscTopQueries: Awaited<ReturnType<typeof getGscTopQueries>> = new Map();
+  try {
+    gscTopQueries = await getGscTopQueries(projectId, pages.length);
+    gscConnected = true;
+  } catch (error) {
+    console.warn(`Audit ${auditId}: GSC top queries unavailable:`, error);
   }
 
   // Best-effort Google index status from the sitemap monitor (KV-only,
@@ -198,12 +276,17 @@ export async function enrichAuditPagesWithGsc<
   const enriched = pages.map((page) => {
     const key = normalizeAuditUrl(page.url);
     const metrics = key ? gscMetrics.get(key) : undefined;
+    const queries = key ? gscTopQueries.get(key) : undefined;
     const indexEntry =
       indexEntries[page.url] ?? (key ? indexByNormalized.get(key) : undefined);
     return {
       ...page,
       gscClicks: metrics?.clicks ?? null,
       gscImpressions: metrics?.impressions ?? null,
+      gscTopImpressionQuery: queries?.impQuery ?? null,
+      gscTopImpressions: queries?.impressions ?? null,
+      gscTopClickQuery: queries?.clickQuery ?? null,
+      gscTopClicks: queries?.clicks ?? null,
       gscIndexStatus: indexStatusOf(indexEntry),
       gscIndexReason: indexEntry?.r ?? null,
     };

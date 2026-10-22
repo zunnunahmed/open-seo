@@ -230,6 +230,62 @@ function buildPagesColumns({
       },
       sortingFn: nullableNumberSort,
     }),
+    pageColumnHelper.accessor((row) => row.gscTopImpressions ?? null, {
+      id: "gscTopImpressionQuery",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Top impression query"
+          title="Highest-impression Search Console query for this page, last 28 days"
+        />
+      ),
+      cell: ({ getValue, row }) => {
+        const query = row.original.gscTopImpressionQuery;
+        const impressions = getValue();
+        if (query == null || impressions == null) {
+          return (
+            <span className="text-xs text-muted-foreground">No data</span>
+          );
+        }
+        return (
+          <span
+            className="block max-w-[220px] truncate text-xs"
+            title={`${query} — ${impressions.toLocaleString("en-US")} impressions`}
+          >
+            {query}
+          </span>
+        );
+      },
+      sortingFn: nullableNumberSort,
+    }),
+    pageColumnHelper.accessor((row) => row.gscTopClicks ?? null, {
+      id: "gscTopClickQuery",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Top click query"
+          title="Highest-click Search Console query for this page, last 28 days"
+        />
+      ),
+      cell: ({ getValue, row }) => {
+        const query = row.original.gscTopClickQuery;
+        const clicks = getValue();
+        if (query == null || clicks == null) {
+          return (
+            <span className="text-xs text-muted-foreground">No data</span>
+          );
+        }
+        return (
+          <span
+            className="block max-w-[220px] truncate text-xs"
+            title={`${query} — ${clicks.toLocaleString("en-US")} clicks`}
+          >
+            {query}
+          </span>
+        );
+      },
+      sortingFn: nullableNumberSort,
+    }),
     pageColumnHelper.accessor((row) => row.gscClicks ?? null, {
       id: "gscCategory",
       header: ({ column }) => (
