@@ -150,8 +150,11 @@ export function getProjectNavGroups(projectId: string) {
         byPath("/p/$projectId/suggestions"),
         byPath("/p/$projectId/serp-checker"),
         byPath("/p/$projectId/domain"),
-        byPath("/p/$projectId/backlinks"),
       ],
+    },
+    {
+      label: "Outreach",
+      items: [byPath("/p/$projectId/backlinks")],
     },
     {
       label: "AI Visibility",
