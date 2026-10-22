@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   getCrawlThrottle: vi.fn(),
   saveCrawlThrottle: vi.fn(),
   renderPage: vi.fn<typeof RenderedPageService.renderPage>(),
+  // The real DO fetches in its own invocation; here it is a plain fetch.
+  crawlFetch: (url: string, headers: Record<string, string>) =>
+    fetch(url, { headers, redirect: "manual" }),
 }));
 vi.mock("cloudflare:workers", () => ({
   env: { CONTEXT_API_KEY: "context-test-key" },

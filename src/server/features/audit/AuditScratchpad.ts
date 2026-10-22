@@ -20,6 +20,7 @@
  */
 import { DurableObject, env } from "cloudflare:workers";
 import type { CrawlThrottleState } from "@/server/lib/audit/crawl-throttle";
+import { directCrawlFetch } from "@/server/lib/audit/crawl-fetch";
 import {
   BROKEN_LINKS_SQL,
   FRONTIER_DISCOVER_SQL,
@@ -112,6 +113,18 @@ export class AuditScratchpad extends DurableObject {
     // blockConcurrencyWhile gates RPC delivery on its own; the returned
     // promise doesn't need observing (constructors can't await).
     void this.ctx.blockConcurrencyWhile(() => this.ensureCleanupAlarm());
+  }
+
+  /**
+   * Fetch one crawl URL from this object instead of the workflow (see
+   * crawl-fetch.ts): the request counts against this call's subrequest
+   * budget, not the workflow instance's 50 on Workers Free.
+   */
+  async crawlFetch(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Response> {
+    return directCrawlFetch(url, headers);
   }
 
   async seedStart(url: string): Promise<void> {

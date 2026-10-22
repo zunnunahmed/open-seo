@@ -6,6 +6,10 @@ import type { PageFetchClass } from "@/shared/audit-fetch-class";
 import { sha256Hex } from "@/server/lib/audit/ids";
 import { normalizeUrl } from "@/server/lib/audit/url-utils";
 import type { CrawlThrottle } from "@/server/lib/audit/crawl-throttle";
+import {
+  directCrawlFetch,
+  type CrawlFetch,
+} from "@/server/lib/audit/crawl-fetch";
 import { crawlerHeadersFor, type CrawlerAccess } from "@/shared/crawler-access";
 
 const CRAWL_USER_AGENT = "OpenSEO-Audit/1.0";
@@ -37,27 +41,26 @@ async function fetchPage(
   access: CrawlerAccess | null | undefined,
   /** Hand a 429 straight back instead of backing off. */
   skipBackoff: boolean,
-  /** Updated as each attempt starts, so a failure is timed without the wait. */
-  timing: { startedAt: number },
+  call: {
+    /** Updated as each attempt starts, so a failure is timed without the wait. */
+    startedAt: number;
+    fetch: CrawlFetch;
+  },
 ) {
   for (let attempt = 1; ; attempt++) {
     if (!(await throttle.ready())) return null;
     const startedAt = Date.now();
-    timing.startedAt = startedAt;
+    call.startedAt = startedAt;
     // Manual redirect handling: each hop is recorded as its own page row and
     // its target is enqueued by the frontier, so redirect chains and loops are
     // detectable from the recorded rows. Trailing-slash redirects (/docs ->
     // /docs/) need no special handling: normalizeUrl preserves trailing
     // slashes, so /docs and /docs/ are distinct URLs and the redirect resolves
     // to its canonical target instead of cycling back to its own source.
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": CRAWL_USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-        ...crawlerHeadersFor(url, access),
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(15_000),
+    const response = await call.fetch(url, {
+      "User-Agent": CRAWL_USER_AGENT,
+      Accept: "text/html,application/xhtml+xml",
+      ...crawlerHeadersFor(url, access),
     });
     const result = {
       response,
@@ -107,11 +110,16 @@ export async function crawlPage(
      * the URL goes back to the frontier for the next step's fresh budget.
      */
     subrequests?: { exhausted: boolean };
+    /** Where page requests are sent; the crawl uses the scratchpad DO. */
+    fetch?: CrawlFetch;
   } = {},
 ): Promise<CrawledPageResult | null> {
   const { access, render } = options;
   const renderThrottled = Boolean(render && options.renderThrottled);
-  const timing = { startedAt: Date.now() };
+  const call = {
+    startedAt: Date.now(),
+    fetch: options.fetch ?? directCrawlFetch,
+  };
 
   try {
     const fetched = await fetchPage(
@@ -119,7 +127,7 @@ export async function crawlPage(
       throttle,
       access,
       renderThrottled,
-      timing,
+      call,
     );
     if (!fetched) return null;
     const { response, responseTimeMs, rateLimited } = fetched;
@@ -289,7 +297,7 @@ export async function crawlPage(
       if (options.subrequests) options.subrequests.exhausted = true;
       return null;
     }
-    const responseTimeMs = Date.now() - timing.startedAt;
+    const responseTimeMs = Date.now() - call.startedAt;
     // Render failures no longer reach here (readable pages fall back to the
     // direct body), so a failure here is always the direct fetch: record a
     // short reason (name + message only, never the body) for the Pages

@@ -337,6 +337,7 @@ async function runCrawlChunk(
         render,
         renderThrottled: input.sitePlatform === "shopify",
         subrequests,
+        fetch: (url, headers) => scratchpad.crawlFetch(url, headers),
       },
     )
       .then((page) => {

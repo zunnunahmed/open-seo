@@ -15,10 +15,11 @@ const SITEMAP_FETCH_TIMEOUT_MS = 15_000;
 // misbehaving server (e.g. HTML at /robots.txt) from blowing the step limit.
 const MAX_ROBOTS_TXT_BYTES = 500 * 1024;
 const MAX_SITEMAP_DEPTH = 3;
-// Every sitemap document is an outgoing subrequest, and discovery runs in one
-// workflow step: Workers Free allows 50 per step. 40 documents still cover
-// the 50k-URL discovery cap on any normal site.
-const MAX_SITEMAP_DOCS = 40;
+// Every sitemap document is an outgoing subrequest from the workflow, and
+// Workers Free gives a workflow instance 50 for its whole run (page fetches go
+// through the scratchpad DO instead). 30 documents still cover the 50k-URL
+// discovery cap on any normal site.
+const MAX_SITEMAP_DOCS = 30;
 const SITEMAP_CONCURRENCY = 5;
 const SITEMAP_RETRIES = 1;
 // Sitemap shards can legally reach 50 MB and SITEMAP_CONCURRENCY of them are
