@@ -1,4 +1,5 @@
 import type { AuditResultsData } from "@/client/features/audit/results/types";
+import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { PageFetchClass } from "@/shared/audit-fetch-class";
 
 export type PageRow = AuditResultsData["pages"][number];
@@ -20,6 +21,20 @@ export type PagesFilters = {
   query: string;
   status: "all" | "ok" | "redirect" | "error" | "missing";
   fetchClass: "all" | PageFetchClass;
+  category:
+    | "all"
+    | "performance"
+    | "good"
+    | "fair"
+    | "weak"
+    | "dead"
+    | "nodata";
+  indexStatus:
+    | "all"
+    | "Indexed"
+    | "Not indexed"
+    | "Not checked"
+    | "Check failed";
   minWords: string;
   maxWords: string;
   minResponseMs: string;
@@ -42,6 +57,8 @@ export const EMPTY_PAGES_FILTERS: PagesFilters = {
   query: "",
   status: "all",
   fetchClass: "all",
+  category: "all",
+  indexStatus: "all",
   minWords: "",
   maxWords: "",
   minResponseMs: "",
@@ -73,6 +90,13 @@ export function isLighthouseFailure(row: LighthouseFailureFields) {
   return !!row.errorMessage || hasMissingLighthouseScores(row);
 }
 
+/** Category key for the Pages category filter. Missing GSC rows are not
+ * dead URLs — they get their own "nodata" bucket. */
+function pageCategory(clicks: number | null): string {
+  if (clicks == null) return "nodata";
+  return classifyGscUrl(clicks).category.toLowerCase();
+}
+
 export function filterPages(rows: PageRow[], filters: PagesFilters) {
   const query = filters.query.trim().toLowerCase();
   return rows.filter((row) => {
@@ -85,6 +109,18 @@ export function filterPages(rows: PageRow[], filters: PagesFilters) {
     }
     if (!matchesStatus(row.statusCode, filters.status)) return false;
     if (filters.fetchClass !== "all" && row.fetchClass !== filters.fetchClass) {
+      return false;
+    }
+    if (
+      filters.category !== "all" &&
+      pageCategory(row.gscClicks ?? null) !== filters.category
+    ) {
+      return false;
+    }
+    if (
+      filters.indexStatus !== "all" &&
+      (row.gscIndexStatus ?? "Not checked") !== filters.indexStatus
+    ) {
       return false;
     }
     if (!matchesRange(row.wordCount, filters.minWords, filters.maxWords)) {

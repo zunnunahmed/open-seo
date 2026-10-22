@@ -31,7 +31,7 @@ export function PagesFilterBar({
 }) {
   return (
     <DataTableFilterPanel activeCount={activeFilterCount} onReset={onReset}>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <TextFilter
           label="Search"
           value={filters.query}
@@ -70,6 +70,32 @@ export function PagesFilterBar({
             ["all", "All"],
             ["yes", "Missing alt"],
             ["no", "No missing alt"],
+          ]}
+        />
+        <SelectFilter
+          label="Category"
+          value={filters.category}
+          onChange={(category) => onChange({ ...filters, category })}
+          options={[
+            ["all", "All"],
+            ["performance", "Performance"],
+            ["good", "Good"],
+            ["fair", "Fair"],
+            ["weak", "Weak"],
+            ["dead", "Dead"],
+            ["nodata", "No GSC data"],
+          ]}
+        />
+        <SelectFilter
+          label="Indexed"
+          value={filters.indexStatus}
+          onChange={(indexStatus) => onChange({ ...filters, indexStatus })}
+          options={[
+            ["all", "All"],
+            ["Indexed", "Indexed"],
+            ["Not indexed", "Not indexed"],
+            ["Not checked", "Not checked"],
+            ["Check failed", "Check failed"],
           ]}
         />
       </div>

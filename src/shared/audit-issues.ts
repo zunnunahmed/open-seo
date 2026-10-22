@@ -256,6 +256,38 @@ export const AUDIT_ISSUE_TYPES = {
     howToFix:
       "Add links from higher-level pages (hubs, category pages, navigation) to flatten the path to this page.",
   },
+  "gsc-valuable-not-indexed": {
+    severity: "critical",
+    title: "High-traffic page not indexed by Google",
+    explanation:
+      "Google's URL Inspection API reports this page as not indexed, yet Search Console shows 500+ clicks for it in the last 28 days. Demand exists, but Google is not serving this URL, so that traffic is at risk. The reason below is Google's own coverage state for the URL.",
+    howToFix:
+      "Fix the cause behind the reason: add prominent internal links and request indexing for 'Discovered' or 'Crawled - currently not indexed' states; remove noindex directives or conflicting canonicals for excluded states; strengthen thin content flagged as soft 404. Then request indexing in Search Console and re-run the coverage check.",
+  },
+  "gsc-not-indexed": {
+    severity: "warning",
+    title: "Page not indexed by Google",
+    explanation:
+      "Google's URL Inspection API reports this page as not indexed. It cannot rank until Google indexes it. The reason below is Google's own coverage state for the URL.",
+    howToFix:
+      "Fix the cause behind the reason (internal links and a sitemap entry for discovered-but-unindexed states; noindex/canonical review for excluded states; content review for soft-404 verdicts), then request indexing in Search Console and re-run the coverage check.",
+  },
+  "gsc-zero-click": {
+    severity: "warning",
+    title: "Indexed page with zero clicks (Dead)",
+    explanation:
+      "Search Console saw this URL in the last 28 days but it earned zero clicks. With zero impressions Google rarely shows it at all; with impressions but no clicks, the title and meta description are losing the click on the results page.",
+    howToFix:
+      "For pages with no impressions: confirm the page targets a query with demand, strengthen internal linking, and verify it is indexed. For pages with impressions but no clicks: rewrite the title and meta description to match the queries Search Console shows and stand out against competing results. If the page serves no distinct purpose, merge or redirect it.",
+  },
+  "gsc-weak-click": {
+    severity: "info",
+    title: "Low-click page (Weak)",
+    explanation:
+      "This page earned only a handful of clicks (1–99) in the last 28 days. It is indexed and visible, but underperforming.",
+    howToFix:
+      "Consolidate overlapping pages, refresh the content around the queries it already gets impressions for, and add internal links from stronger pages.",
+  },
 } as const satisfies Record<string, AuditIssueDescriptor>;
 
 export type AuditIssueType = keyof typeof AUDIT_ISSUE_TYPES;
