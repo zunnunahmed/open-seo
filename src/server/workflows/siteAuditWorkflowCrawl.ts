@@ -28,8 +28,10 @@ import { crawlPage } from "@/server/workflows/site-audit-workflow-helpers";
 import type { RenderUsage } from "@/shared/audit-rendering";
 import type { CrawlerAccess } from "@/shared/crawler-access";
 import { pgStep } from "@/server/workflows/pgStep";
-import { CRAWL_CHUNK_STEP } from "@/server/workflows/auditStepConfigs";
-import { getOptionalEnvValue } from "@/server/lib/runtime-env";
+import {
+  chunkTargetPages,
+  CRAWL_CHUNK_STEP,
+} from "@/server/workflows/auditStepConfigs";
 
 /**
  * The crawl runs in chunks: each chunk is one durable step that leases up to
@@ -39,24 +41,6 @@ import { getOptionalEnvValue } from "@/server/lib/runtime-env";
  * only counters, so step state stays tiny regardless of site size and the
  * workflow heap stays O(one batch).
  */
-const MAX_CHUNK_TARGET_PAGES = 200;
-/**
- * Every page fetch is an outgoing subrequest, and Workers Free allows 50 per
- * invocation: past that, each fetch throws at once and the page is recorded
- * as Failed. 40 leaves room for 429 retries. A Workers Paid deployment can
- * raise it with AUDIT_PAGES_PER_STEP (fewer, larger steps).
- */
-const DEFAULT_CHUNK_TARGET_PAGES = 40;
-
-async function chunkTargetPages(renderJavaScript: boolean): Promise<number> {
-  const configured = Number(await getOptionalEnvValue("AUDIT_PAGES_PER_STEP"));
-  const pages =
-    Number.isInteger(configured) && configured > 0
-      ? Math.min(configured, MAX_CHUNK_TARGET_PAGES)
-      : DEFAULT_CHUNK_TARGET_PAGES;
-  // A rendered page can cost a second outgoing request (the render service).
-  return renderJavaScript ? Math.max(1, Math.floor(pages / 2)) : pages;
-}
 /** Stop launching new fetches after this long; leftover leases are released. */
 const CHUNK_SOFT_DEADLINE_MS = 90_000;
 /** Crawled pages are persisted in sub-batches of this size. */
@@ -183,7 +167,12 @@ export async function runCrawlPhase(
       // The timestamp comes from the persisted chunk result. Always replay
       // the same sleep step, even when that timestamp is now in the past.
       await step.sleepUntil(`crawl-cooldown-${chunkNo}`, result.resumeAt);
-      zeroProgressChunks = 0;
+      // A fresh run that still crawls nothing will not improve by sleeping.
+      zeroProgressChunks =
+        result.outOfSubrequests && result.attemptedInChunk === 0
+          ? zeroProgressChunks + 1
+          : 0;
+      if (zeroProgressChunks >= 2) break;
       continue;
     }
     // One zero-attempt chunk is normal (retry of a completed chunk number);
@@ -210,6 +199,8 @@ async function runCrawlChunk(
   pending: number;
   endWindow: number;
   rateLimited?: boolean;
+  /** The run hit its Workers subrequest cap; resumeAt starts a fresh run. */
+  outOfSubrequests?: boolean;
   throttleState?: CrawlThrottleState;
   resumeAt?: number;
   renderUsage?: RenderUsage;
@@ -421,11 +412,17 @@ async function runCrawlChunk(
     pending: stats.pending,
     endWindow: windowSize,
     rateLimited: throttle.stopped,
+    outOfSubrequests: subrequests.exhausted,
     throttleState,
+    // Workers counts subrequests per Workflow run, not per step, so the next
+    // chunk would start with an empty budget. A short sleep ends this run;
+    // the workflow resumes in a fresh one with a fresh budget.
     resumeAt:
       throttleState.pausedUntil > Date.now()
         ? throttleState.pausedUntil
-        : undefined,
+        : subrequests.exhausted
+          ? Date.now() + 5_000
+          : undefined,
     renderUsage,
   };
 }

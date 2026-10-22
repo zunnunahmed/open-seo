@@ -146,6 +146,26 @@ function serve(status: (now: number) => number, retryAfter?: string) {
 }
 
 describe("crawl pacing and cooldowns", () => {
+  // Workers Free counts subrequests per workflow run: once a run's budget
+  // is spent, only a sleep (a fresh run) lets the crawl continue.
+  it("sleeps into a fresh run when the subrequest budget runs out", async () => {
+    let budget = 10;
+    mocks.sleepUntil.mockImplementation(async () => {
+      budget = 10;
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      if (budget-- <= 0) throw new Error("Too many subrequests.");
+      return new Response(HTML, { headers: { "content-type": "text/html" } });
+    });
+
+    const result = crawl(30);
+    await vi.runAllTimersAsync();
+
+    expect(await result).toMatchObject({ pagesCrawled: 30, completed: true });
+    expect(saved.every((page) => page.fetchClass === "ok")).toBe(true);
+    expect(mocks.sleepUntil).toHaveBeenCalled();
+  });
+
   it("spaces a fast site's requests across chunks", async () => {
     const starts: number[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {

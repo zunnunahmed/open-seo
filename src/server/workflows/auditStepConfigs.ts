@@ -1,3 +1,4 @@
+import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 import type { WorkflowStepConfig } from "cloudflare:workers";
 
 /**
@@ -62,3 +63,25 @@ export const MULTIPAGE_CHECKS_STEP: WorkflowStepConfig = {
   retries: { limit: 2, delay: "5 seconds", backoff: "exponential" },
   timeout: "5 minutes",
 };
+
+/** Pages one crawl chunk step claims. */
+const MAX_CHUNK_TARGET_PAGES = 200;
+/**
+ * Every page fetch is an outgoing subrequest, and Workers Free allows 50 per
+ * invocation: past that, each fetch throws at once and the page is recorded
+ * as Failed. 40 leaves room for 429 retries. A Workers Paid deployment can
+ * raise it with AUDIT_PAGES_PER_STEP (fewer, larger steps).
+ */
+const DEFAULT_CHUNK_TARGET_PAGES = 40;
+
+export async function chunkTargetPages(
+  renderJavaScript: boolean,
+): Promise<number> {
+  const configured = Number(await getOptionalEnvValue("AUDIT_PAGES_PER_STEP"));
+  const pages =
+    Number.isInteger(configured) && configured > 0
+      ? Math.min(configured, MAX_CHUNK_TARGET_PAGES)
+      : DEFAULT_CHUNK_TARGET_PAGES;
+  // A rendered page can cost a second outgoing request (the render service).
+  return renderJavaScript ? Math.max(1, Math.floor(pages / 2)) : pages;
+}
