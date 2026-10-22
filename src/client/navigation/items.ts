@@ -8,6 +8,7 @@ import {
   Globe,
   LayoutDashboard,
   Link2,
+  ListPlus,
   MessageSquare,
   Network,
   Search,
@@ -34,6 +35,11 @@ const projectNavItems = [
     to: "/p/$projectId/keyword-clustering" as const,
     label: "Keyword Clustering",
     icon: Network,
+  },
+  {
+    to: "/p/$projectId/suggestions" as const,
+    label: "Suggestions",
+    icon: ListPlus,
   },
   {
     to: "/p/$projectId/saved" as const,
@@ -135,6 +141,7 @@ export function getProjectNavGroups(projectId: string) {
       items: [
         byPath("/p/$projectId/keywords"),
         byPath("/p/$projectId/keyword-clustering"),
+        byPath("/p/$projectId/suggestions"),
         byPath("/p/$projectId/domain"),
         byPath("/p/$projectId/backlinks"),
       ],

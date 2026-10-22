@@ -45,6 +45,17 @@ export const researchKeywordsSchema = z.object({
   groupKeywords: z.boolean().optional().default(false),
 });
 
+export const searchSuggestionsSchema = z.object({
+  projectId: z.string().min(1),
+  seeds: z.array(z.string().trim().min(1).max(100)).min(1).max(3),
+  hl: z.string().trim().min(2).max(5).default("en"),
+  gl: z.string().trim().min(2).max(2).default("AU"),
+  groups: z
+    .array(z.enum(["letters", "questions", "commercial"]))
+    .min(1)
+    .default(["letters", "questions", "commercial"]),
+});
+
 export const savedKeywordMetricSchema = z.object({
   keyword: z.string().min(1),
   searchVolume: z.number().int().nonnegative().nullable().optional(),

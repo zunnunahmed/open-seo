@@ -7,11 +7,13 @@ import {
   exportSavedKeywordsSchema,
   removeSavedKeywordsSchema,
   refreshSavedKeywordMetricsSchema,
+  searchSuggestionsSchema,
   serpAnalysisSchema,
   updateSavedKeywordTagSchema,
   updateSavedKeywordTagsSchema,
 } from "@/types/schemas/keywords";
 import { KeywordResearchService } from "@/server/features/keywords/services/KeywordResearchService";
+import { mineSearchSuggestions } from "@/server/features/keywords/services/searchSuggestions";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { resolveMarket } from "@/shared/keyword-locations";
 
@@ -133,3 +135,16 @@ export const getSerpAnalysis = createServerFn({ method: "POST" })
       context,
     ),
   );
+
+/** Free Google autocomplete mining: no DataForSEO credit involved. */
+export const getSearchSuggestions = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(searchSuggestionsSchema)
+  .handler(async ({ data }) => {
+    return mineSearchSuggestions({
+      seeds: data.seeds,
+      hl: data.hl,
+      gl: data.gl.toLowerCase(),
+      groups: data.groups,
+    });
+  });
