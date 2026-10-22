@@ -82,7 +82,10 @@ async function fetchPage(
   }
 }
 
-/** Null leaves this URL deferred when the shared cooldown stops its fetch. */
+/**
+ * Null leaves this URL deferred: the shared cooldown stopped its fetch, or the
+ * step ran out of Workers subrequests.
+ */
 export async function crawlPage(
   url: string,
   crawlDepth: number | null,
@@ -98,6 +101,12 @@ export async function crawlPage(
      * reads a throttled page through the renderer instead of backing off.
      */
     renderThrottled?: boolean;
+    /**
+     * Set when Workers refuses a fetch for this invocation's subrequest cap
+     * (50 on the Free plan). The page is fine; the step stops launching and
+     * the URL goes back to the frontier for the next step's fresh budget.
+     */
+    subrequests?: { exhausted: boolean };
   } = {},
 ): Promise<CrawledPageResult | null> {
   const { access, render } = options;
@@ -276,6 +285,10 @@ export async function crawlPage(
     // Losing a durable cooldown must fail the workflow, not become a page
     // error that lets the scheduler continue making requests.
     if (throttle.checkpointFailed) throw error;
+    if (error instanceof Error && /too many subrequests/i.test(error.message)) {
+      if (options.subrequests) options.subrequests.exhausted = true;
+      return null;
+    }
     const responseTimeMs = Date.now() - timing.startedAt;
     // Render failures no longer reach here (readable pages fall back to the
     // direct body), so a failure here is always the direct fetch: record a

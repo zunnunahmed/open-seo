@@ -330,6 +330,11 @@ async function runCrawlChunk(
       }
     : undefined;
 
+  // Workers counts this step's own storage and progress calls toward the
+  // same cap, so the page target alone cannot guarantee it; when a fetch is
+  // refused, stop here and let the next step crawl the rest.
+  const subrequests = { exhausted: false };
+
   const launch = (entry: ClaimedUrl) => {
     const promise = crawlPage(
       entry.url,
@@ -340,6 +345,7 @@ async function runCrawlChunk(
         access: input.access,
         render,
         renderThrottled: input.sitePlatform === "shopify",
+        subrequests,
       },
     )
       .then((page) => {
@@ -361,7 +367,8 @@ async function runCrawlChunk(
     while (
       inFlight.size < windowSize &&
       nextIndex < claimed.length &&
-      Date.now() < deadlineAt
+      Date.now() < deadlineAt &&
+      !subrequests.exhausted
     ) {
       // queuedPersists changes when persistChain settles. Keep it out of the
       // loop condition because the type-aware linter cannot see that async
@@ -380,6 +387,7 @@ async function runCrawlChunk(
     // chunk is done (leases exhausted or soft deadline hit).
     if (
       !throttle.stopped &&
+      !subrequests.exhausted &&
       queuedPersists > MAX_QUEUED_PERSIST_BATCHES &&
       nextIndex < claimed.length &&
       Date.now() < deadlineAt

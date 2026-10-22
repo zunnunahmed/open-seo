@@ -40,6 +40,24 @@ afterEach(() => {
 });
 
 describe("crawlPage", () => {
+  it("hands a page back instead of failing it when the step is out of subrequests", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      new Error("Too many subrequests."),
+    );
+    const subrequests = { exhausted: false };
+
+    const page = await crawlPage(
+      PAGE_URL,
+      0,
+      false,
+      createCrawlThrottle(Date.now() + 90_000),
+      { subrequests },
+    );
+
+    expect(page).toBeNull();
+    expect(subrequests.exhausted).toBe(true);
+  });
+
   it("waits out the server's Retry-After and keeps the retried page", async () => {
     vi.useFakeTimers();
     const fetchMock = stubFetch(
