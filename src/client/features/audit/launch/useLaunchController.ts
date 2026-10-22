@@ -24,10 +24,38 @@ import {
 import { renderingCreditsNeededText } from "@/shared/audit-rendering";
 import { useAuditCapabilities } from "@/client/features/audit/shared";
 
+/** Hostname without "www.", or null when the text is not an http(s) URL. */
+function urlHost(value: string): string | null {
+  try {
+    const url = new URL(
+      /^https?:\/\//i.test(value) ? value : `https://${value}`,
+    );
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** Same site as the start URL, ignoring "www." (the crawl treats them alike). */
+function sitemapError(sitemapUrl: string, startUrl: string): string | null {
+  if (!sitemapUrl) return null;
+  const sitemapHost = urlHost(sitemapUrl);
+  if (!sitemapHost || !/^https?:\/\//i.test(sitemapUrl))
+    return "Enter the full sitemap URL, starting with https://";
+  const siteHost = urlHost(startUrl);
+  if (siteHost && siteHost !== sitemapHost)
+    return "The sitemap must be on the same website as the start URL.";
+  return null;
+}
+
 function getLaunchValidationErrors(
   value: LaunchFormValues,
   shouldValidateUntouchedField: boolean,
 ) {
+  const sitemap = sitemapError(value.sitemapUrl.trim(), value.url.trim());
+  if (sitemap) {
+    return createFormValidationErrors({ fields: { sitemapUrl: sitemap } });
+  }
   if (value.url.trim()) {
     return null;
   }
@@ -100,6 +128,7 @@ export function useLaunchController({
           maxPages: effectiveMaxPages,
           lighthouseStrategy: value.runLighthouse ? "auto" : "none",
           renderJavaScript: value.renderJavaScript,
+          sitemapUrl: value.sitemapUrl.trim() || undefined,
         });
         toast.success("Audit started!");
         onAuditStarted(result.auditId);
@@ -163,6 +192,7 @@ function useLaunchMutations({ projectId }: { projectId: string }) {
       maxPages: number;
       lighthouseStrategy: "auto" | "none";
       renderJavaScript: boolean;
+      sitemapUrl?: string;
     }) => startAudit({ data }),
     onSuccess: () => {
       void invalidateHistory();

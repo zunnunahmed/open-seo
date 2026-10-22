@@ -28,6 +28,8 @@ export function clampMaxPagesInput(input: string, maxPagesLimit: number) {
 
 export type LaunchFormValues = {
   url: string;
+  /** Optional sitemap or sitemap index; empty means robots.txt only. */
+  sitemapUrl: string;
   maxPagesInput: string;
   runLighthouse: boolean;
   renderJavaScript: boolean;
@@ -35,6 +37,7 @@ export type LaunchFormValues = {
 
 export const DEFAULT_LAUNCH_FORM_VALUES: LaunchFormValues = {
   url: "",
+  sitemapUrl: "",
   maxPagesInput: String(DEFAULT_AUDIT_PAGES),
   runLighthouse: false,
   renderJavaScript: false,

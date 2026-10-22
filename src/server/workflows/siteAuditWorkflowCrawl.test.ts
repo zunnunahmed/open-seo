@@ -300,7 +300,9 @@ describe("crawl pacing and cooldowns", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(mocks.sleepUntil).not.toHaveBeenCalled();
-    expect(mocks.releaseUrls.mock.calls[0][0]).toHaveLength(99);
+    // Everything claimed but the one refused URL goes back to the frontier.
+    const claimLimit = Number(mocks.claimChunk.mock.calls[0][1]);
+    expect(mocks.releaseUrls.mock.calls[0][0]).toHaveLength(claimLimit - 1);
   });
 });
 

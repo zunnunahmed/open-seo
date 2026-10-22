@@ -37,10 +37,13 @@ async function fetchPage(
   access: CrawlerAccess | null | undefined,
   /** Hand a 429 straight back instead of backing off. */
   skipBackoff: boolean,
+  /** Updated as each attempt starts, so a failure is timed without the wait. */
+  timing: { startedAt: number },
 ) {
   for (let attempt = 1; ; attempt++) {
     if (!(await throttle.ready())) return null;
     const startedAt = Date.now();
+    timing.startedAt = startedAt;
     // Manual redirect handling: each hop is recorded as its own page row and
     // its target is enqueued by the frontier, so redirect chains and loops are
     // detectable from the recorded rows. Trailing-slash redirects (/docs ->
@@ -99,10 +102,16 @@ export async function crawlPage(
 ): Promise<CrawledPageResult | null> {
   const { access, render } = options;
   const renderThrottled = Boolean(render && options.renderThrottled);
-  const startTime = Date.now();
+  const timing = { startedAt: Date.now() };
 
   try {
-    const fetched = await fetchPage(url, throttle, access, renderThrottled);
+    const fetched = await fetchPage(
+      url,
+      throttle,
+      access,
+      renderThrottled,
+      timing,
+    );
     if (!fetched) return null;
     const { response, responseTimeMs, rateLimited } = fetched;
     let statusCode = response.status;
@@ -267,7 +276,7 @@ export async function crawlPage(
     // Losing a durable cooldown must fail the workflow, not become a page
     // error that lets the scheduler continue making requests.
     if (throttle.checkpointFailed) throw error;
-    const responseTimeMs = Date.now() - startTime;
+    const responseTimeMs = Date.now() - timing.startedAt;
     // Render failures no longer reach here (readable pages fall back to the
     // direct body), so a failure here is always the direct fetch: record a
     // short reason (name + message only, never the body) for the Pages

@@ -19,6 +19,8 @@ export const startAuditSchema = z.object({
     .optional()
     .default(DEFAULT_AUDIT_PAGES),
   lighthouseStrategy: z.enum(["auto", "none"]).optional().default("auto"),
+  /** A sitemap (or sitemap index) to seed the crawl with, besides robots.txt. */
+  sitemapUrl: z.string().trim().url().max(2048).optional(),
 });
 
 export const getAuditStatusSchema = z.object({

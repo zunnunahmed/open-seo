@@ -78,6 +78,7 @@ export async function runAuditPhases(
     startUrl,
     maxPages,
     access,
+    sitemap: config.sitemapUrl,
   });
   // Parsed outside the step from checkpointed text, so replays see the exact
   // robots rules the original run used (a live re-fetch could differ and
@@ -121,6 +122,8 @@ async function runDiscoveryPhase(
     startUrl: string;
     maxPages: number;
     access?: CrawlerAccess | null;
+    /** The sitemap the user named, if any. */
+    sitemap?: string;
   },
 ) {
   const { auditId, workflowInstanceId, origin, startUrl, maxPages, access } =
@@ -130,7 +133,7 @@ async function runDiscoveryPhase(
   // code must re-run discovery — resuming from the old cached {sitemapUrls}
   // shape would leave the scratchpad empty and finalize a zero-page audit.
   return pgStep(step, "discover-urls-v2", DISCOVERY_STEP, async () => {
-    const result = await discoverUrls(origin, maxPages, access);
+    const result = await discoverUrls(origin, maxPages, access, input.sitemap);
     const robots = parseRobotsTxt(origin, result.robotsText);
     const scratchpad = getAuditScratchpad(auditId);
 

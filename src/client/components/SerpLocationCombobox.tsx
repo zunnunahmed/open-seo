@@ -119,7 +119,7 @@ export function SerpLocationCombobox({
       {/* Full labels such as "Orange County, California, United States" are
           wider than a compact field, so the list sizes to its content. */}
       <ComboboxContent anchor={anchor} className="w-max">
-        <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
+        <ComboboxEmpty className="px-3">{emptyMessage}</ComboboxEmpty>
         <ComboboxList>
           {(item: LocationItem) => (
             <ComboboxItem key={item.locationName} value={item}>

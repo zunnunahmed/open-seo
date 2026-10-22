@@ -29,16 +29,34 @@ import type { RenderUsage } from "@/shared/audit-rendering";
 import type { CrawlerAccess } from "@/shared/crawler-access";
 import { pgStep } from "@/server/workflows/pgStep";
 import { CRAWL_CHUNK_STEP } from "@/server/workflows/auditStepConfigs";
+import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 
 /**
  * The crawl runs in chunks: each chunk is one durable step that leases up to
- * CHUNK_TARGET_PAGES URLs from the scratchpad DO, crawls them with a rolling
+ * chunkTargetPages() URLs from the scratchpad DO, crawls them with a rolling
  * concurrency window, and persists results incrementally (full page rows to
  * the app DB, links/mirror/frontier updates to the DO). Step returns carry
  * only counters, so step state stays tiny regardless of site size and the
  * workflow heap stays O(one batch).
  */
-const CHUNK_TARGET_PAGES = 200;
+const MAX_CHUNK_TARGET_PAGES = 200;
+/**
+ * Every page fetch is an outgoing subrequest, and Workers Free allows 50 per
+ * invocation: past that, each fetch throws at once and the page is recorded
+ * as Failed. 40 leaves room for 429 retries. A Workers Paid deployment can
+ * raise it with AUDIT_PAGES_PER_STEP (fewer, larger steps).
+ */
+const DEFAULT_CHUNK_TARGET_PAGES = 40;
+
+async function chunkTargetPages(renderJavaScript: boolean): Promise<number> {
+  const configured = Number(await getOptionalEnvValue("AUDIT_PAGES_PER_STEP"));
+  const pages =
+    Number.isInteger(configured) && configured > 0
+      ? Math.min(configured, MAX_CHUNK_TARGET_PAGES)
+      : DEFAULT_CHUNK_TARGET_PAGES;
+  // A rendered page can cost a second outgoing request (the render service).
+  return renderJavaScript ? Math.max(1, Math.floor(pages / 2)) : pages;
+}
 /** Stop launching new fetches after this long; leftover leases are released. */
 const CHUNK_SOFT_DEADLINE_MS = 90_000;
 /** Crawled pages are persisted in sub-batches of this size. */
@@ -203,7 +221,7 @@ async function runCrawlChunk(
     (await scratchpad.getCrawlThrottle()) ?? input.throttleState;
 
   const claimLimit = Math.min(
-    CHUNK_TARGET_PAGES,
+    await chunkTargetPages(Boolean(input.renderJavaScript)),
     maxPages - input.attemptedBefore,
   );
   const { urls: claimed, isRetry } = await scratchpad.claimChunk(

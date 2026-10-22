@@ -67,7 +67,7 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
               check();
             }}
           >
-            <InputGroup className="h-10 w-full lg:max-w-md lg:min-w-0 lg:flex-1">
+            <InputGroup className="h-10 w-full lg:min-w-0 lg:flex-1">
               <InputGroupAddon>
                 <Search />
               </InputGroupAddon>

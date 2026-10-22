@@ -33,4 +33,35 @@ describe("discoverUrls", () => {
 
     expect(urls).toContain("https://example.com/");
   });
+
+  // Rank Math and Yoast publish /sitemap_index.xml, which robots.txt may not
+  // list; the user can name it so its pages seed the crawl.
+  it("follows a sitemap index the user named", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith("/sitemap_index.xml")
+            ? new Response(
+                `<sitemapindex><sitemap><loc>https://www.example.com/post-sitemap.xml</loc></sitemap></sitemapindex>`,
+                { headers: { "content-type": "application/xml" } },
+              )
+            : url.endsWith("/post-sitemap.xml")
+              ? new Response(sitemapXml(["https://www.example.com/hello/"]), {
+                  headers: { "content-type": "application/xml" },
+                })
+              : new Response("", { status: 404 }),
+        ),
+      ),
+    );
+
+    const { urls } = await discoverUrls(
+      "https://www.example.com",
+      50,
+      null,
+      "https://www.example.com/sitemap_index.xml",
+    );
+
+    expect(urls).toEqual(["https://www.example.com/hello/"]);
+  });
 });

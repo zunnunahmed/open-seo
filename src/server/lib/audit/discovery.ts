@@ -15,7 +15,10 @@ const SITEMAP_FETCH_TIMEOUT_MS = 15_000;
 // misbehaving server (e.g. HTML at /robots.txt) from blowing the step limit.
 const MAX_ROBOTS_TXT_BYTES = 500 * 1024;
 const MAX_SITEMAP_DEPTH = 3;
-const MAX_SITEMAP_DOCS = 300;
+// Every sitemap document is an outgoing subrequest, and discovery runs in one
+// workflow step: Workers Free allows 50 per step. 40 documents still cover
+// the 50k-URL discovery cap on any normal site.
+const MAX_SITEMAP_DOCS = 40;
 const SITEMAP_CONCURRENCY = 5;
 const SITEMAP_RETRIES = 1;
 // Sitemap shards can legally reach 50 MB and SITEMAP_CONCURRENCY of them are
@@ -279,18 +282,21 @@ async function fetchSitemapDocumentWithRetry(
 
 /**
  * Discover all page URLs from robots.txt + sitemaps for an origin.
- * Also tries the default /sitemap.xml if not listed in robots.txt.
+ * Also tries the default /sitemap.xml if not listed in robots.txt, and a
+ * sitemap the user named (read first, so it is never cut by the doc cap).
  */
 export async function discoverUrls(
   origin: string,
   maxPages = 50,
   access?: CrawlerAccess | null,
+  sitemapUrl?: string,
 ): Promise<{ urls: string[]; robotsText: string | null }> {
   const robotsText = await fetchRobotsTxtText(origin, access);
   const robots = parseRobotsTxt(origin, robotsText);
 
-  // Collect sitemap URLs: from robots.txt + default location
-  const sitemapSources = new Set(robots.sitemapUrls);
+  // Collect sitemap URLs: named sitemap, robots.txt, default location
+  const sitemapSources = new Set(sitemapUrl ? [sitemapUrl] : []);
+  for (const url of robots.sitemapUrls) sitemapSources.add(url);
   sitemapSources.add(`${origin}/sitemap.xml`);
 
   const maxDiscoveredUrls = Math.min(Math.max(maxPages * 20, 500), 50_000);

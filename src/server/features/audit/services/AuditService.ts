@@ -20,6 +20,7 @@ import {
   getEstimatedAuditCapacity,
   type AuditLimitTier,
 } from "@/server/features/audit/services/audit-capacity";
+import { isSameOrigin } from "@/server/lib/audit/url-utils";
 import { AppError } from "@/server/lib/errors";
 import { deleteR2Prefix } from "@/server/lib/r2";
 import { RENDERED_MAX_AUDIT_PAGES } from "@/shared/audit-limits";
@@ -51,6 +52,7 @@ async function startAudit(input: {
   lighthouseStrategy?: LighthouseStrategy;
   limitTier: AuditLimitTier;
   renderJavaScript?: boolean;
+  sitemapUrl?: string;
 }) {
   const renderJavaScript = input.renderJavaScript ?? false;
   if (renderJavaScript && !(await isAuditRenderingAllowed())) {
@@ -88,11 +90,21 @@ async function startAudit(input: {
     new URL(startUrl).hostname,
   );
 
+  // The sitemap must belong to the audited site: discovery only follows
+  // same-site URLs, so another site's sitemap would silently seed nothing.
+  if (input.sitemapUrl && !isSameOrigin(input.sitemapUrl, startUrl)) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "The sitemap must be on the same website as the start URL.",
+    );
+  }
+
   const config: AuditConfig = {
     maxPages,
     lighthouseStrategy,
     renderJavaScript,
     crawlerCredentialId: credential?.id,
+    sitemapUrl: input.sitemapUrl,
   };
 
   await AuditRepository.createAudit({

@@ -95,6 +95,34 @@ export function LaunchFormCard({
             )}
           </launchForm.Subscribe>
 
+          <launchForm.Field name="sitemapUrl">
+            {(field) => {
+              const sitemapError = getFieldError(field.state.meta.errors);
+              return (
+                <div className="space-y-1 lg:col-span-12">
+                  <Input
+                    aria-label="Sitemap URL (optional)"
+                    aria-invalid={sitemapError ? true : undefined}
+                    placeholder="Sitemap URL (optional), e.g. https://example.com/sitemap_index.xml"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                  />
+                  <p
+                    className={
+                      sitemapError
+                        ? "text-xs text-destructive"
+                        : "text-xs text-muted-foreground"
+                    }
+                  >
+                    {sitemapError ??
+                      "Crawls from the homepage and every page in this sitemap. Sitemap indexes are followed. robots.txt sitemaps are always included."}
+                  </p>
+                </div>
+              );
+            }}
+          </launchForm.Field>
+
           <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-12 lg:items-start">
             <LaunchOptions
               launchForm={launchForm}
