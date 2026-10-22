@@ -16,10 +16,12 @@ export function parseSeoProviderPreference(
   if (
     value === "direct_dataforseo" ||
     value === "treg_serpstat" ||
-    value === "treg_dataforseo" ||
-    value === "both"
+    value === "treg_dataforseo"
   )
     return value;
+  // The old "both" setting had no deterministic routing semantics. Existing
+  // projects remain safe by starting on the direct provider.
+  if (value === "both") return "both";
   return "direct_dataforseo";
 }
 
