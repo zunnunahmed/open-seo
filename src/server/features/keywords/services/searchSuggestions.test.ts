@@ -2,8 +2,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   expandSeed,
   fetchSuggestions,
+  mineDataforseoSuggestions,
   mineSearchSuggestions,
 } from "@/server/features/keywords/services/searchSuggestions";
+
+vi.mock("@/server/lib/dataforseo", () => ({
+  createDataforseoClient: () => ({
+    keywords: {
+      suggestions: async () => [
+        {
+          keyword: "Solar Panels Cost",
+          keyword_info: {
+            search_volume: 1000,
+            cpc: 2.5,
+            competition: 0.8,
+            monthly_searches: [],
+          },
+          keyword_properties: { keyword_difficulty: 30 },
+          search_intent_info: { main_intent: "commercial" },
+        },
+        {
+          keyword: "solar panels cost",
+          keyword_info: null,
+          keyword_properties: null,
+          search_intent_info: null,
+        },
+        { keyword: null },
+      ],
+    },
+  }),
+}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -22,6 +50,35 @@ function mockFetch(
     return Response.json(outcome.body);
   });
 }
+
+describe("mineDataforseoSuggestions", () => {
+  it("maps Labs rows with metrics and dedupes case-insensitively", async () => {
+    const { rows, queriesRun, seedsMined } = await mineDataforseoSuggestions({
+      seeds: ["solar panels"],
+      locationCode: 2840,
+      languageCode: "en",
+      limitPerSeed: 200,
+      billingCustomer: {
+        userId: "u",
+        userEmail: "u@e.com",
+        organizationId: "o",
+        projectId: "p",
+      },
+    });
+    expect(queriesRun).toBe(1);
+    expect(seedsMined).toEqual(["solar panels"]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      keyword: "solar panels cost",
+      searchVolume: 1000,
+      cpc: 2.5,
+      competition: 0.8,
+      keywordDifficulty: 30,
+      intent: "commercial",
+      seed: "solar panels",
+    });
+  });
+});
 
 describe("expandSeed", () => {
   it("crosses every modifier before and after the seed", () => {

@@ -1,4 +1,10 @@
 import { sort } from "remeda";
+import { createDataforseoClient } from "@/server/lib/dataforseo";
+import type { BillingCustomerContext } from "@/server/billing/subscription";
+import {
+  normalizeIntent,
+  normalizeKeyword,
+} from "@/server/features/keywords/services/research/helpers";
 
 /**
  * Google Search suggestions miner ("alphabet soup" keyword research).
@@ -255,5 +261,78 @@ export async function mineSearchSuggestions(input: {
     seedsMined: seeds,
     endpoint,
     probeLog,
+  };
+}
+
+export type DataforseoSuggestionRow = {
+  keyword: string;
+  searchVolume: number | null;
+  cpc: number | null;
+  /** 0-1 paid-competition ratio, as reported by Labs. */
+  competition: number | null;
+  keywordDifficulty: number | null;
+  intent:
+    | "informational"
+    | "commercial"
+    | "transactional"
+    | "navigational"
+    | "unknown";
+  seed: string;
+};
+
+/**
+ * DataForSEO keyword_suggestions per seed: Google-based suggestions with
+ * volume, CPC, competition, difficulty and intent, billed per row under the
+ * keyword_research feature. Reliable where raw autocomplete is blocked.
+ */
+export async function mineDataforseoSuggestions(input: {
+  seeds: string[];
+  locationCode: number;
+  languageCode: string;
+  limitPerSeed: number;
+  billingCustomer: BillingCustomerContext;
+}): Promise<{
+  rows: DataforseoSuggestionRow[];
+  queriesRun: number;
+  seedsMined: string[];
+}> {
+  const client = createDataforseoClient(input.billingCustomer);
+  const seeds = [...new Set(input.seeds.map((seed) => seed.trim()))].filter(
+    (seed) => seed.length > 0,
+  );
+  const byKeyword = new Map<string, DataforseoSuggestionRow>();
+  for (const seed of seeds) {
+    const items = await client.keywords.suggestions({
+      keyword: seed,
+      locationCode: input.locationCode,
+      languageCode: input.languageCode,
+      limit: input.limitPerSeed,
+      creditFeature: "keyword_research",
+    });
+    for (const item of items) {
+      if (!item.keyword) continue;
+      const keyword = normalizeKeyword(item.keyword);
+      if (byKeyword.has(keyword)) continue;
+      const info = item.keyword_info_normalized_with_clickstream
+        ?.search_volume
+        ? item.keyword_info_normalized_with_clickstream
+        : item.keyword_info;
+      byKeyword.set(keyword, {
+        keyword,
+        searchVolume: info?.search_volume ?? null,
+        cpc: info?.cpc ?? null,
+        competition: info?.competition ?? null,
+        keywordDifficulty: item.keyword_properties?.keyword_difficulty ?? null,
+        intent: normalizeIntent(item.search_intent_info?.main_intent),
+        seed,
+      });
+    }
+  }
+  return {
+    rows: sort([...byKeyword.values()], (a, b) =>
+      (b.searchVolume ?? -1) - (a.searchVolume ?? -1),
+    ),
+    queriesRun: seeds.length,
+    seedsMined: seeds,
   };
 }

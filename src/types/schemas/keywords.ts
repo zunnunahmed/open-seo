@@ -56,6 +56,16 @@ export const searchSuggestionsSchema = z.object({
     .default(["letters", "questions", "commercial"]),
 });
 
+export const searchSuggestionsDataforseoSchema = z.object({
+  projectId: z.string().min(1),
+  seeds: z.array(z.string().trim().min(1).max(100)).min(1).max(3),
+  limitPerSeed: z
+    .union([z.literal(100), z.literal(200), z.literal(500)])
+    .default(200),
+  locationCode: z.number().int().positive().optional(),
+  languageCode: z.string().min(2).max(8).optional(),
+});
+
 export const savedKeywordMetricSchema = z.object({
   keyword: z.string().min(1),
   searchVolume: z.number().int().nonnegative().nullable().optional(),

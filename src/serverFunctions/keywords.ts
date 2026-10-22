@@ -7,13 +7,14 @@ import {
   exportSavedKeywordsSchema,
   removeSavedKeywordsSchema,
   refreshSavedKeywordMetricsSchema,
+  searchSuggestionsDataforseoSchema,
   searchSuggestionsSchema,
   serpAnalysisSchema,
   updateSavedKeywordTagSchema,
   updateSavedKeywordTagsSchema,
 } from "@/types/schemas/keywords";
 import { KeywordResearchService } from "@/server/features/keywords/services/KeywordResearchService";
-import { mineSearchSuggestions } from "@/server/features/keywords/services/searchSuggestions";
+import { mineDataforseoSuggestions, mineSearchSuggestions } from "@/server/features/keywords/services/searchSuggestions";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { resolveMarket } from "@/shared/keyword-locations";
 
@@ -146,5 +147,20 @@ export const getSearchSuggestions = createServerFn({ method: "POST" })
       hl: data.hl,
       gl: data.gl.toLowerCase(),
       groups: data.groups,
+    });
+  });
+
+/** DataForSEO keyword_suggestions per seed, billed under keyword_research. */
+export const getDataforseoSuggestions = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(searchSuggestionsDataforseoSchema)
+  .handler(async ({ data, context }) => {
+    const market = resolveMarket(data, context.project);
+    return mineDataforseoSuggestions({
+      seeds: data.seeds,
+      locationCode: market.locationCode,
+      languageCode: market.languageCode,
+      limitPerSeed: data.limitPerSeed,
+      billingCustomer: context,
     });
   });
