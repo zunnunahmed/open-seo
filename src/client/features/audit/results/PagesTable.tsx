@@ -107,7 +107,12 @@ function buildPagesColumns({
           </a>
         );
       },
-      meta: { cellClassName: "max-w-[240px] truncate" },
+      meta: {
+        headerClassName:
+          "sticky left-0 z-20 bg-card shadow-[1px_0_0_0_var(--color-border)]",
+        cellClassName:
+          "sticky left-0 z-0 max-w-[240px] truncate bg-card shadow-[1px_0_0_0_var(--color-border)]",
+      },
     }),
     pageColumnHelper.accessor("statusCode", {
       header: ({ column }) => <SortableHeader column={column} label="Status" />,
@@ -256,6 +261,7 @@ export function PagesTable({
       empty={{ title: "No pages crawled" }}
       isFiltered={activeFilterCount > 0}
       onClearFilters={resetFilters}
+      scrollClassName="max-h-[70vh] overflow-y-auto"
       toolbar={
         <>
           {tabs}
