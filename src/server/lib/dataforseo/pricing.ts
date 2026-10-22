@@ -29,6 +29,7 @@ import {
 } from "@/server/lib/dataforseo/google-ads";
 import {
   clampSerpDepth,
+  fetchGoogleAutocomplete,
   fetchLiveSerp,
   fetchLocalSerp,
   fetchRankCheckSerp,
@@ -148,6 +149,10 @@ export function llmResponseUsd(
   return webSearch ? price.webSearch : price.noSearch;
 }
 
+// SERP Google Autocomplete, live. Flat $0.002 per query (measured,
+// provider-reported charge), one query per call.
+const AUTOCOMPLETE_LIVE_USD = 0.002;
+
 // SERP Google Maps and Local Finder, live. measured: Maps bills one request
 // through depth 100 ($0.002 at depth 20 and 100), and no caller asks for
 // more. Local Finder bills every page of 10 at the first-page rate ($0.02 at
@@ -256,6 +261,7 @@ export const dataforseoPricing = {
     relevantPages: priced(fetchRelevantPages, (input) => labsUsd(input.limit)),
   },
   serp: {
+    autocomplete: priced(fetchGoogleAutocomplete, () => AUTOCOMPLETE_LIVE_USD),
     live: priced(fetchLiveSerp, (input) =>
       serpUsd(
         clampSerpDepth(input.depth ?? SERP_ANALYSIS_DEPTH),

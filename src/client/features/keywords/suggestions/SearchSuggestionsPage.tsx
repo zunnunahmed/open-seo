@@ -30,9 +30,8 @@ import {
   COUNTRY_OPTIONS,
   ENDPOINT_LABELS,
   GROUP_OPTIONS,
-  LIMIT_OPTIONS,
+  MODIFIER_COUNTS,
   type SuggestEndpoint,
-  type SuggestionLimit,
 } from "./suggestionOptions";
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
@@ -47,7 +46,6 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     "questions",
     "commercial",
   ]);
-  const [limitPerSeed, setLimitPerSeed] = useState<SuggestionLimit>(200);
 
   const freeMutation = useMutation({
     mutationFn: (input: {
@@ -60,7 +58,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   const dfsMutation = useMutation({
     mutationFn: (input: {
       seeds: string[];
-      limitPerSeed: SuggestionLimit;
+      groups: SuggestionModifierGroup[];
     }) =>
       getDataforseoSuggestions({
         data: { ...input, projectId },
@@ -76,14 +74,19 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   );
   const canMine =
     seeds.length > 0 &&
-    (mode === "dataforseo" || groups.length > 0) &&
+    groups.length > 0 &&
     !freeMutation.isPending &&
     !dfsMutation.isPending;
   const countryName =
     COUNTRY_OPTIONS.find((c) => c.code === gl)?.name ?? gl.toUpperCase();
 
-  // ~$0.012 task + $0.00012 per returned row, billed on actual rows.
-  const dfsCredits = Math.ceil((0.012 + limitPerSeed * 0.00012) * 1.28 * 1000);
+  // Upper-bound estimate: every expansion billed as one autocomplete call,
+  // plus one overview task per seed sized to the expansion count.
+  const expansionsPerSeed =
+    groups.reduce((sum, group) => sum + MODIFIER_COUNTS[group], 0) * 2;
+  const expansions = Math.min(300, expansionsPerSeed * seeds.length);
+  const dfsCostUsd = expansions * 0.002 + 0.012 + expansions * 0.00012;
+  const dfsCostCredits = Math.ceil(dfsCostUsd * 1.28 * 1000);
 
   function toggleGroup(group: SuggestionModifierGroup, on: boolean) {
     setGroups((current) =>
@@ -95,7 +98,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     if (mode === "free") {
       freeMutation.mutate({ seeds, hl, gl, groups });
     } else {
-      dfsMutation.mutate({ seeds, limitPerSeed });
+      dfsMutation.mutate({ seeds, groups });
     }
   }
 
@@ -106,7 +109,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Search Suggestions"
-        description="Mine autocomplete before and after your seed for free — or pull Google-based suggestions with volume via DataForSEO."
+        description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with volume via DataForSEO."
       />
       <Card>
         <CardContent className="flex flex-col gap-4">
@@ -176,62 +179,35 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                 </div>
               </>
             ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="suggestion-limit">Results per seed</Label>
-                  <Select
-                    items={LIMIT_OPTIONS.map((limit) => ({
-                      value: String(limit),
-                      label: String(limit),
-                    }))}
-                    value={String(limitPerSeed)}
-                    onValueChange={(next) => {
-                      if (next !== null)
-                        setLimitPerSeed(Number(next) as SuggestionLimit);
-                    }}
-                  >
-                    <SelectTrigger id="suggestion-limit" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LIMIT_OPTIONS.map((limit) => (
-                        <SelectItem key={limit} value={String(limit)}>
-                          {limit}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Market</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Your project market · ≈{dfsCredits} credits per seed
-                  </p>
-                </div>
-              </>
+              <div className="flex flex-col gap-1.5 lg:col-span-2">
+                <Label>Cost estimate</Label>
+                <p className="text-sm text-muted-foreground">
+                  ≈ ${dfsCostUsd.toFixed(2)} (≈{dfsCostCredits} credits) per
+                  run at current seed/modifier selection. Uses your project
+                  market. Served from cache when repeated within 24 hours.
+                </p>
+              </div>
             )}
           </div>
-          {mode === "free" ? (
-            <div className="flex flex-wrap items-center gap-4">
-              {GROUP_OPTIONS.map((option) => (
-                <label
-                  key={option.value}
-                  className="flex cursor-pointer items-center gap-2 text-sm"
-                >
-                  <Checkbox
-                    checked={groups.includes(option.value)}
-                    onCheckedChange={(checked) =>
-                      toggleGroup(option.value, checked === true)
-                    }
-                  />
-                  <span className="font-medium">{option.label}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {option.hint}
-                  </span>
-                </label>
-              ))}
-            </div>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-4">
+            {GROUP_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex cursor-pointer items-center gap-2 text-sm"
+              >
+                <Checkbox
+                  checked={groups.includes(option.value)}
+                  onCheckedChange={(checked) =>
+                    toggleGroup(option.value, checked === true)
+                  }
+                />
+                <span className="font-medium">{option.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {option.hint}
+                </span>
+              </label>
+            ))}
+          </div>
           <div>
             <Button
               disabled={!canMine}
@@ -267,7 +243,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             <ErrorState
               variant="card"
               title="Google blocked this run"
-              message={`No Google suggest host answered (${freeMutation.data.probeLog.map((p) => `${ENDPOINT_LABELS[p.endpoint as SuggestEndpoint]}: ${p.result}`).join(" · ")}). Wait a few minutes and try again — mining more slowly helps, and the tool now spaces its requests out.`}
+              message={`No Google suggest host answered (${freeMutation.data.probeLog.map((p) => `${ENDPOINT_LABELS[p.endpoint as SuggestEndpoint]}: ${p.result}`).join(" · ")}). Wait a few minutes and try again, or switch to the DataForSEO source above — same before/after modifiers, billed per lookup.`}
               onRetry={runMine}
               isRetrying={freeMutation.isPending}
             />
@@ -294,7 +270,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           <EmptyState
             variant="plain"
             title="Enter a seed to get DataForSEO suggestions"
-            description="Google-based suggestions with volume, CPC, competition, difficulty and intent for your project market."
+            description="Google autocomplete expansions crossed before and after your seed, each enriched with volume, CPC, competition, difficulty and intent."
           />
         )
       )}

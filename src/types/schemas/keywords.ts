@@ -59,9 +59,10 @@ export const searchSuggestionsSchema = z.object({
 export const searchSuggestionsDataforseoSchema = z.object({
   projectId: z.string().min(1),
   seeds: z.array(z.string().trim().min(1).max(100)).min(1).max(3),
-  limitPerSeed: z
-    .union([z.literal(100), z.literal(200), z.literal(500)])
-    .default(200),
+  groups: z
+    .array(z.enum(["letters", "questions", "commercial"]))
+    .min(1)
+    .default(["letters", "questions", "commercial"]),
   locationCode: z.number().int().positive().optional(),
   languageCode: z.string().min(2).max(8).optional(),
 });

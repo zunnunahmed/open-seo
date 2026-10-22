@@ -160,7 +160,7 @@ export const getDataforseoSuggestions = createServerFn({ method: "POST" })
       seeds: data.seeds,
       locationCode: market.locationCode,
       languageCode: market.languageCode,
-      limitPerSeed: data.limitPerSeed,
+      groups: data.groups,
       billingCustomer: context,
     });
   });

@@ -8,8 +8,16 @@ import {
 
 vi.mock("@/server/lib/dataforseo", () => ({
   createDataforseoClient: () => ({
-    keywords: {
-      suggestions: async () => [
+    serp: {
+      autocomplete: async ({ keyword }: { keyword: string }) =>
+        keyword === "who solar panels"
+          ? ["Solar Panels Cost", "X"]
+          : keyword === "solar panels what"
+            ? ["X", "Z"]
+            : [],
+    },
+    labs: {
+      keywordOverview: async () => [
         {
           keyword: "Solar Panels Cost",
           keyword_info: {
@@ -22,16 +30,24 @@ vi.mock("@/server/lib/dataforseo", () => ({
           search_intent_info: { main_intent: "commercial" },
         },
         {
-          keyword: "solar panels cost",
+          keyword: "x",
           keyword_info: null,
           keyword_properties: null,
           search_intent_info: null,
         },
-        { keyword: null },
       ],
     },
   }),
 }));
+
+vi.mock("@/server/lib/r2-cache", () => ({
+  buildCacheKey: (...parts: unknown[]) => Promise.resolve(parts.join("|")),
+  getCached: () => Promise.resolve(null),
+  setCached: () => Promise.resolve(),
+  CACHE_TTL: { researchResult: 86400 },
+}));
+
+vi.mock("cloudflare:workers", () => ({}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -52,12 +68,12 @@ function mockFetch(
 }
 
 describe("mineDataforseoSuggestions", () => {
-  it("maps Labs rows with metrics and dedupes case-insensitively", async () => {
+  it("mines autocomplete expansions and enriches them with overview metrics", async () => {
     const { rows, queriesRun, seedsMined } = await mineDataforseoSuggestions({
       seeds: ["solar panels"],
       locationCode: 2840,
       languageCode: "en",
-      limitPerSeed: 200,
+      groups: ["questions"],
       billingCustomer: {
         userId: "u",
         userEmail: "u@e.com",
@@ -65,18 +81,25 @@ describe("mineDataforseoSuggestions", () => {
         projectId: "p",
       },
     });
-    expect(queriesRun).toBe(1);
+    expect(queriesRun).toBe(24);
     expect(seedsMined).toEqual(["solar panels"]);
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({
-      keyword: "solar panels cost",
+      keyword: "Solar Panels Cost",
+      placement: "before",
+      modifier: "who",
+      seed: "solar panels",
       searchVolume: 1000,
       cpc: 2.5,
       competition: 0.8,
       keywordDifficulty: 30,
       intent: "commercial",
-      seed: "solar panels",
     });
+    expect(rows.map((row) => row.keyword)).toEqual([
+      "Solar Panels Cost",
+      "X",
+      "Z",
+    ]);
   });
 });
 

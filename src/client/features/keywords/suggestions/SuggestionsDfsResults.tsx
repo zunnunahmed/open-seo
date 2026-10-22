@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
+import { Badge } from "@/client/components/ui/badge";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import { ScoreBadge } from "@/client/components/table/ScoreBadge";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
@@ -26,6 +27,32 @@ function buildColumns() {
         </span>
       ),
       meta: { cellClassName: "max-w-[420px]" },
+    }),
+    columnHelper.accessor("placement", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Position" />
+      ),
+      cell: ({ getValue }) =>
+        getValue() === "before" ? (
+          <Badge variant="soft" size="sm" title="Modifier added before the seed">
+            Before
+          </Badge>
+        ) : (
+          <Badge
+            variant="secondary"
+            size="sm"
+            title="Modifier added after the seed"
+          >
+            After
+          </Badge>
+        ),
+      meta: { cellClassName: "whitespace-nowrap" },
+    }),
+    columnHelper.accessor("modifier", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Modifier" />
+      ),
+      meta: { cellClassName: "whitespace-nowrap" },
     }),
     columnHelper.accessor("searchVolume", {
       header: ({ column }) => (
@@ -87,11 +114,7 @@ function buildColumns() {
   ];
 }
 
-export function SuggestionsDfsResults({
-  rows,
-}: {
-  rows: DfsSuggestionRow[];
-}) {
+export function SuggestionsDfsResults({ rows }: { rows: DfsSuggestionRow[] }) {
   const columns = useMemo(buildColumns, []);
   const table = useDataTable({ data: rows, columns, withSorting: true });
 
@@ -101,7 +124,7 @@ export function SuggestionsDfsResults({
       empty={{
         title: "No suggestions found",
         description:
-          "DataForSEO returned nothing for these seeds in your project market.",
+          "DataForSEO returned nothing for these expansions in your project market.",
       }}
       toolbar={
         <div className="flex w-full items-center justify-between gap-2">
@@ -118,6 +141,8 @@ export function SuggestionsDfsResults({
                   headers: DFS_HEADERS,
                   rows: rows.map((row) => [
                     row.keyword,
+                    row.placement,
+                    row.modifier,
                     row.searchVolume ?? "No data",
                     row.cpc ?? "No data",
                     row.competition ?? "No data",

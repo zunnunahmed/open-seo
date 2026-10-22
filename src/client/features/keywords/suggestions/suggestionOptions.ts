@@ -10,6 +10,9 @@ export type SuggestionRow = {
 
 export type DfsSuggestionRow = {
   keyword: string;
+  placement: "before" | "after";
+  modifier: string;
+  seed: string;
   searchVolume: number | null;
   cpc: number | null;
   competition: number | null;
@@ -20,7 +23,6 @@ export type DfsSuggestionRow = {
     | "transactional"
     | "navigational"
     | "unknown";
-  seed: string;
 };
 
 export type SuggestEndpoint = "suggestqueries" | "www" | "toolbar";
@@ -99,9 +101,21 @@ export const GROUP_OPTIONS: Array<{
 export const LIMIT_OPTIONS = [100, 200, 500] as const;
 export type SuggestionLimit = (typeof LIMIT_OPTIONS)[number];
 
+/** Modifier counts per group, for cost estimates (each runs before + after). */
+export const MODIFIER_COUNTS: Record<
+  SuggestionModifierGroup,
+  number
+> = {
+  letters: 26,
+  questions: 12,
+  commercial: 11,
+};
+
 export const FREE_HEADERS = ["Keyword", "Position", "Modifier", "Seed query"];
 export const DFS_HEADERS = [
   "Keyword",
+  "Position",
+  "Modifier",
   "Volume",
   "CPC",
   "Competition",

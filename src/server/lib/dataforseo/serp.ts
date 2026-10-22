@@ -515,3 +515,43 @@ export async function fetchLocalSerpTaskResult(
   }
   return { status: "completed", items: task.result?.[0]?.items ?? [] };
 }
+
+const autocompleteItemSchema = z
+  .object({
+    suggestion: z.string().nullable().optional(),
+  })
+  .passthrough();
+
+/**
+ * Google autocomplete suggestions for one exact query string. Result items
+ * carry a `suggestion` field; anything else is dropped.
+ */
+export async function fetchGoogleAutocomplete(input: {
+  keyword: string;
+  locationCode: number;
+  languageCode: string;
+  client?: string;
+}): Promise<DataforseoApiResponse<string[]>> {
+  const response = await dataforseoPost<
+    DataforseoItemsTask<unknown>
+  >("/v3/serp/google/autocomplete/live/advanced", [
+    {
+      keyword: input.keyword,
+      location_code: input.locationCode,
+      language_code: input.languageCode,
+      client: input.client ?? "gws-wiz-serp",
+    },
+  ]);
+  const task = assertOk(response, { treatNoResultsAsEmpty: true });
+  const items = parseTaskItems(
+    "google-autocomplete-live-advanced",
+    task,
+    autocompleteItemSchema,
+  );
+  return {
+    data: items.flatMap((item) =>
+      item.suggestion ? [item.suggestion] : [],
+    ),
+    billing: buildTaskBilling(task),
+  };
+}

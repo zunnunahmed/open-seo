@@ -6,6 +6,7 @@ vi.mock("@/server/lib/runtime-env", () => ({
 
 import { DataforseoChargedTaskError } from "@/server/lib/dataforseo/envelope";
 import {
+  fetchGoogleAutocomplete,
   fetchLiveSerp,
   fetchLocalSerpTaskResult,
   fetchRankCheckTaskResult,
@@ -53,6 +54,50 @@ describe("live SERP", () => {
       }),
     ).resolves.toMatchObject({
       data: [],
+      billing: { costUsd: 0.002 },
+    });
+  });
+});
+
+describe("Google autocomplete", () => {
+  it("reads suggestion strings from the autocomplete items", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        Response.json({
+          status_code: 20000,
+          tasks: [
+            {
+              status_code: 20000,
+              cost: 0.002,
+              path: ["v3", "serp", "google", "autocomplete", "live", "advanced"],
+              result_count: 1,
+              result: [
+                {
+                  keyword: "a ai automation",
+                  type: "autocomplete",
+                  items_count: 3,
+                  items: [
+                    { type: "autocomplete", suggestion: "a ai automation agency" },
+                    { type: "autocomplete", suggestion: null },
+                    { type: "autocomplete" },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      fetchGoogleAutocomplete({
+        keyword: "a ai automation",
+        locationCode: 2840,
+        languageCode: "en",
+      }),
+    ).resolves.toMatchObject({
+      data: ["a ai automation agency"],
       billing: { costUsd: 0.002 },
     });
   });

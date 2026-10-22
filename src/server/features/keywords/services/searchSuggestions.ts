@@ -1,6 +1,14 @@
 import { sort } from "remeda";
+import { z } from "zod";
 import { createDataforseoClient } from "@/server/lib/dataforseo";
+import type { LabsKeywordDataItem } from "@/server/lib/dataforseo";
 import type { BillingCustomerContext } from "@/server/billing/subscription";
+import {
+  buildCacheKey,
+  CACHE_TTL,
+  getCached,
+  setCached,
+} from "@/server/lib/r2-cache";
 import {
   normalizeIntent,
   normalizeKeyword,
@@ -266,6 +274,9 @@ export async function mineSearchSuggestions(input: {
 
 export type DataforseoSuggestionRow = {
   keyword: string;
+  placement: SuggestionPlacement;
+  modifier: string;
+  seed: string;
   searchVolume: number | null;
   cpc: number | null;
   /** 0-1 paid-competition ratio, as reported by Labs. */
@@ -277,19 +288,48 @@ export type DataforseoSuggestionRow = {
     | "transactional"
     | "navigational"
     | "unknown";
-  seed: string;
 };
 
+const autocompleteCacheSchema = z.object({
+  suggestions: z.array(z.string()),
+});
+
+/** One exact query string through DataForSEO autocomplete, cached 24h. */
+async function cachedAutocomplete(
+  client: ReturnType<typeof createDataforseoClient>,
+  input: { query: string; locationCode: number; languageCode: string },
+): Promise<string[]> {
+  const key = await buildCacheKey("suggest:autocomplete", {
+    query: input.query,
+    locationCode: input.locationCode,
+    languageCode: input.languageCode,
+  });
+  const cached = autocompleteCacheSchema.safeParse(await getCached(key));
+  if (cached.success) return cached.data.suggestions;
+  const suggestions = await client.serp.autocomplete({
+    keyword: input.query,
+    locationCode: input.locationCode,
+    languageCode: input.languageCode,
+    creditFeature: "keyword_research",
+  });
+  await setCached(key, { suggestions }, CACHE_TTL.researchResult);
+  return suggestions;
+}
+
+const AUTOCOMPLETE_CONCURRENCY = 6;
+const OVERVIEW_CHUNK_SIZE = 1000;
+
 /**
- * DataForSEO keyword_suggestions per seed: Google-based suggestions with
- * volume, CPC, competition, difficulty and intent, billed per row under the
- * keyword_research feature. Reliable where raw autocomplete is blocked.
+ * DataForSEO autocomplete for every before/after expansion, then one
+ * keyword_overview call per 1,000 unique suggestions for volume, CPC,
+ * competition, difficulty and intent. Google-sourced and reliable where raw
+ * scraping is blocked; billed per autocomplete call plus overview rows.
  */
 export async function mineDataforseoSuggestions(input: {
   seeds: string[];
   locationCode: number;
   languageCode: string;
-  limitPerSeed: number;
+  groups: SuggestionModifierGroup[];
   billingCustomer: BillingCustomerContext;
 }): Promise<{
   rows: DataforseoSuggestionRow[];
@@ -300,39 +340,67 @@ export async function mineDataforseoSuggestions(input: {
   const seeds = [...new Set(input.seeds.map((seed) => seed.trim()))].filter(
     (seed) => seed.length > 0,
   );
-  const byKeyword = new Map<string, DataforseoSuggestionRow>();
-  for (const seed of seeds) {
-    const items = await client.keywords.suggestions({
-      keyword: seed,
+  const expansions = seeds
+    .flatMap((seed) => expandSeed(seed, input.groups))
+    .slice(0, MAX_EXPANSIONS);
+
+  const byKeyword = new Map<string, SuggestionExpansion & { keyword: string }>();
+  const queue = [...expansions];
+  async function worker() {
+    while (queue.length > 0) {
+      const expansion = queue.shift();
+      if (!expansion) return;
+      const suggestions = await cachedAutocomplete(client, {
+        query: expansion.query,
+        locationCode: input.locationCode,
+        languageCode: input.languageCode,
+      }).catch(() => [] as string[]);
+      for (const keyword of suggestions) {
+        const key = keyword.toLowerCase();
+        if (!byKeyword.has(key)) byKeyword.set(key, { ...expansion, keyword });
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: AUTOCOMPLETE_CONCURRENCY }, () => worker()),
+  );
+
+  const keywords = [...byKeyword.keys()];
+  const metrics = new Map<string, LabsKeywordDataItem>();
+  for (let i = 0; i < keywords.length; i += OVERVIEW_CHUNK_SIZE) {
+    const items = await client.labs.keywordOverview({
+      keywords: keywords.slice(i, i + OVERVIEW_CHUNK_SIZE),
       locationCode: input.locationCode,
       languageCode: input.languageCode,
-      limit: input.limitPerSeed,
       creditFeature: "keyword_research",
     });
     for (const item of items) {
-      if (!item.keyword) continue;
-      const keyword = normalizeKeyword(item.keyword);
-      if (byKeyword.has(keyword)) continue;
-      const info = item.keyword_info_normalized_with_clickstream
-        ?.search_volume
-        ? item.keyword_info_normalized_with_clickstream
-        : item.keyword_info;
-      byKeyword.set(keyword, {
-        keyword,
-        searchVolume: info?.search_volume ?? null,
-        cpc: info?.cpc ?? null,
-        competition: info?.competition ?? null,
-        keywordDifficulty: item.keyword_properties?.keyword_difficulty ?? null,
-        intent: normalizeIntent(item.search_intent_info?.main_intent),
-        seed,
-      });
+      if (item.keyword) metrics.set(normalizeKeyword(item.keyword), item);
     }
   }
+
+  const rows: DataforseoSuggestionRow[] = [];
+  for (const [key, expansion] of byKeyword) {
+    const item = metrics.get(key);
+    const info = item?.keyword_info_normalized_with_clickstream
+      ?.search_volume
+      ? item.keyword_info_normalized_with_clickstream
+      : item?.keyword_info;
+    rows.push({
+      keyword: expansion.keyword,
+      placement: expansion.placement,
+      modifier: expansion.modifier,
+      seed: expansion.seed,
+      searchVolume: info?.search_volume ?? null,
+      cpc: info?.cpc ?? null,
+      competition: info?.competition ?? null,
+      keywordDifficulty: item?.keyword_properties?.keyword_difficulty ?? null,
+      intent: normalizeIntent(item?.search_intent_info?.main_intent),
+    });
+  }
   return {
-    rows: sort([...byKeyword.values()], (a, b) =>
-      (b.searchVolume ?? -1) - (a.searchVolume ?? -1),
-    ),
-    queriesRun: seeds.length,
+    rows: sort(rows, (a, b) => (b.searchVolume ?? -1) - (a.searchVolume ?? -1)),
+    queriesRun: expansions.length,
     seedsMined: seeds,
   };
 }
