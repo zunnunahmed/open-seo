@@ -57,6 +57,7 @@ import type {
   DomainSortMode,
   SortOrder,
 } from "@/client/features/domain/types";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 type Props = {
   projectId: string;
@@ -552,6 +553,7 @@ export function DomainOverviewPage({
         <PageHeader
           title="Domain Overview"
           description="Analyze any domain's SEO profile: traffic, keywords, and backlinks."
+          actions={<DataSourceLabel projectId={projectId} />}
           backLink={
             routeState.domain ? (
               <BackButton

@@ -27,13 +27,12 @@ export async function buildCacheKey(
   prefix: string,
   params: Record<string, unknown>,
 ): Promise<string> {
-  // Serpstat data differs from DataForSEO's, so a treg → Serpstat project
-  // keeps its own entries. DataForSEO direct or through treg is the same data
-  // and shares them.
+  // Each treg route keeps its own entries, so the data source label on a
+  // page is always the route that fetched the cached result. Direct keys are
+  // unchanged, so existing entries stay valid.
+  const route = activeSeoProviderRoute();
   const keyed =
-    activeSeoProviderRoute() === "treg_serpstat"
-      ? { ...params, provider: "serpstat" }
-      : params;
+    route === "direct_dataforseo" ? params : { ...params, provider: route };
   const raw = JSON.stringify(
     Object.fromEntries(sortBy(Object.entries(keyed), ([key]) => key)),
   );

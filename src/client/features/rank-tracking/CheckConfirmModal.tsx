@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "@/client/components/ConfirmDialog";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 import type { RankTrackingConfig } from "@/types/schemas/rank-tracking";
 import {
   devicesCount,
@@ -7,6 +8,7 @@ import {
 } from "@/shared/rank-tracking";
 
 export function CheckConfirmModal({
+  projectId,
   keywordCount,
   devices,
   costUsd,
@@ -14,6 +16,7 @@ export function CheckConfirmModal({
   onRunNow,
   onCancel,
 }: {
+  projectId: string;
   keywordCount: number;
   devices: RankTrackingConfig["devices"];
   /** Server estimate; it prices each keyword's text (operators cost 5x). */
@@ -50,6 +53,9 @@ export function CheckConfirmModal({
           .
         </>
       ) : null}
+      <div className="mt-3">
+        <DataSourceLabel projectId={projectId} prefix="This check uses" />
+      </div>
     </ConfirmDialog>
   );
 }

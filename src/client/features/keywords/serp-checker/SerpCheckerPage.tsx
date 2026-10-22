@@ -9,6 +9,7 @@ import { useProjectMarket } from "@/client/features/projects/useProjectMarket";
 import { useKeywordSerpAnalysis } from "@/client/features/keywords/hooks/useKeywordSerpAnalysis";
 import { KeywordAreaField } from "@/client/features/keywords/page/KeywordAreaField";
 import { SerpAnalysisCard } from "@/client/features/keywords/components/SerpAnalysisCard";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 /**
  * Standalone localized SERP checker: any query, project market by default
@@ -48,6 +49,7 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
         <PageHeader
           title="SERP Checker"
+          actions={<DataSourceLabel projectId={projectId} />}
           description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."
         />
         <Card className="overflow-visible">

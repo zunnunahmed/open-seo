@@ -8,6 +8,7 @@ import {
 } from "@/serverFunctions/keywordClustering";
 import { ClusterRunForm } from "./ClusterRunForm";
 import { ClusterRunView } from "./ClusterRunView";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 const STATUS_LABEL = { draft: "Not started", running: "Running", done: "Done" };
 
@@ -48,7 +49,9 @@ export function KeywordClusteringPage({
               <Button variant="outline" onClick={() => onSelectJob(undefined)}>
                 New run
               </Button>
-            ) : null
+            ) : (
+              <DataSourceLabel projectId={projectId} prefix="New runs use" />
+            )
           }
         />
         {jobId ? (

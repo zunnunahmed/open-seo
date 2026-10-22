@@ -21,6 +21,7 @@ import {
   BACKLINKS_DEFAULT_SORT,
   DEFAULT_BACKLINKS_PAGE_SIZE,
 } from "@/types/schemas/backlinks";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 export function BacklinksPage({
   projectId,
@@ -123,6 +124,7 @@ export function BacklinksPage({
       <div className="mx-auto max-w-7xl space-y-4">
         <PageHeader
           title="Backlinks"
+          actions={<DataSourceLabel projectId={projectId} />}
           description="Understand who links to a site, what changed recently, and which pages attract links."
           backLink={
             searchState.target ? (

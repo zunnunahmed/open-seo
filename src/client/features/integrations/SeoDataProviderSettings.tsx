@@ -3,27 +3,28 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
+import { updateProjectContext } from "@/serverFunctions/projectContext";
 import {
-  getProjectSeoProviderPreference,
-  updateProjectContext,
-} from "@/serverFunctions/projectContext";
+  SEO_PROVIDER_TITLES,
+  seoProviderPreferenceQuery,
+} from "@/client/features/integrations/DataSourceLabel";
 
 const SECTION = "seo-data-providers";
 const OPTIONS = [
   {
     value: "direct_dataforseo",
-    title: "Direct DataForSEO",
+    title: SEO_PROVIDER_TITLES.direct_dataforseo,
     description: "Use the connected DataForSEO account directly.",
   },
   {
     value: "treg_serpstat",
-    title: "treg → Serpstat",
+    title: SEO_PROVIDER_TITLES.treg_serpstat,
     description:
       "Serpstat data through treg, billed to the treg balance. Country-level data only.",
   },
   {
     value: "treg_dataforseo",
-    title: "treg → DataForSEO",
+    title: SEO_PROVIDER_TITLES.treg_dataforseo,
     description:
       "The same DataForSEO data through treg, billed to the treg balance. Queued SERP jobs run live (higher cost).",
   },
@@ -37,11 +38,8 @@ type Choice = (typeof OPTIONS)[number]["value"];
  */
 export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
-  const queryKey = ["seo-provider-preferences", projectId];
-  const query = useQuery({
-    queryKey,
-    queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
-  });
+  const { queryKey } = seoProviderPreferenceQuery(projectId);
+  const query = useQuery(seoProviderPreferenceQuery(projectId));
   const saved = query.data ?? "direct_dataforseo";
   const [choice, setChoice] = useState<Choice>("direct_dataforseo");
 
@@ -64,6 +62,9 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
         },
       }),
     onSuccess: () => {
+      // Results fetched on the old route must not show under the new route's
+      // data source label, so drop them from the browser cache.
+      queryClient.removeQueries({ type: "inactive" });
       void queryClient.invalidateQueries({ queryKey });
       toast.success("Project provider preference saved");
     },

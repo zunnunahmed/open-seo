@@ -35,6 +35,7 @@ import {
 } from "./suggestionOptions";
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   const [mode, setMode] = useState<"free" | "dataforseo">("free");
@@ -116,6 +117,9 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
         <PageHeader
           title="Search Suggestions"
+          actions={
+            <DataSourceLabel projectId={projectId} prefix="Paid lookups" />
+          }
           description="Mine autocomplete before and after your seed for free — or pay per lookup for Google suggestions with volume via DataForSEO."
         />
         <Card className="overflow-visible">

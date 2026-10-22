@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CardShell } from "@/client/components/CardShell";
 import { Button } from "@/client/components/ui/button";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 import {
   advanceClusterJob,
   getClusterJob,
@@ -159,7 +160,10 @@ export function ClusterRunView({
   if (job.status === "draft") {
     const total = job.estimatedUsd.serps + job.estimatedUsd.volume;
     return (
-      <CardShell title={job.name}>
+      <CardShell
+        title={job.name}
+        action={<DataSourceLabel projectId={projectId} route={job.route} />}
+      >
         <div className="space-y-3 text-sm">
           <p>
             {job.total.toLocaleString()} keywords. Estimated{" "}
@@ -190,7 +194,10 @@ export function ClusterRunView({
   if (job.status === "running") {
     const progress = progressOf(job);
     return (
-      <CardShell title={job.name}>
+      <CardShell
+        title={job.name}
+        action={<DataSourceLabel projectId={projectId} route={job.route} />}
+      >
         <div className="space-y-3 text-sm">
           <p>
             {progress.label}… {Math.round(progress.value * 100)}%
@@ -235,11 +242,14 @@ export function ClusterRunView({
       </p>
     );
   return (
-    <ClusterResults
-      name={job.name}
-      items={results.data.items}
-      failed={results.data.failed}
-      ownDomain={ownDomain}
-    />
+    <div className="space-y-3">
+      <DataSourceLabel projectId={projectId} route={job.route} />
+      <ClusterResults
+        name={job.name}
+        items={results.data.items}
+        failed={results.data.failed}
+        ownDomain={ownDomain}
+      />
+    </div>
   );
 }

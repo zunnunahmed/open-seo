@@ -30,6 +30,7 @@ import { KeywordResearchLoadingState } from "./KeywordResearchLoadingState";
 import { KeywordResearchResults } from "./KeywordResearchResults";
 import { KeywordResearchSearchBar } from "./KeywordResearchSearchBar";
 import type { KeywordResearchControllerState } from "./types";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 
 type ControllerProps = Omit<KeywordResearchControllerInput, "onFormSubmit">;
 type Props = Omit<
@@ -201,6 +202,7 @@ export function KeywordResearchPage(input: Props) {
         <PageHeader
           title="Keyword Research"
           description="Discover keyword ideas, search demand, and ranking opportunities."
+          actions={<DataSourceLabel projectId={projectId} />}
           backLink={
             controller.hasSearched ? (
               <BackButton

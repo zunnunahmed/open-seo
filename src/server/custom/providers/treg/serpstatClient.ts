@@ -100,7 +100,11 @@ export function labsKeyword(row: KeywordRow) {
       competition: row.concurrency != null ? row.concurrency / 100 : null,
       monthly_searches: null,
     },
-    keyword_properties: { keyword_difficulty: row.difficulty ?? null },
+    // Serpstat sends fractional difficulty (46.33); DataForSEO is whole 0-100.
+    keyword_properties: {
+      keyword_difficulty:
+        row.difficulty != null ? Math.round(row.difficulty) : null,
+    },
     search_intent_info: { main_intent: row.intents?.[0] ?? null },
   };
 }
