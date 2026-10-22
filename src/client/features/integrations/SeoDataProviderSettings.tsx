@@ -9,11 +9,20 @@ import {
 } from "@/serverFunctions/projectContext";
 
 const SECTION = "seo-data-providers";
-const OPTIONS = ["dataforseo", "treg", "both"] as const;
+const OPTIONS = [
+  "direct_dataforseo",
+  "treg_serpstat",
+  "treg_dataforseo",
+  "both",
+] as const;
 type Choice = (typeof OPTIONS)[number];
 
 function parseChoice(value: string): Choice {
-  return value === "treg" || value === "both" ? value : "dataforseo";
+  if (value === "treg") return "treg_serpstat";
+  if (value === "dataforseo") return "direct_dataforseo";
+  return OPTIONS.includes(value as Choice)
+    ? (value as Choice)
+    : "direct_dataforseo";
 }
 
 /**
@@ -28,8 +37,8 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
     queryKey,
     queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
   });
-  const saved = query.data ?? "dataforseo";
-  const [choice, setChoice] = useState<Choice>("dataforseo");
+  const saved = query.data ?? "direct_dataforseo";
+  const [choice, setChoice] = useState<Choice>("direct_dataforseo");
 
   useEffect(() => {
     if (query.data) setChoice(saved);
@@ -83,12 +92,25 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
                 <legend className="font-medium">Preferred providers</legend>
                 {[
                   [
-                    "dataforseo",
-                    "DataForSEO only",
-                    "Use the current OpenSEO provider.",
+                    "direct_dataforseo",
+                    "Direct DataForSEO",
+                    "Use the connected DataForSEO account directly.",
                   ],
-                  ["treg", "treg only", "Prefer treg when supported."],
-                  ["both", "Both", "Choose a source by capability and cost."],
+                  [
+                    "treg_serpstat",
+                    "treg → Serpstat",
+                    "Use treg's Serpstat route where supported.",
+                  ],
+                  [
+                    "treg_dataforseo",
+                    "treg → DataForSEO",
+                    "Use treg's DataForSEO route where supported.",
+                  ],
+                  [
+                    "both",
+                    "Both available",
+                    "Keep both routes available; each workflow chooses explicitly.",
+                  ],
                 ].map(([value, title, description]) => (
                   <label
                     key={value}
@@ -112,10 +134,9 @@ export function SeoDataProviderSettings({ projectId }: { projectId: string }) {
                 ))}
               </fieldset>
               <p className="text-xs text-muted-foreground">
-                Preference only: existing research requests continue to use
-                DataForSEO until treg routing, billing, caching and feature
-                coverage are implemented. Selecting Both does not send duplicate
-                paid requests.
+                The selected route is never silently replaced by another
+                provider. Unsupported workflow/provider combinations show a
+                clear error instead.
               </p>
               <div className="flex justify-end">
                 <Button

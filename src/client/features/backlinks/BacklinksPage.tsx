@@ -33,7 +33,9 @@ export function BacklinksPage({
     queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
   });
   const showDataForSeo =
-    providerQuery.isSuccess && providerQuery.data !== "treg";
+    providerQuery.isSuccess &&
+    (providerQuery.data === "direct_dataforseo" ||
+      providerQuery.data === "both");
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -161,7 +163,8 @@ export function BacklinksPage({
             Could not load provider settings. Research queries are paused.
           </p>
         ) : null}
-        {providerQuery.data === "treg" || providerQuery.data === "both" ? (
+        {providerQuery.data === "treg_serpstat" ||
+        providerQuery.data === "both" ? (
           <>
             <TregBacklinksSummaryCard
               projectId={projectId}
