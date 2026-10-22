@@ -121,6 +121,11 @@ export function analyzeHtml(
     if (linksByTarget.size >= MAX_EXTRACTED_LINKS) return;
     const resolved = normalizeUrl(href, pageUrl);
     if (!resolved || linksByTarget.has(resolved)) return;
+    // Cloudflare serves bot-protection infrastructure under /cdn-cgi/
+    // (email-protection decoder, challenge platform). These are not real
+    // links: fetching one directly 404s, so keeping them would flag every
+    // page showing an email address as linking to a broken URL.
+    if (new URL(resolved).pathname.startsWith("/cdn-cgi/")) return;
     const anchor = text
       .join("")
       .replace(/\s+/g, " ")

@@ -62,6 +62,7 @@ function analyzeHtmlWithCheerio(html: string, pageUrl: string): PageAnalysis {
     if (/^(javascript:|mailto:|tel:|#)/.test(href)) return;
     const resolved = normalizeUrl(href, pageUrl);
     if (!resolved) return;
+    if (new URL(resolved).pathname.startsWith("/cdn-cgi/")) return;
     if (linksByTarget.has(resolved)) return;
     const anchor = $(el).text().replace(/\s+/g, " ").trim().slice(0, 200);
     const rel = $(el).attr("rel")?.toLowerCase() ?? "";
@@ -245,6 +246,20 @@ describe("analyzeHtml extraction caps", () => {
     );
     expect(analysis.links).toHaveLength(1_000);
     expect(analysis.images).toHaveLength(1_000);
+  });
+});
+
+describe("analyzeHtml skips Cloudflare infrastructure links", () => {
+  it("ignores /cdn-cgi/ decoder endpoints but keeps real links", () => {
+    const html =
+      '<a href="/real-page">Real</a>' +
+      '<a href="/cdn-cgi/l/email-protection#3a5b">[email protected]</a>' +
+      '<a href="https://example.com/cdn-cgi/challenge-platform">c</a>';
+    const analysis = analyzeHtml(html, PAGE_URL, 200, 0);
+    expect(analysis.links.map((link) => link.targetUrl)).toEqual([
+      "https://example.com/real-page",
+    ]);
+    expectParity(html);
   });
 });
 
