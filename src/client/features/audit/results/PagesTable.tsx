@@ -13,8 +13,8 @@ import {
   extractPathname,
   HttpStatusBadge,
 } from "@/client/features/audit/shared";
-import { classifyGscUrl } from "@/client/features/search-performance/urlCategories";
 import type { AuditResultsData } from "@/client/features/audit/results/types";
+import { buildGscColumns } from "@/client/features/audit/results/PagesTableGscColumns";
 import {
   countActiveFilters,
   PagesFilterBar,
@@ -139,7 +139,11 @@ function buildPagesColumns({
         }
         const title = getValue();
         if (title) {
-          return <span className="break-words">{title}</span>;
+          return (
+            <span className="line-clamp-2 break-words" title={title}>
+              {title}
+            </span>
+          );
         }
         // Red only when the engine flagged it — a 200 that isn't an HTML
         // document (robots.txt, security.txt) legitimately has no title.
@@ -150,21 +154,24 @@ function buildPagesColumns({
         );
       },
       sortingFn: nullableStringSort,
-      meta: { cellClassName: "max-w-[360px]" },
+      meta: { cellClassName: "max-w-[360px] min-w-[200px]" },
     }),
     pageColumnHelper.accessor("h1Count", {
       header: ({ column }) => <SortableHeader column={column} label="H1" />,
+      meta: { cellClassName: "whitespace-nowrap" },
       cell: ({ getValue, row }) =>
         hasAnalyzedContent(row.original) ? getValue() : <EmptyCell />,
     }),
     pageColumnHelper.accessor("wordCount", {
       header: ({ column }) => <SortableHeader column={column} label="Words" />,
+      meta: { cellClassName: "whitespace-nowrap" },
       cell: ({ getValue, row }) =>
         hasAnalyzedContent(row.original) ? getValue() : <EmptyCell />,
     }),
     pageColumnHelper.display({
       id: "images",
       header: ({ column }) => <SortableHeader column={column} label="Images" />,
+      meta: { cellClassName: "whitespace-nowrap" },
       cell: ({ row }) => {
         if (!hasAnalyzedContent(row.original)) return <EmptyCell />;
         return row.original.imagesMissingAlt > 0 ? (
@@ -182,6 +189,7 @@ function buildPagesColumns({
     }),
     pageColumnHelper.accessor("responseTimeMs", {
       header: ({ column }) => <SortableHeader column={column} label="Speed" />,
+      meta: { cellClassName: "whitespace-nowrap" },
       cell: ({ getValue }) => {
         const value = getValue();
         return value ? (
@@ -192,160 +200,7 @@ function buildPagesColumns({
       },
       sortingFn: nullableNumberSort,
     }),
-    pageColumnHelper.accessor((row) => row.gscClicks ?? null, {
-      id: "gscClicks",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Clicks"
-          title="Search Console clicks, last 28 days"
-        />
-      ),
-      cell: ({ getValue }) => {
-        const value = getValue();
-        return value == null ? (
-          <span className="text-xs text-muted-foreground">No clicks</span>
-        ) : (
-          <span className="text-xs">{value.toLocaleString("en-US")}</span>
-        );
-      },
-      sortingFn: nullableNumberSort,
-    }),
-    pageColumnHelper.accessor((row) => row.gscImpressions ?? null, {
-      id: "gscImpressions",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Impressions"
-          title="Search Console impressions, last 28 days"
-        />
-      ),
-      cell: ({ getValue }) => {
-        const value = getValue();
-        return value == null ? (
-          <span className="text-xs text-muted-foreground">No impression</span>
-        ) : (
-          <span className="text-xs">{value.toLocaleString("en-US")}</span>
-        );
-      },
-      sortingFn: nullableNumberSort,
-    }),
-    pageColumnHelper.accessor((row) => row.gscTopImpressions ?? null, {
-      id: "gscTopImpressionQuery",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Top impression query"
-          title="Highest-impression Search Console query for this page, last 28 days"
-        />
-      ),
-      cell: ({ getValue, row }) => {
-        const query = row.original.gscTopImpressionQuery;
-        const impressions = getValue();
-        if (query == null || impressions == null) {
-          return (
-            <span className="text-xs text-muted-foreground">No data</span>
-          );
-        }
-        return (
-          <span
-            className="block max-w-[220px] truncate text-xs"
-            title={`${query} — ${impressions.toLocaleString("en-US")} impressions`}
-          >
-            {query}
-          </span>
-        );
-      },
-      sortingFn: nullableNumberSort,
-    }),
-    pageColumnHelper.accessor((row) => row.gscTopClicks ?? null, {
-      id: "gscTopClickQuery",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Top click query"
-          title="Highest-click Search Console query for this page, last 28 days"
-        />
-      ),
-      cell: ({ getValue, row }) => {
-        const query = row.original.gscTopClickQuery;
-        const clicks = getValue();
-        if (query == null || clicks == null) {
-          return (
-            <span className="text-xs text-muted-foreground">No data</span>
-          );
-        }
-        return (
-          <span
-            className="block max-w-[220px] truncate text-xs"
-            title={`${query} — ${clicks.toLocaleString("en-US")} clicks`}
-          >
-            {query}
-          </span>
-        );
-      },
-      sortingFn: nullableNumberSort,
-    }),
-    pageColumnHelper.accessor((row) => row.gscClicks ?? null, {
-      id: "gscCategory",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Category"
-          title="GSC click category, last 28 days: Performance, Good, Fair, Weak or Dead"
-        />
-      ),
-      cell: ({ getValue }) => {
-        const clicks = getValue();
-        if (clicks == null) {
-          return (
-            <span className="text-xs text-muted-foreground">No data</span>
-          );
-        }
-        const { category, action } = classifyGscUrl(clicks);
-        return (
-          <span className="text-xs" title={action}>
-            {category}
-          </span>
-        );
-      },
-      sortingFn: nullableNumberSort,
-    }),
-    pageColumnHelper.accessor((row) => row.gscIndexStatus ?? "Not checked", {
-      id: "gscIndexStatus",
-      header: ({ column }) => (
-        <SortableHeader
-          column={column}
-          label="Indexed"
-          title="Google index status via Search Console URL Inspection"
-        />
-      ),
-      cell: ({ getValue, row }) => {
-        const value = getValue();
-        const reason =
-          (row.original as { gscIndexReason?: string | null })
-            .gscIndexReason ?? undefined;
-        if (value === "Indexed") {
-          return (
-            <span className="text-xs text-success" title={reason}>
-              Indexed
-            </span>
-          );
-        }
-        if (value === "Not indexed") {
-          return (
-            <span className="text-xs text-destructive" title={reason}>
-              Not indexed
-            </span>
-          );
-        }
-        return (
-          <span className="text-xs text-muted-foreground" title={reason}>
-            {value}
-          </span>
-        );
-      },
-    }),
+    ...buildGscColumns(),
   ];
 }
 
