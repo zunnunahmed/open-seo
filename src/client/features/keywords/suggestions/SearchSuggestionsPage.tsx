@@ -34,12 +34,12 @@ type SuggestionRow = {
   query: string;
 };
 
-type SuggestSource = "google" | "duckduckgo" | "yahoo";
+type SuggestEndpoint = "suggestqueries" | "www" | "toolbar";
 
-const SOURCE_LABELS: Record<SuggestSource, string> = {
-  google: "Google",
-  duckduckgo: "DuckDuckGo",
-  yahoo: "Yahoo",
+const ENDPOINT_LABELS: Record<SuggestEndpoint, string> = {
+  suggestqueries: "suggest host",
+  www: "www host",
+  toolbar: "toolbar host",
 };
 
 const COUNTRY_OPTIONS: Array<{ code: string; name: string }> = [
@@ -188,7 +188,6 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
     COUNTRY_OPTIONS.find((c) => c.code === gl)?.name ?? gl.toUpperCase();
 
   const rows: SuggestionRow[] = mutation.data?.rows ?? [];
-  const source = mutation.data?.source ?? null;
   const columns = useMemo(buildColumns, []);
   const table = useDataTable({
     data: rows,
@@ -313,11 +312,11 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
       </Card>
 
       {mutation.data ? (
-        mutation.data.source === null ? (
+        mutation.data.endpoint === null ? (
           <ErrorState
             variant="card"
-            title="Suggestions are unreachable right now"
-            message={`Google, DuckDuckGo and Yahoo all returned nothing (${mutation.data.probeLog.map((p) => `${SOURCE_LABELS[p.source as SuggestSource]}: ${p.result}`).join(" · ")}). This usually means the server IP is temporarily rate-limited. Wait a few minutes and try again.`}
+            title="Google blocked this run"
+            message={`No Google suggest host answered (${mutation.data.probeLog.map((p) => `${ENDPOINT_LABELS[p.endpoint as SuggestEndpoint]}: ${p.result}`).join(" · ")}). Wait a few minutes and try again — mining more slowly helps, and the tool now spaces its requests out.`}
             onRetry={runMine}
             isRetrying={mutation.isPending}
           />
@@ -326,17 +325,14 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             table={table}
             empty={{
               title: "No suggestions found",
-              description: `${SOURCE_LABELS[source as SuggestSource]} returned nothing for these expansions in ${countryName}. Try a broader seed.`,
+              description: `Google returned nothing for these expansions in ${countryName}. Try a broader seed.`,
             }}
             toolbar={
               <div className="flex w-full items-center justify-between gap-2">
                 <span className="text-sm tabular-nums text-muted-foreground">
                   {rows.length.toLocaleString("en-US")} keywords from{" "}
                   {mutation.data.queriesRun.toLocaleString("en-US")} queries ·{" "}
-                  Source: {SOURCE_LABELS[source as SuggestSource]}
-                  {source !== "google"
-                    ? " (Google blocked this run)"
-                    : null}
+                  Source: Google
                 </span>
                 {rows.length > 0 ? (
                   <ExportMenu

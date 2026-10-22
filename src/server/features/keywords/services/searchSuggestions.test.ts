@@ -10,14 +10,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function mockFetch(handler: (url: string) => unknown) {
+function mockFetch(
+  handler: (url: URL) => { status: number; body: unknown } | "network-error",
+) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-    const outcome = handler(String(input));
+    const outcome = handler(new URL(String(input)));
     if (outcome === "network-error") throw new Error("fetch failed");
-    if (typeof outcome === "number") {
-      return new Response("blocked", { status: outcome });
+    if (outcome.status !== 200) {
+      return new Response("blocked", { status: outcome.status });
     }
-    return Response.json(outcome);
+    return Response.json(outcome.body);
   });
 }
 
@@ -41,36 +43,14 @@ describe("expandSeed", () => {
 });
 
 describe("fetchSuggestions parsers", () => {
-  it("reads Google firefox and Yahoo fxjson responses", async () => {
-    mockFetch(() => ["q", ["a", "b"]]);
-    expect(
-      (await fetchSuggestions("google", "q", "en", "au")).suggestions,
-    ).toEqual(["a", "b"]);
-    expect(
-      (await fetchSuggestions("yahoo", "q", "en", "au")).suggestions,
-    ).toEqual(["a", "b"]);
-  });
-
-  it("reads DuckDuckGo phrase responses", async () => {
-    mockFetch(() => [{ phrase: "a" }, { phrase: "" }, { nope: 1 }]);
-    const { suggestions, result } = await fetchSuggestions(
-      "duckduckgo",
-      "q",
-      "en",
-      "au",
-    );
-    expect(suggestions).toEqual(["a"]);
-    expect(result).toBe("ok");
-  });
-
   it("reports http and network failures without throwing", async () => {
-    mockFetch(() => 429);
-    expect(await fetchSuggestions("google", "q", "en", "au")).toEqual({
+    mockFetch(() => ({ status: 429, body: null }));
+    expect(await fetchSuggestions("suggestqueries", "q", "en", "au")).toEqual({
       suggestions: [],
       result: "http 429",
     });
     mockFetch(() => "network-error");
-    expect(await fetchSuggestions("google", "q", "en", "au")).toEqual({
+    expect(await fetchSuggestions("www", "q", "en", "au")).toEqual({
       suggestions: [],
       result: "error",
     });
@@ -78,69 +58,75 @@ describe("fetchSuggestions parsers", () => {
 });
 
 describe("mineSearchSuggestions", () => {
-  it("mines through Google when it answers and dedupes case-insensitively", async () => {
+  it("mines through suggestqueries when it answers, deduped", async () => {
     mockFetch((url) => {
-      const parsed = new URL(url);
-      if (!parsed.hostname.includes("google")) return ["q", []];
-      const q = parsed.searchParams.get("q");
-      if (q === "solar panels") return ["q", ["probe hit"]];
-      if (q === "who solar panels") return ["q", ["Solar Panels Cost", "X"]];
-      if (q === "solar panels what") return ["q", ["X", "Z"]];
-      return ["q", []];
+      if (!url.hostname.includes("suggestqueries")) return { status: 200, body: ["q", []] };
+      const q = url.searchParams.get("q");
+      if (q === "solar panels") return { status: 200, body: ["q", ["probe hit"]] };
+      if (q === "who solar panels")
+        return { status: 200, body: ["q", ["Solar Panels Cost", "X"]] };
+      if (q === "solar panels what")
+        return { status: 200, body: ["q", ["X", "Z"]] };
+      return { status: 200, body: ["q", []] };
     });
-    const { rows, queriesRun, source, probeLog } =
+    const { rows, queriesRun, endpoint, probeLog } =
       await mineSearchSuggestions({
         seeds: ["solar panels"],
         hl: "en",
         gl: "au",
         groups: ["questions"],
       });
-    expect(source).toBe("google");
+    expect(endpoint).toBe("suggestqueries");
     expect(queriesRun).toBe(24);
     expect(new Set(rows.map((r) => r.keyword))).toEqual(
       new Set(["Solar Panels Cost", "X", "Z"]),
     );
-    expect(probeLog[0]).toEqual({ source: "google", result: "ok" });
+    expect(probeLog[0]).toEqual({
+      endpoint: "suggestqueries",
+      result: "ok",
+    });
   });
 
-  it("falls back to DuckDuckGo when Google is rate-limited", async () => {
+  it("falls through to the next Google host when the first is rate-limited", async () => {
     mockFetch((url) => {
-      if (url.includes("suggestqueries.google.com")) return 429;
-      if (url.includes("duckduckgo.com")) return [{ phrase: "ddg hit" }];
-      return [];
+      if (url.hostname.includes("suggestqueries"))
+        return { status: 429, body: null };
+      if (url.hostname.includes("www.google"))
+        return { status: 200, body: ["q", ["www hit"]] };
+      return { status: 200, body: ["q", []] };
     });
-    const { rows, source, probeLog } = await mineSearchSuggestions({
+    const { rows, endpoint, probeLog } = await mineSearchSuggestions({
       seeds: ["solar panels"],
       hl: "en",
       gl: "au",
       groups: ["questions"],
     });
-    expect(source).toBe("duckduckgo");
-    expect(rows.map((r) => r.keyword)).toEqual(["ddg hit"]);
+    expect(endpoint).toBe("www");
+    expect(rows.map((r) => r.keyword)).toEqual(["www hit"]);
     expect(probeLog).toEqual([
-      { source: "google", result: "http 429" },
-      { source: "duckduckgo", result: "ok" },
+      { endpoint: "suggestqueries", result: "http 429" },
+      { endpoint: "www", result: "ok" },
     ]);
   });
 
-  it("reports every probe result when no provider answers", async () => {
+  it("reports every probe result when no Google host answers", async () => {
     mockFetch((url) => {
-      if (url.includes("duckduckgo.com")) return [];
-      if (url.includes("yahoo.com")) return "network-error";
-      return 403;
+      if (url.hostname.includes("suggestqueries")) return { status: 403, body: null };
+      if (url.hostname.includes("www.google")) return { status: 200, body: ["q", []] };
+      return "network-error";
     });
-    const { rows, source, probeLog } = await mineSearchSuggestions({
+    const { rows, endpoint, probeLog } = await mineSearchSuggestions({
       seeds: ["x"],
       hl: "en",
       gl: "au",
       groups: ["letters"],
     });
     expect(rows).toEqual([]);
-    expect(source).toBeNull();
+    expect(endpoint).toBeNull();
     expect(probeLog).toEqual([
-      { source: "google", result: "http 403" },
-      { source: "duckduckgo", result: "empty" },
-      { source: "yahoo", result: "error" },
+      { endpoint: "suggestqueries", result: "http 403" },
+      { endpoint: "www", result: "empty" },
+      { endpoint: "toolbar", result: "error" },
     ]);
   });
 });
