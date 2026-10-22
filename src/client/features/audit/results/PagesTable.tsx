@@ -122,7 +122,10 @@ function buildPagesColumns({
           <Badge
             variant="destructive"
             size="sm"
-            title="Fetching or rendering failed, so this page was not checked for content issues."
+            title={
+              row.original.crawlError ??
+              "Fetching or rendering failed, so this page was not checked for content issues."
+            }
           >
             Failed
           </Badge>

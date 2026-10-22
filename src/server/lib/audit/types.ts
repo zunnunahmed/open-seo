@@ -172,6 +172,12 @@ export interface CrawledPageResult {
   hreflangTags: string[];
   isIndexable: boolean;
   responseTimeMs: number;
+  /**
+   * Why the fetch failed (error name + message, truncated). Only set when
+   * fetchClass is "error"; null otherwise. Persisted so the Pages table can
+   * explain unread pages instead of showing a bare Failed badge.
+   */
+  crawlError: string | null;
   /** null = not reached via links (e.g. sitemap-seeded). */
   crawlDepth: number | null;
   inSitemap: boolean;

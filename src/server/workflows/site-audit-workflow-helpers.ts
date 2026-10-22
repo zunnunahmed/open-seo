@@ -222,6 +222,7 @@ export async function crawlPage(
       fetchClass,
       redirectUrl: null,
       title: analysis.title,
+      crawlError: null,
       metaDescription: analysis.metaDescription,
       canonicalUrl: analysis.canonical
         ? (normalizeUrl(analysis.canonical, url) ?? analysis.canonical)
@@ -268,12 +269,14 @@ export async function crawlPage(
     if (throttle.checkpointFailed) throw error;
     const responseTimeMs = Date.now() - startTime;
     // Render failures no longer reach here (readable pages fall back to the
-    // direct body), so a failure here is always the direct fetch: log the
-    // reason class, never the body, so Worker logs explain future failures.
-    console.warn(
-      `Failed to crawl ${url} (fetch, ${responseTimeMs}ms):`,
-      error instanceof Error ? error.message : error,
-    );
+    // direct body), so a failure here is always the direct fetch: record a
+    // short reason (name + message only, never the body) for the Pages
+    // table, and log it for Worker logs.
+    const crawlError =
+      error instanceof Error
+        ? `${error.name}: ${error.message}`.slice(0, 300)
+        : String(error).slice(0, 300);
+    console.warn(`Failed to crawl ${url} (fetch, ${responseTimeMs}ms):`, crawlError);
     return emptyPageResult({
       url,
       statusCode: 0,
@@ -284,6 +287,7 @@ export async function crawlPage(
       headerCanonicalUrl: null,
       crawlDepth,
       inSitemap,
+      crawlError,
     });
   }
 }
@@ -300,6 +304,7 @@ function emptyPageResult(input: {
   inSitemap: boolean;
   htmlBytes?: number;
   rateLimited?: boolean;
+  crawlError?: string | null;
 }): CrawledPageResult {
   return {
     id: crypto.randomUUID(),
@@ -338,5 +343,6 @@ function emptyPageResult(input: {
     responseTimeMs: input.responseTimeMs,
     crawlDepth: input.crawlDepth,
     inSitemap: input.inSitemap,
+    crawlError: input.crawlError ?? null,
   };
 }

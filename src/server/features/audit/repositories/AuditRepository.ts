@@ -200,6 +200,7 @@ async function insertCrawledBatch(
       crawlDepth: page.crawlDepth,
       inSitemap: page.inSitemap,
       responseTimeMs: page.responseTimeMs,
+      crawlError: page.crawlError,
     };
     return tx
       .insert(auditPages)
@@ -292,6 +293,7 @@ async function getPagesForAudit(auditId: string) {
       inSitemap: auditPages.inSitemap,
       internalLinkCount: auditPages.internalLinkCount,
       responseTimeMs: auditPages.responseTimeMs,
+      crawlError: auditPages.crawlError,
     })
     .from(auditPages)
     .where(eq(auditPages.auditId, auditId));

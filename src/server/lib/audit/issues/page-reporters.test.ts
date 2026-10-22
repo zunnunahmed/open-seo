@@ -53,6 +53,7 @@ function makePage(overrides: Partial<CrawledPageResult>): CrawledPageResult {
     responseTimeMs: 200,
     crawlDepth: 1,
     inSitemap: true,
+    crawlError: null,
     ...overrides,
   };
 }

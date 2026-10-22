@@ -59,6 +59,7 @@ const PAGES_HEADERS = [
   "Images",
   "Missing Alt",
   "Response Time (ms)",
+  "Error",
   "Clicks (28d)",
   "Impressions (28d)",
   "Top impression query (28d)",
@@ -77,6 +78,7 @@ function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
     page.imagesTotal,
     page.imagesMissingAlt,
     page.responseTimeMs,
+    page.crawlError ?? "",
     page.gscClicks ?? "No clicks",
     page.gscImpressions ?? "No impression",
     page.gscTopImpressionQuery == null
@@ -143,6 +145,7 @@ export function exportPages(
       imagesTotal: page.imagesTotal,
       imagesMissingAlt: page.imagesMissingAlt,
       responseTimeMs: page.responseTimeMs,
+      crawlError: page.crawlError ?? null,
       gscClicks: page.gscClicks ?? null,
       gscImpressions: page.gscImpressions ?? null,
       gscTopImpressionQuery: page.gscTopImpressionQuery ?? null,

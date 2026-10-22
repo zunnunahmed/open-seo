@@ -115,6 +115,9 @@ export const auditPages = sqliteTable(
       .default("ok"),
     // Performance
     responseTimeMs: integer("response_time_ms"),
+    // Why a fetch failed (error name + message, truncated). Null unless
+    // fetchClass is "error" — lets the Pages table explain unread pages.
+    crawlError: text("crawl_error"),
   },
   (table) => [index("audit_pages_audit_url_idx").on(table.auditId, table.url)],
 );

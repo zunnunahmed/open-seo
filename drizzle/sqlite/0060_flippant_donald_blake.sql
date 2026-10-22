@@ -1,0 +1,1 @@
+ALTER TABLE `audit_pages` ADD `crawl_error` text;
