@@ -229,6 +229,41 @@ function buildPagesColumns({
       },
       sortingFn: nullableNumberSort,
     }),
+    pageColumnHelper.accessor((row) => row.gscIndexStatus ?? "Not checked", {
+      id: "gscIndexStatus",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Indexed"
+          title="Google index status via Search Console URL Inspection"
+        />
+      ),
+      cell: ({ getValue, row }) => {
+        const value = getValue();
+        const reason =
+          (row.original as { gscIndexReason?: string | null })
+            .gscIndexReason ?? undefined;
+        if (value === "Indexed") {
+          return (
+            <span className="text-xs text-success" title={reason}>
+              Indexed
+            </span>
+          );
+        }
+        if (value === "Not indexed") {
+          return (
+            <span className="text-xs text-destructive" title={reason}>
+              Not indexed
+            </span>
+          );
+        }
+        return (
+          <span className="text-xs text-muted-foreground" title={reason}>
+            {value}
+          </span>
+        );
+      },
+    }),
   ];
 }
 

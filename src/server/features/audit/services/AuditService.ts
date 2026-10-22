@@ -222,13 +222,40 @@ async function getResults(auditId: string, projectId: string) {
     console.warn(`Audit ${auditId}: GSC page metrics unavailable:`, error);
   }
 
+  // Best-effort Google index status from the sitemap monitor (KV-only,
+  // keyed by sitemap URL). Missing coverage never fails the audit view —
+  // those pages simply show "Not checked".
+  let indexEntries: Record<string, { i: boolean | null; r: string }> = {};
+  try {
+    const { readResults } = await import(
+      "@/server/custom/sitemaps/indexCoverageStore"
+    );
+    indexEntries = await readResults(env.KV, projectId);
+  } catch (error) {
+    console.warn(`Audit ${auditId}: index coverage unavailable:`, error);
+  }
+  const indexByNormalized = new Map<
+    string,
+    { i: boolean | null; r: string }
+  >();
+  for (const [rawUrl, entry] of Object.entries(indexEntries)) {
+    const normalized = normalizeAuditUrl(rawUrl);
+    if (normalized && !indexByNormalized.has(normalized)) {
+      indexByNormalized.set(normalized, entry);
+    }
+  }
+
   const pagesWithGsc = pages.map((page) => {
     const key = normalizeAuditUrl(page.url);
     const metrics = key ? gscMetrics.get(key) : undefined;
+    const indexEntry =
+      indexEntries[page.url] ?? (key ? indexByNormalized.get(key) : undefined);
     return {
       ...page,
       gscClicks: metrics?.clicks ?? null,
       gscImpressions: metrics?.impressions ?? null,
+      gscIndexStatus: indexStatusOf(indexEntry),
+      gscIndexReason: indexEntry?.r ?? null,
     };
   });
 
@@ -248,6 +275,14 @@ async function getResults(auditId: string, projectId: string) {
     issues,
     gscConnected,
   };
+}
+
+/** Index-coverage status labels, matching the sitemap index-coverage page. */
+function indexStatusOf(entry: { i: boolean | null } | undefined) {
+  if (!entry) return "Not checked";
+  if (entry.i === true) return "Indexed";
+  if (entry.i === false) return "Not indexed";
+  return "Check failed";
 }
 
 /** Normalize audit and GSC page URLs to the same key: ignore protocol

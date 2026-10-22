@@ -60,6 +60,7 @@ const PAGES_HEADERS = [
   "Response Time (ms)",
   "Clicks (28d)",
   "Impressions (28d)",
+  "Indexed",
 ];
 
 function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
@@ -74,6 +75,7 @@ function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
     page.responseTimeMs,
     page.gscClicks ?? "No clicks",
     page.gscImpressions ?? "No impression",
+    page.gscIndexStatus ?? "Not checked",
   ]);
 }
 
@@ -130,6 +132,8 @@ export function exportPages(
       responseTimeMs: page.responseTimeMs,
       gscClicks: page.gscClicks ?? null,
       gscImpressions: page.gscImpressions ?? null,
+      gscIndexStatus: page.gscIndexStatus ?? "Not checked",
+      gscIndexReason: page.gscIndexReason ?? null,
     })),
   });
 }
