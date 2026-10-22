@@ -58,6 +58,8 @@ const PAGES_HEADERS = [
   "Images",
   "Missing Alt",
   "Response Time (ms)",
+  "Clicks (28d)",
+  "Impressions (28d)",
 ];
 
 function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
@@ -70,6 +72,8 @@ function pagesRows(pages: AuditResultsData["pages"]): CsvValue[][] {
     page.imagesTotal,
     page.imagesMissingAlt,
     page.responseTimeMs,
+    page.gscClicks ?? "No clicks",
+    page.gscImpressions ?? "No impression",
   ]);
 }
 
@@ -124,6 +128,8 @@ export function exportPages(
       imagesTotal: page.imagesTotal,
       imagesMissingAlt: page.imagesMissingAlt,
       responseTimeMs: page.responseTimeMs,
+      gscClicks: page.gscClicks ?? null,
+      gscImpressions: page.gscImpressions ?? null,
     })),
   });
 }

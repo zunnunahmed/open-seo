@@ -210,6 +210,28 @@ async function getResults(auditId: string, projectId: string) {
     throw new AppError("INTERNAL_ERROR", "Invalid audit configuration");
   }
 
+  // Best-effort Search Console page metrics (last 28 days). A missing
+  // connection, revoked grant or API failure must not fail the audit view —
+  // those pages simply show "No clicks" / "No impression".
+  let gscMetrics = new Map<string, { clicks: number; impressions: number }>();
+  let gscConnected = false;
+  try {
+    gscMetrics = await getGscPageMetrics(projectId, pages.length);
+    gscConnected = true;
+  } catch (error) {
+    console.warn(`Audit ${auditId}: GSC page metrics unavailable:`, error);
+  }
+
+  const pagesWithGsc = pages.map((page) => {
+    const key = normalizeAuditUrl(page.url);
+    const metrics = key ? gscMetrics.get(key) : undefined;
+    return {
+      ...page,
+      gscClicks: metrics?.clicks ?? null,
+      gscImpressions: metrics?.impressions ?? null,
+    };
+  });
+
   return {
     audit: {
       id: audit.id,
@@ -221,10 +243,63 @@ async function getResults(auditId: string, projectId: string) {
       completedAt: audit.completedAt,
       config: parsedConfig,
     },
-    pages,
+    pages: pagesWithGsc,
     lighthouse,
     issues,
+    gscConnected,
   };
+}
+
+/** Normalize audit and GSC page URLs to the same key: ignore protocol
+ * (http vs https), www vs apex, and a trailing slash. Query params are kept
+ * sorted; fragments are dropped. */
+function normalizeAuditUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    parsed.hostname = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    parsed.protocol = "https:";
+    parsed.searchParams.sort();
+    if (parsed.pathname.length > 1 && parsed.pathname.endsWith("/")) {
+      parsed.pathname = parsed.pathname.slice(0, -1);
+    }
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch page-dimension Search Console rows and index them by normalized URL,
+ * summing duplicates. Returns an empty map when GSC is not connected. */
+async function getGscPageMetrics(
+  projectId: string,
+  pageCount: number,
+): Promise<Map<string, { clicks: number; impressions: number }>> {
+  const { GscService } = await import(
+    "@/server/features/gsc/services/GscService"
+  );
+  const rowLimit = Math.min(25000, Math.max(1000, pageCount));
+  const { rows } = await GscService.getPerformance({
+    projectId,
+    dimensions: ["page"],
+    dateRange: "last_28_days",
+    rowLimit,
+  });
+  const metrics = new Map<string, { clicks: number; impressions: number }>();
+  for (const row of rows) {
+    const pageUrl = row.keys?.[0];
+    if (!pageUrl) continue;
+    const key = normalizeAuditUrl(pageUrl);
+    if (!key) continue;
+    const existing = metrics.get(key);
+    if (existing) {
+      existing.clicks += row.clicks;
+      existing.impressions += row.impressions;
+    } else {
+      metrics.set(key, { clicks: row.clicks, impressions: row.impressions });
+    }
+  }
+  return metrics;
 }
 
 async function getHistory(projectId: string) {

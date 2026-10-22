@@ -191,6 +191,44 @@ function buildPagesColumns({
       },
       sortingFn: nullableNumberSort,
     }),
+    pageColumnHelper.accessor((row) => row.gscClicks ?? null, {
+      id: "gscClicks",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Clicks"
+          title="Search Console clicks, last 28 days"
+        />
+      ),
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return value == null ? (
+          <span className="text-xs text-muted-foreground">No clicks</span>
+        ) : (
+          <span className="text-xs">{value.toLocaleString("en-US")}</span>
+        );
+      },
+      sortingFn: nullableNumberSort,
+    }),
+    pageColumnHelper.accessor((row) => row.gscImpressions ?? null, {
+      id: "gscImpressions",
+      header: ({ column }) => (
+        <SortableHeader
+          column={column}
+          label="Impressions"
+          title="Search Console impressions, last 28 days"
+        />
+      ),
+      cell: ({ getValue }) => {
+        const value = getValue();
+        return value == null ? (
+          <span className="text-xs text-muted-foreground">No impression</span>
+        ) : (
+          <span className="text-xs">{value.toLocaleString("en-US")}</span>
+        );
+      },
+      sortingFn: nullableNumberSort,
+    }),
   ];
 }
 
