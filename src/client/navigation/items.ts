@@ -4,6 +4,7 @@ import {
   Brain,
   ChartLine,
   ClipboardCheck,
+  Crosshair,
   FileText,
   Globe,
   LayoutDashboard,
@@ -40,6 +41,11 @@ const projectNavItems = [
     to: "/p/$projectId/suggestions" as const,
     label: "Suggestions",
     icon: ListPlus,
+  },
+  {
+    to: "/p/$projectId/serp-checker" as const,
+    label: "SERP Checker",
+    icon: Crosshair,
   },
   {
     to: "/p/$projectId/saved" as const,
@@ -142,6 +148,7 @@ export function getProjectNavGroups(projectId: string) {
         byPath("/p/$projectId/keywords"),
         byPath("/p/$projectId/keyword-clustering"),
         byPath("/p/$projectId/suggestions"),
+        byPath("/p/$projectId/serp-checker"),
         byPath("/p/$projectId/domain"),
         byPath("/p/$projectId/backlinks"),
       ],
