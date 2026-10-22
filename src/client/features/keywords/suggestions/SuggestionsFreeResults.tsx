@@ -77,7 +77,10 @@ export function SuggestionsFreeResults({
       toolbar={
         <div className="flex w-full items-center justify-between gap-2">
           <span className="text-sm tabular-nums text-muted-foreground">
-            {rows.length.toLocaleString("en-US")} keywords from{" "}
+            {rows.length === 1
+              ? "1 keyword"
+              : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
+            from{" "}
             {queriesRun.toLocaleString("en-US")} queries · Source: Google
           </span>
           {rows.length > 0 ? (

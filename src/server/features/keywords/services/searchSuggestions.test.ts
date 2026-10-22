@@ -6,6 +6,8 @@ import {
   mineSearchSuggestions,
 } from "@/server/features/keywords/services/searchSuggestions";
 
+let overviewShouldFail = false;
+
 vi.mock("@/server/lib/dataforseo", () => ({
   createDataforseoClient: () => ({
     serp: {
@@ -17,7 +19,9 @@ vi.mock("@/server/lib/dataforseo", () => ({
             : [],
     },
     labs: {
-      keywordOverview: async () => [
+      keywordOverview: async () => {
+        if (overviewShouldFail) throw new Error("UPSTREAM_UNAVAILABLE");
+        return [
         {
           keyword: "Solar Panels Cost",
           keyword_info: {
@@ -35,7 +39,8 @@ vi.mock("@/server/lib/dataforseo", () => ({
           keyword_properties: null,
           search_intent_info: null,
         },
-      ],
+      ];
+      },
     },
   }),
 }));
@@ -50,6 +55,7 @@ vi.mock("@/server/lib/r2-cache", () => ({
 vi.mock("cloudflare:workers", () => ({}));
 
 afterEach(() => {
+  overviewShouldFail = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -69,7 +75,8 @@ function mockFetch(
 
 describe("mineDataforseoSuggestions", () => {
   it("mines autocomplete expansions and enriches them with overview metrics", async () => {
-    const { rows, queriesRun, seedsMined } = await mineDataforseoSuggestions({
+    const { rows, queriesRun, seedsMined, metricsError } =
+      await mineDataforseoSuggestions({
       seeds: ["solar panels"],
       locationCode: 2840,
       languageCode: "en",
@@ -100,6 +107,31 @@ describe("mineDataforseoSuggestions", () => {
       "X",
       "Z",
     ]);
+    expect(metricsError).toBeNull();
+  });
+
+  it("still returns autocomplete rows when the overview lookup fails", async () => {
+    overviewShouldFail = true;
+    const { rows, seedsMined, metricsError } = await mineDataforseoSuggestions({
+      seeds: ["solar panels"],
+      locationCode: 2840,
+      languageCode: "en",
+      groups: ["questions"],
+      billingCustomer: {
+        userId: "u",
+        userEmail: "u@e.com",
+        organizationId: "o",
+        projectId: "p",
+      },
+    });
+    expect(seedsMined).toEqual(["solar panels"]);
+    expect(rows.map((row) => row.keyword)).toEqual([
+      "Solar Panels Cost",
+      "X",
+      "Z",
+    ]);
+    expect(rows.every((row) => row.searchVolume === null)).toBe(true);
+    expect(typeof metricsError).toBe("string");
   });
 });
 

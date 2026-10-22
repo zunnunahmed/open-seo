@@ -88,6 +88,12 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
   const dfsCostUsd = expansions * 0.002 + 0.012 + expansions * 0.00012;
   const dfsCostCredits = Math.ceil(dfsCostUsd * 1.28 * 1000);
 
+  function switchMode(next: "free" | "dataforseo") {
+    setMode(next);
+    freeMutation.reset();
+    dfsMutation.reset();
+  }
+
   function toggleGroup(group: SuggestionModifierGroup, on: boolean) {
     setGroups((current) =>
       on ? [...current, group] : current.filter((g) => g !== group),
@@ -117,14 +123,14 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
             <Button
               variant={mode === "free" ? "default" : "outline"}
               size="sm"
-              onClick={() => setMode("free")}
+              onClick={() => switchMode("free")}
             >
               Free autocomplete
             </Button>
             <Button
               variant={mode === "dataforseo" ? "default" : "outline"}
               size="sm"
-              onClick={() => setMode("dataforseo")}
+              onClick={() => switchMode("dataforseo")}
             >
               DataForSEO + volume
             </Button>
@@ -225,15 +231,20 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               isRetrying={freeMutation.isPending}
             />
           ) : null}
-          {dfsMutation.isError ? (
-            <ErrorState
-              title="DataForSEO suggestions failed"
-              message={getStandardErrorMessage(dfsMutation.error)}
-              onRetry={runMine}
-              isRetrying={dfsMutation.isPending}
-              action={dfsOutOfCredits ? <GetCreditsButton /> : undefined}
-            />
-          ) : null}
+          {dfsMutation.isError
+            ? (() => {
+                const code = getErrorCode(dfsMutation.error);
+                return (
+                  <ErrorState
+                    title="DataForSEO suggestions failed"
+                    message={`${getStandardErrorMessage(dfsMutation.error)}${code ? ` (code: ${code})` : ""}`}
+                    onRetry={runMine}
+                    isRetrying={dfsMutation.isPending}
+                    action={dfsOutOfCredits ? <GetCreditsButton /> : undefined}
+                  />
+                );
+              })()
+            : null}
         </CardContent>
       </Card>
 
@@ -264,7 +275,10 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           )
         )
       ) : dfsMutation.data ? (
-        <SuggestionsDfsResults rows={dfsMutation.data.rows} />
+        <SuggestionsDfsResults
+          rows={dfsMutation.data.rows}
+          metricsError={dfsMutation.data.metricsError}
+        />
       ) : (
         !dfsMutation.isPending && (
           <EmptyState

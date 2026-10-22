@@ -294,25 +294,36 @@ const autocompleteCacheSchema = z.object({
   suggestions: z.array(z.string()),
 });
 
-/** One exact query string through DataForSEO autocomplete, cached 24h. */
+/** One exact query string through DataForSEO autocomplete, cached 24h.
+ * Cache storage is best-effort: a missing or broken R2 binding falls back
+ * to a live call instead of failing the run. */
 async function cachedAutocomplete(
   client: ReturnType<typeof createDataforseoClient>,
   input: { query: string; locationCode: number; languageCode: string },
 ): Promise<string[]> {
-  const key = await buildCacheKey("suggest:autocomplete", {
-    query: input.query,
-    locationCode: input.locationCode,
-    languageCode: input.languageCode,
-  });
-  const cached = autocompleteCacheSchema.safeParse(await getCached(key));
-  if (cached.success) return cached.data.suggestions;
+  let key: string | null = null;
+  try {
+    key = await buildCacheKey("suggest:autocomplete", {
+      query: input.query,
+      locationCode: input.locationCode,
+      languageCode: input.languageCode,
+    });
+    const cached = autocompleteCacheSchema.safeParse(await getCached(key));
+    if (cached.success) return cached.data.suggestions;
+  } catch {
+    key = null;
+  }
   const suggestions = await client.serp.autocomplete({
     keyword: input.query,
     locationCode: input.locationCode,
     languageCode: input.languageCode,
     creditFeature: "keyword_research",
   });
-  await setCached(key, { suggestions }, CACHE_TTL.researchResult);
+  if (key) {
+    await setCached(key, { suggestions }, CACHE_TTL.researchResult).catch(
+      () => {},
+    );
+  }
   return suggestions;
 }
 
@@ -335,6 +346,8 @@ export async function mineDataforseoSuggestions(input: {
   rows: DataforseoSuggestionRow[];
   queriesRun: number;
   seedsMined: string[];
+  /** Set when overview metrics failed; rows still carry autocomplete data. */
+  metricsError: string | null;
 }> {
   const client = createDataforseoClient(input.billingCustomer);
   const seeds = [...new Set(input.seeds.map((seed) => seed.trim()))].filter(
@@ -367,15 +380,27 @@ export async function mineDataforseoSuggestions(input: {
 
   const keywords = [...byKeyword.keys()];
   const metrics = new Map<string, LabsKeywordDataItem>();
+  // Metrics enrich the rows but must not fail them: a denied overview call
+  // still leaves the full autocomplete list, flagged via metricsError.
+  let metricsError: string | null = null;
   for (let i = 0; i < keywords.length; i += OVERVIEW_CHUNK_SIZE) {
-    const items = await client.labs.keywordOverview({
-      keywords: keywords.slice(i, i + OVERVIEW_CHUNK_SIZE),
-      locationCode: input.locationCode,
-      languageCode: input.languageCode,
-      creditFeature: "keyword_research",
-    });
-    for (const item of items) {
-      if (item.keyword) metrics.set(normalizeKeyword(item.keyword), item);
+    try {
+      const items = await client.labs.keywordOverview({
+        keywords: keywords.slice(i, i + OVERVIEW_CHUNK_SIZE),
+        locationCode: input.locationCode,
+        languageCode: input.languageCode,
+        creditFeature: "keyword_research",
+      });
+      for (const item of items) {
+        if (item.keyword) metrics.set(normalizeKeyword(item.keyword), item);
+      }
+    } catch (error) {
+      if (!metricsError) {
+        metricsError =
+          error instanceof Error && error.message
+            ? error.message.slice(0, 200)
+            : "overview lookup failed";
+      }
     }
   }
 
@@ -402,5 +427,6 @@ export async function mineDataforseoSuggestions(input: {
     rows: sort(rows, (a, b) => (b.searchVolume ?? -1) - (a.searchVolume ?? -1)),
     queriesRun: expansions.length,
     seedsMined: seeds,
+    metricsError,
   };
 }

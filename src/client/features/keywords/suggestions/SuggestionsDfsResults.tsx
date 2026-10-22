@@ -6,6 +6,7 @@ import { ScoreBadge } from "@/client/components/table/ScoreBadge";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
 import { ExportMenu } from "@/client/components/ExportMenu";
 import { exportRows } from "@/client/lib/exportRows";
+import { Alert, AlertDescription, AlertTitle } from "@/client/components/ui/alert";
 import { IntentBadge } from "@/client/features/keywords/components";
 import { DFS_HEADERS, type DfsSuggestionRow } from "./suggestionOptions";
 
@@ -114,12 +115,29 @@ function buildColumns() {
   ];
 }
 
-export function SuggestionsDfsResults({ rows }: { rows: DfsSuggestionRow[] }) {
+export function SuggestionsDfsResults({
+  rows,
+  metricsError,
+}: {
+  rows: DfsSuggestionRow[];
+  metricsError: string | null;
+}) {
   const columns = useMemo(buildColumns, []);
   const table = useDataTable({ data: rows, columns, withSorting: true });
 
   return (
-    <DataTable
+    <div className="flex flex-col gap-4">
+      {metricsError ? (
+        <Alert variant="warning">
+          <AlertTitle>Volumes unavailable</AlertTitle>
+          <AlertDescription>
+            Showing suggestions without volume, CPC, competition, difficulty
+            and intent ({metricsError}). The keyword list itself is complete —
+            try again for metrics.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <DataTable
       table={table}
       empty={{
         title: "No suggestions found",
@@ -129,7 +147,10 @@ export function SuggestionsDfsResults({ rows }: { rows: DfsSuggestionRow[] }) {
       toolbar={
         <div className="flex w-full items-center justify-between gap-2">
           <span className="text-sm tabular-nums text-muted-foreground">
-            {rows.length.toLocaleString("en-US")} keywords · Source: DataForSEO
+            {rows.length === 1
+              ? "1 keyword"
+              : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
+            · Source: DataForSEO
           </span>
           {rows.length > 0 ? (
             <ExportMenu
@@ -159,5 +180,6 @@ export function SuggestionsDfsResults({ rows }: { rows: DfsSuggestionRow[] }) {
         </div>
       }
     />
+    </div>
   );
 }
