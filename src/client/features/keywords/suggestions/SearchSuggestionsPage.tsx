@@ -135,19 +135,19 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
               DataForSEO + volume
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px_160px]">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="suggestion-seeds">
-                Seed keywords (one per line, up to 3)
-              </Label>
-              <Textarea
-                id="suggestion-seeds"
-                value={seedsText}
-                onChange={(event) => setSeedsText(event.target.value)}
-                placeholder={"ai automation agency\ncrm automation"}
-                rows={3}
-              />
-            </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="suggestion-seeds">
+              Seed keywords (one per line, up to 3)
+            </Label>
+            <Textarea
+              id="suggestion-seeds"
+              value={seedsText}
+              onChange={(event) => setSeedsText(event.target.value)}
+              placeholder={"ai automation agency\ncrm automation"}
+              rows={3}
+            />
+          </div>
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
             {mode === "free" ? (
               <>
                 <div className="flex flex-col gap-1.5">
@@ -184,17 +184,15 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
                   />
                 </div>
               </>
-            ) : (
-              <div className="flex flex-col gap-1.5 lg:col-span-2">
-                <Label>Cost estimate</Label>
-                <p className="text-sm text-muted-foreground">
-                  ≈ ${dfsCostUsd.toFixed(2)} (≈{dfsCostCredits} credits) per
-                  run at current seed/modifier selection. Uses your project
-                  market. Served from cache when repeated within 24 hours.
-                </p>
-              </div>
-            )}
+            ) : null}
           </div>
+          {mode === "dataforseo" ? (
+            <p className="text-sm text-muted-foreground">
+              Cost estimate: ≈ ${dfsCostUsd.toFixed(2)} (≈{dfsCostCredits}{" "}
+              credits) per run at current seed/modifier selection. Uses your
+              project market. Served from cache when repeated within 24 hours.
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-4">
             {GROUP_OPTIONS.map((option) => (
               <label

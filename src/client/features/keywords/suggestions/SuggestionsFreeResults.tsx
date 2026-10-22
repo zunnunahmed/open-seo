@@ -1,13 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { Badge } from "@/client/components/ui/badge";
+import { Card } from "@/client/components/ui/card";
+import { Separator } from "@/client/components/ui/separator";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { TablePagination } from "@/client/components/table/TablePagination";
 import { ExportMenu } from "@/client/components/ExportMenu";
 import { exportRows } from "@/client/lib/exportRows";
 import { FREE_HEADERS, type SuggestionRow } from "./suggestionOptions";
 
 const columnHelper = createColumnHelper<SuggestionRow>();
+
+const PAGE_SIZES = [25, 50, 100] as const;
 
 function buildColumns() {
   return [
@@ -55,6 +60,15 @@ function buildColumns() {
   ];
 }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
 export function SuggestionsFreeResults({
   rows,
   queriesRun,
@@ -65,27 +79,54 @@ export function SuggestionsFreeResults({
   countryName: string;
 }) {
   const columns = useMemo(buildColumns, []);
-  const table = useDataTable({ data: rows, columns, withSorting: true });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(
+    PAGE_SIZES[1] as (typeof PAGE_SIZES)[number],
+  );
+  const visibleRows = useMemo(
+    () => rows.slice(page * pageSize, page * pageSize + pageSize),
+    [rows, page, pageSize],
+  );
+  const before = useMemo(
+    () => rows.filter((row) => row.placement === "before").length,
+    [rows],
+  );
+  const table = useDataTable({ data: visibleRows, columns, withSorting: true });
 
   return (
-    <DataTable
-      table={table}
-      empty={{
-        title: "No suggestions found",
-        description: `Google returned nothing for these expansions in ${countryName}. Try a broader seed.`,
-      }}
-      toolbar={
-        <div className="flex w-full items-center justify-between gap-2">
-          <span className="text-sm tabular-nums text-muted-foreground">
-            {rows.length === 1
-              ? "1 keyword"
-              : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
-            from{" "}
-            {queriesRun.toLocaleString("en-US")} queries · Source: Google
-          </span>
-          {rows.length > 0 ? (
+    <div className="flex flex-col gap-4">
+      <Card className="shrink-0 flex-row items-center gap-4 px-4 py-2.5">
+        <Stat label="Keywords" value={rows.length.toLocaleString("en-US")} />
+        <Separator orientation="vertical" className="h-6" />
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <Stat label="Before" value={before.toLocaleString("en-US")} />
+          <Stat
+            label="After"
+            value={(rows.length - before).toLocaleString("en-US")}
+          />
+          <Stat
+            label="Queries run"
+            value={queriesRun.toLocaleString("en-US")}
+          />
+        </div>
+      </Card>
+      <DataTable
+        table={table}
+        empty={{
+          title: "No suggestions found",
+          description: `Google returned nothing for these expansions in ${countryName}. Try a broader seed.`,
+        }}
+        toolbar={
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {rows.length === 1
+                ? "1 keyword"
+                : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
+              · Source: Google
+            </span>
             <ExportMenu
               actions={["sheets", "csv", "json"]}
+              disabled={rows.length === 0}
               onExport={(format) => {
                 void exportRows({
                   format,
@@ -102,9 +143,21 @@ export function SuggestionsFreeResults({
                 });
               }}
             />
-          ) : null}
-        </div>
-      }
-    />
+          </div>
+        }
+        footer={
+          rows.length > 0 ? (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              pageSizes={PAGE_SIZES}
+              totalCount={rows.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          ) : undefined
+        }
+      />
+    </div>
   );
 }

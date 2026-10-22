@@ -44,7 +44,7 @@ export function SerpCheckerPage({ projectId }: { projectId: string }) {
   const hasChecked = serp.serpKeyword !== null || serp.serpResults.length > 0;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
       <PageHeader
         title="SERP Checker"
         description="See Google's live results for any query — project market by default, or narrow to an area. Top 20 costs about 5 credits; paging to the full 100 costs about 20 more."

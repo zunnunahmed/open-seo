@@ -1,16 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { Badge } from "@/client/components/ui/badge";
+import { Card } from "@/client/components/ui/card";
+import { Separator } from "@/client/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/client/components/ui/alert";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import { ScoreBadge } from "@/client/components/table/ScoreBadge";
 import { DataTable, useDataTable } from "@/client/components/table/DataTable";
+import { TablePagination } from "@/client/components/table/TablePagination";
 import { ExportMenu } from "@/client/components/ExportMenu";
 import { exportRows } from "@/client/lib/exportRows";
-import { Alert, AlertDescription, AlertTitle } from "@/client/components/ui/alert";
 import { IntentBadge } from "@/client/features/keywords/components";
 import { DFS_HEADERS, type DfsSuggestionRow } from "./suggestionOptions";
 
 const columnHelper = createColumnHelper<DfsSuggestionRow>();
+
+const PAGE_SIZES = [25, 50, 100] as const;
 
 function formatCount(value: number | null): string {
   return value == null ? "-" : value.toLocaleString("en-US");
@@ -60,9 +65,7 @@ function buildColumns() {
         <SortableHeader column={column} label="Volume" align="right" />
       ),
       cell: ({ getValue }) => (
-        <span className="text-xs tabular-nums">
-          {formatCount(getValue())}
-        </span>
+        <span className="text-xs tabular-nums">{formatCount(getValue())}</span>
       ),
       meta: { cellClassName: "whitespace-nowrap text-right tabular-nums" },
     }),
@@ -115,6 +118,15 @@ function buildColumns() {
   ];
 }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
 export function SuggestionsDfsResults({
   rows,
   metricsError,
@@ -123,7 +135,26 @@ export function SuggestionsDfsResults({
   metricsError: string | null;
 }) {
   const columns = useMemo(buildColumns, []);
-  const table = useDataTable({ data: rows, columns, withSorting: true });
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(
+    PAGE_SIZES[1] as (typeof PAGE_SIZES)[number],
+  );
+  const visibleRows = useMemo(
+    () => rows.slice(page * pageSize, page * pageSize + pageSize),
+    [rows, page, pageSize],
+  );
+  const withVolume = useMemo(
+    () => rows.filter((row) => row.searchVolume != null),
+    [rows],
+  );
+  const avgVolume = useMemo(() => {
+    if (withVolume.length === 0) return null;
+    return Math.round(
+      withVolume.reduce((sum, row) => sum + (row.searchVolume ?? 0), 0) /
+        withVolume.length,
+    );
+  }, [withVolume]);
+  const table = useDataTable({ data: visibleRows, columns, withSorting: true });
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,24 +168,38 @@ export function SuggestionsDfsResults({
           </AlertDescription>
         </Alert>
       ) : null}
+      <Card className="shrink-0 flex-row items-center gap-4 px-4 py-2.5">
+        <Stat label="Keywords" value={rows.length.toLocaleString("en-US")} />
+        <Separator orientation="vertical" className="h-6" />
+        <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <Stat
+            label="With volume"
+            value={`${withVolume.length.toLocaleString("en-US")} (${rows.length === 0 ? 0 : Math.round((withVolume.length / rows.length) * 100)}%)`}
+          />
+          <Stat
+            label="Avg volume"
+            value={avgVolume == null ? "-" : avgVolume.toLocaleString("en-US")}
+          />
+        </div>
+      </Card>
       <DataTable
-      table={table}
-      empty={{
-        title: "No suggestions found",
-        description:
-          "DataForSEO returned nothing for these expansions in your project market.",
-      }}
-      toolbar={
-        <div className="flex w-full items-center justify-between gap-2">
-          <span className="text-sm tabular-nums text-muted-foreground">
-            {rows.length === 1
-              ? "1 keyword"
-              : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
-            · Source: DataForSEO
-          </span>
-          {rows.length > 0 ? (
+        table={table}
+        empty={{
+          title: "No suggestions found",
+          description:
+            "DataForSEO returned nothing for these expansions in your project market.",
+        }}
+        toolbar={
+          <div className="flex w-full items-center justify-between gap-2">
+            <span className="text-sm tabular-nums text-muted-foreground">
+              {rows.length === 1
+                ? "1 keyword"
+                : `${rows.length.toLocaleString("en-US")} keywords`}{" "}
+              · Source: DataForSEO
+            </span>
             <ExportMenu
               actions={["sheets", "csv", "json"]}
+              disabled={rows.length === 0}
               onExport={(format) => {
                 void exportRows({
                   format,
@@ -176,10 +221,21 @@ export function SuggestionsDfsResults({
                 });
               }}
             />
-          ) : null}
-        </div>
-      }
-    />
+          </div>
+        }
+        footer={
+          rows.length > 0 ? (
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              pageSizes={PAGE_SIZES}
+              totalCount={rows.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          ) : undefined
+        }
+      />
     </div>
   );
 }
