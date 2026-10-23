@@ -13,7 +13,10 @@ import {
   linkGapProspects,
   prProspects,
 } from "@/server/custom/outreach/prospectFinders";
-import { findContactsForDomain } from "@/server/custom/outreach/contactFinder";
+import {
+  findContactsForDomain,
+  tregAccountProblem,
+} from "@/server/custom/outreach/contactFinder";
 import {
   addInstantlyLeads,
   InstantlyError,
@@ -195,11 +198,18 @@ export const findOutreachContacts = createServerFn({ method: "POST" })
     let found = 0;
     let costUsd = 0;
     for (const prospect of prospects) {
-      const result = await findContactsForDomain(
-        prospect.domain,
-        prospect.source === "pr" ? "pr" : "link",
-        suppressed,
-      );
+      let result: Awaited<ReturnType<typeof findContactsForDomain>>;
+      try {
+        result = await findContactsForDomain(
+          prospect.domain,
+          prospect.source === "pr" ? "pr" : "link",
+          suppressed,
+        );
+      } catch (error) {
+        const problem = tregAccountProblem(error);
+        if (problem) return { ok: false as const, error: problem };
+        throw error;
+      }
       costUsd += result.costUsd;
       const now = new Date().toISOString();
       await OutreachRepository.addContacts(
@@ -226,7 +236,7 @@ export const findOutreachContacts = createServerFn({ method: "POST" })
         { contactsCheckedAt: now },
       );
     }
-    return { found, costUsd };
+    return { ok: true as const, found, costUsd };
   });
 
 export const getInstantlyCampaigns = createServerFn({ method: "POST" })

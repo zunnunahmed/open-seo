@@ -219,6 +219,10 @@ export function OutreachPage({ projectId }: { projectId: string }) {
             prospectIds: targets.slice(i, i + CONTACT_BATCH).map((p) => p.id),
           },
         });
+        if (!result.ok) {
+          toast.error(result.error, { duration: 15_000 });
+          return;
+        }
         found += result.found;
         costUsd += result.costUsd;
         setFinding({

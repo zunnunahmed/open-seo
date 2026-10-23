@@ -179,11 +179,31 @@ async function verify(email: string): Promise<Verification> {
  * no balance. Every other error is the provider's own answer, which treg
  * relays unchanged (some answer "not found" with a 404 or 422).
  */
-function isTregAccountError(error: unknown): boolean {
+function isTregAccountError(error: unknown): error is AppError {
   if (!(error instanceof AppError) || error.code !== "TREG_REQUEST_FAILED")
     return false;
   const status = error.details?.providerStatus;
   return !status || ["401", "402", "403"].includes(status);
+}
+
+/** What the user must fix when treg itself refused the work, else null. */
+export function tregAccountProblem(error: unknown): string | null {
+  if (!isTregAccountError(error)) return null;
+  const status = error.details?.providerStatus;
+  if (!status)
+    return `treg is not set up on this deployment: ${error.message}.`;
+  if (status === "402")
+    return "Your treg balance is empty. Top up at treg.to, then try again.";
+  let reason = "";
+  try {
+    const body = z
+      .object({ error: z.string().optional(), message: z.string().optional() })
+      .safeParse(JSON.parse(error.details?.responseBody ?? ""));
+    reason = (body.data?.error ?? body.data?.message ?? "").slice(0, 200);
+  } catch {
+    // Not JSON: the status alone says enough.
+  }
+  return `treg refused the request (HTTP ${status}${reason ? `: ${reason}` : ""}). If your API key expired, create a new one at treg.to, update the TREG_API_TOKEN GitHub secret and deploy again.`;
 }
 
 /** A finder's failure (no match, rate limit, outage) is a miss, not fatal. */
