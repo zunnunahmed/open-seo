@@ -52,7 +52,7 @@ export const listCompetitorTopicalMaps = createServerFn({ method: "POST" })
     }> = [];
     let cursor: string | undefined;
     do {
-      const listing = await env.R2.list({ prefix: prefix(context.projectId), limit: 1000, cursor });
+      const listing = await env.R2.list({ prefix: prefix(context.projectId), limit: 1000, cursor, include: ["customMetadata"] });
       for (const object of listing.objects) {
         const meta = object.customMetadata;
         if (!meta?.domain || !meta.savedAt) continue;
