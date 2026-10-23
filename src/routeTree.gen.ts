@@ -48,10 +48,10 @@ import { Route as AppPProjectIdIndexRouteImport } from './routes/_app/p/$project
 import { Route as AppPProjectIdAiVisibilityRouteImport } from './routes/_app/p/$projectId/ai-visibility'
 import { Route as AppPProjectIdBacklinksRouteImport } from './routes/_app/p/$projectId/backlinks'
 import { Route as AppPProjectIdBrandLookupRouteImport } from './routes/_app/p/$projectId/brand-lookup'
-import { Route as AppPProjectIdContextRouteImport } from './routes/_app/p/$projectId/context'
-import { Route as AppPProjectIdDomainRouteImport } from './routes/_app/p/$projectId/domain'
 import { Route as AppPProjectIdCompetitorOverviewRouteImport } from './routes/_app/p/$projectId/competitor-overview'
 import { Route as AppPProjectIdCompetitorTopicalMapRouteImport } from './routes/_app/p/$projectId/competitor-topical-map'
+import { Route as AppPProjectIdContextRouteImport } from './routes/_app/p/$projectId/context'
+import { Route as AppPProjectIdDomainRouteImport } from './routes/_app/p/$projectId/domain'
 import { Route as AppPProjectIdKeywordClusteringRouteImport } from './routes/_app/p/$projectId/keyword-clustering'
 import { Route as AppPProjectIdKeywordsRouteImport } from './routes/_app/p/$projectId/keywords'
 import { Route as AppPProjectIdPromptExplorerRouteImport } from './routes/_app/p/$projectId/prompt-explorer'
@@ -275,6 +275,18 @@ const AppPProjectIdBrandLookupRoute =
     path: '/brand-lookup',
     getParentRoute: () => AppPProjectIdRouteRoute,
   } as any)
+const AppPProjectIdCompetitorOverviewRoute =
+  AppPProjectIdCompetitorOverviewRouteImport.update({
+    id: '/competitor-overview',
+    path: '/competitor-overview',
+    getParentRoute: () => AppPProjectIdRouteRoute,
+  } as any)
+const AppPProjectIdCompetitorTopicalMapRoute =
+  AppPProjectIdCompetitorTopicalMapRouteImport.update({
+    id: '/competitor-topical-map',
+    path: '/competitor-topical-map',
+    getParentRoute: () => AppPProjectIdRouteRoute,
+  } as any)
 const AppPProjectIdContextRoute = AppPProjectIdContextRouteImport.update({
   id: '/context',
   path: '/context',
@@ -283,16 +295,6 @@ const AppPProjectIdContextRoute = AppPProjectIdContextRouteImport.update({
 const AppPProjectIdDomainRoute = AppPProjectIdDomainRouteImport.update({
   id: '/domain',
   path: '/domain',
-  getParentRoute: () => AppPProjectIdRouteRoute,
-} as any)
-const AppPProjectIdCompetitorOverviewRoute = AppPProjectIdCompetitorOverviewRouteImport.update({
-  id: '/competitor-overview',
-  path: '/competitor-overview',
-  getParentRoute: () => AppPProjectIdRouteRoute,
-} as any)
-const AppPProjectIdCompetitorTopicalMapRoute = AppPProjectIdCompetitorTopicalMapRouteImport.update({
-  id: '/competitor-topical-map',
-  path: '/competitor-topical-map',
   getParentRoute: () => AppPProjectIdRouteRoute,
 } as any)
 const AppPProjectIdKeywordClusteringRoute =
@@ -475,10 +477,10 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
   '/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
   '/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
-  '/p/$projectId/context': typeof AppPProjectIdContextRoute
-  '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/p/$projectId/competitor-topical-map': typeof AppPProjectIdCompetitorTopicalMapRoute
+  '/p/$projectId/context': typeof AppPProjectIdContextRoute
+  '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -539,10 +541,10 @@ export interface FileRoutesByTo {
   '/s/$token': typeof STokenIndexRoute
   '/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
   '/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
-  '/p/$projectId/context': typeof AppPProjectIdContextRoute
-  '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/p/$projectId/competitor-topical-map': typeof AppPProjectIdCompetitorTopicalMapRoute
+  '/p/$projectId/context': typeof AppPProjectIdContextRoute
+  '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -608,10 +610,10 @@ export interface FileRoutesById {
   '/_app/p/$projectId/ai-visibility': typeof AppPProjectIdAiVisibilityRouteWithChildren
   '/_app/p/$projectId/backlinks': typeof AppPProjectIdBacklinksRoute
   '/_app/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
-  '/_app/p/$projectId/context': typeof AppPProjectIdContextRoute
-  '/_app/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/_app/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/_app/p/$projectId/competitor-topical-map': typeof AppPProjectIdCompetitorTopicalMapRoute
+  '/_app/p/$projectId/context': typeof AppPProjectIdContextRoute
+  '/_app/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/_app/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/_app/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/_app/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -677,6 +679,8 @@ export interface FileRouteTypes {
     | '/p/$projectId/ai-visibility'
     | '/p/$projectId/backlinks'
     | '/p/$projectId/brand-lookup'
+    | '/p/$projectId/competitor-overview'
+    | '/p/$projectId/competitor-topical-map'
     | '/p/$projectId/context'
     | '/p/$projectId/domain'
     | '/p/$projectId/keyword-clustering'
@@ -739,6 +743,8 @@ export interface FileRouteTypes {
     | '/s/$token'
     | '/p/$projectId/backlinks'
     | '/p/$projectId/brand-lookup'
+    | '/p/$projectId/competitor-overview'
+    | '/p/$projectId/competitor-topical-map'
     | '/p/$projectId/context'
     | '/p/$projectId/domain'
     | '/p/$projectId/keyword-clustering'
@@ -805,6 +811,8 @@ export interface FileRouteTypes {
     | '/_app/p/$projectId/ai-visibility'
     | '/_app/p/$projectId/backlinks'
     | '/_app/p/$projectId/brand-lookup'
+    | '/_app/p/$projectId/competitor-overview'
+    | '/_app/p/$projectId/competitor-topical-map'
     | '/_app/p/$projectId/context'
     | '/_app/p/$projectId/domain'
     | '/_app/p/$projectId/keyword-clustering'
@@ -1132,20 +1140,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectIdBrandLookupRouteImport
       parentRoute: typeof AppPProjectIdRouteRoute
     }
-    '/_app/p/$projectId/context': {
-      id: '/_app/p/$projectId/context'
-      path: '/context'
-      fullPath: '/p/$projectId/context'
-      preLoaderRoute: typeof AppPProjectIdContextRouteImport
-      parentRoute: typeof AppPProjectIdRouteRoute
-    }
-    '/_app/p/$projectId/domain': {
-      id: '/_app/p/$projectId/domain'
-      path: '/domain'
-      fullPath: '/p/$projectId/domain'
-      preLoaderRoute: typeof AppPProjectIdDomainRouteImport
-      parentRoute: typeof AppPProjectIdRouteRoute
-    }
     '/_app/p/$projectId/competitor-overview': {
       id: '/_app/p/$projectId/competitor-overview'
       path: '/competitor-overview'
@@ -1158,6 +1152,20 @@ declare module '@tanstack/react-router' {
       path: '/competitor-topical-map'
       fullPath: '/p/$projectId/competitor-topical-map'
       preLoaderRoute: typeof AppPProjectIdCompetitorTopicalMapRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
+    '/_app/p/$projectId/context': {
+      id: '/_app/p/$projectId/context'
+      path: '/context'
+      fullPath: '/p/$projectId/context'
+      preLoaderRoute: typeof AppPProjectIdContextRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
+    '/_app/p/$projectId/domain': {
+      id: '/_app/p/$projectId/domain'
+      path: '/domain'
+      fullPath: '/p/$projectId/domain'
+      preLoaderRoute: typeof AppPProjectIdDomainRouteImport
       parentRoute: typeof AppPProjectIdRouteRoute
     }
     '/_app/p/$projectId/keyword-clustering': {
@@ -1411,10 +1419,10 @@ interface AppPProjectIdRouteRouteChildren {
   AppPProjectIdAiVisibilityRoute: typeof AppPProjectIdAiVisibilityRouteWithChildren
   AppPProjectIdBacklinksRoute: typeof AppPProjectIdBacklinksRoute
   AppPProjectIdBrandLookupRoute: typeof AppPProjectIdBrandLookupRoute
-  AppPProjectIdContextRoute: typeof AppPProjectIdContextRoute
-  AppPProjectIdDomainRoute: typeof AppPProjectIdDomainRoute
   AppPProjectIdCompetitorOverviewRoute: typeof AppPProjectIdCompetitorOverviewRoute
   AppPProjectIdCompetitorTopicalMapRoute: typeof AppPProjectIdCompetitorTopicalMapRoute
+  AppPProjectIdContextRoute: typeof AppPProjectIdContextRoute
+  AppPProjectIdDomainRoute: typeof AppPProjectIdDomainRoute
   AppPProjectIdKeywordClusteringRoute: typeof AppPProjectIdKeywordClusteringRoute
   AppPProjectIdKeywordsRoute: typeof AppPProjectIdKeywordsRoute
   AppPProjectIdPromptExplorerRoute: typeof AppPProjectIdPromptExplorerRoute
@@ -1437,10 +1445,11 @@ const AppPProjectIdRouteRouteChildren: AppPProjectIdRouteRouteChildren = {
   AppPProjectIdAiVisibilityRoute: AppPProjectIdAiVisibilityRouteWithChildren,
   AppPProjectIdBacklinksRoute: AppPProjectIdBacklinksRoute,
   AppPProjectIdBrandLookupRoute: AppPProjectIdBrandLookupRoute,
+  AppPProjectIdCompetitorOverviewRoute: AppPProjectIdCompetitorOverviewRoute,
+  AppPProjectIdCompetitorTopicalMapRoute:
+    AppPProjectIdCompetitorTopicalMapRoute,
   AppPProjectIdContextRoute: AppPProjectIdContextRoute,
   AppPProjectIdDomainRoute: AppPProjectIdDomainRoute,
-  AppPProjectIdCompetitorOverviewRoute: AppPProjectIdCompetitorOverviewRoute,
-  AppPProjectIdCompetitorTopicalMapRoute: AppPProjectIdCompetitorTopicalMapRoute,
   AppPProjectIdKeywordClusteringRoute: AppPProjectIdKeywordClusteringRoute,
   AppPProjectIdKeywordsRoute: AppPProjectIdKeywordsRoute,
   AppPProjectIdPromptExplorerRoute: AppPProjectIdPromptExplorerRoute,

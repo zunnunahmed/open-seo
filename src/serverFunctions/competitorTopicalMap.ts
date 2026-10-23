@@ -144,13 +144,18 @@ const aiClusterSchema = z.object({
 const aiResultSchema = z.object({
   clusters: z.array(aiClusterSchema).min(1).max(30),
 });
+// Models paraphrase: long labels are trimmed and non-integer indices dropped
+// here, and range/duplicate checks happen below, instead of failing the batch.
 const aiIndexSchema = z.object({
   clusters: z.array(z.object({
-    name: z.string().min(1).max(120),
-    intent: z.string().max(100),
-    indices: z.array(z.number().int().min(0).max(999)).min(1).max(30),
-  })).min(1).max(30),
+    name: z.string().trim().min(1).transform((name) => name.slice(0, 120)),
+    intent: z.string().catch("").transform((intent) => intent.slice(0, 100)),
+    indices: z.array(z.unknown()).transform((values) =>
+      values.filter((value): value is number => Number.isInteger(value)),
+    ),
+  })).min(1),
 });
+const UNASSIGNED_CLUSTER = "Other (not grouped by the model)";
 const aiInput = readInput.extend({ confirmCost: z.literal(true), startIndex: z.number().int().min(0).max(999) });
 const AI_BATCH_SIZE = 15;
 const aiKey = (projectId: string, id: string) => `${prefix(projectId)}ai/${id}.json`;
@@ -216,7 +221,17 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
       }),
       signal: AbortSignal.timeout(45000),
     });
-    if (!response.ok) throw new Error(`OpenRouter request failed (HTTP ${response.status}). Check the model and available credits.`);
+    if (!response.ok) {
+      // OpenRouter explains refusals (unknown model, no credit, no JSON mode)
+      // in error.message; show it instead of a bare status.
+      const body = await response.text();
+      let reason = "";
+      try {
+        reason = z.object({ error: z.object({ message: z.string() }) })
+          .parse(JSON.parse(body)).error.message;
+      } catch { /* not OpenRouter's JSON error shape */ }
+      throw new Error(`OpenRouter request failed (HTTP ${response.status}${reason ? `: ${reason.slice(0, 200)}` : ""}). Check the model in Project Integrations and your OpenRouter credits.`);
+    }
     const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     const raw = payload.choices?.[0]?.message?.content;
     if (!raw) throw new Error("OpenRouter returned no analysis.");
@@ -224,19 +239,22 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     try {
       const json = JSON.parse(raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""));
       const indexed = aiIndexSchema.parse(json);
-      const allIndices = indexed.clusters.flatMap((cluster) => cluster.indices);
-      if (allIndices.length !== inputs.length ||
-          new Set(allIndices).size !== inputs.length ||
-          allIndices.some((index) => index >= inputs.length)) {
-        throw new Error("The AI model did not assign each input page exactly once.");
+      // Keep each page's first valid assignment; pages the model skipped go
+      // to one "Other" group so a near-miss answer is still saved.
+      const assigned = new Set<number>();
+      const clusters = indexed.clusters.map((cluster) => ({
+        name: cluster.name,
+        intent: cluster.intent,
+        urls: cluster.indices
+          .filter((index) => index >= 0 && index < inputs.length && !assigned.has(index) && assigned.add(index))
+          .map((index) => inputs[index]!.url),
+      })).filter((cluster) => cluster.urls.length > 0);
+      if (clusters.length === 0) throw new Error("The AI model did not group any of the pages.");
+      const skipped = inputs.filter((_, index) => !assigned.has(index));
+      if (skipped.length > 0) {
+        clusters.push({ name: UNASSIGNED_CLUSTER, intent: "unknown", urls: skipped.map((input) => input.url) });
       }
-      parsed = aiResultSchema.parse({
-        clusters: indexed.clusters.map((cluster) => ({
-          name: cluster.name,
-          intent: cluster.intent,
-          urls: cluster.indices.map((index) => inputs[index]!.url),
-        })),
-      });
+      parsed = aiResultSchema.parse({ clusters: clusters.slice(0, 30) });
     } catch (error) {
       const detail = error instanceof SyntaxError ? "The AI model returned incomplete or invalid JSON." :
         error instanceof z.ZodError ? "The AI model returned unexpected JSON fields or types." :
