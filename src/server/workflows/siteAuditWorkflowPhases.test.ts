@@ -240,9 +240,9 @@ describe("app-shell crawl coverage", () => {
           return callback();
         },
       );
-      // pgStep is mocked, so no WorkflowStep implementation is needed.
+      // pgStep is mocked, so the step only needs sleep.
       // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
-      await runAuditPhases({} as never, {
+      await runAuditPhases({ sleep: vi.fn() } as never, {
         ...PHASE_PARAMS,
         config: { maxPages: 50, lighthouseStrategy: "none" },
         renderUsage: { cloudflareAttempts: 0, contextCredits: 0 },

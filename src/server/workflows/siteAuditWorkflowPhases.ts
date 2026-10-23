@@ -93,14 +93,13 @@ export async function runAuditPhases(
     renderJavaScript: config.renderJavaScript,
     sitePlatform: config.sitePlatform,
   });
-  await runLighthousePhase(step, {
-    auditId,
-    workflowInstanceId,
-    billingCustomer,
-    projectId,
-    startUrl,
-    config,
-  });
+  // Workers Free caps calls to Cloudflare services per run, and a long crawl
+  // spends most of it. A short sleep ends the run, so each phase below starts
+  // in a fresh one with the full allowance.
+  if (config.lighthouseStrategy !== "none")
+    await step.sleep("fresh-run-before-lighthouse", "5 seconds");
+  await runLighthousePhase(step, { ...params, startUrl, config });
+  await step.sleep("fresh-run-before-finalize", "5 seconds");
   await finalizeAudit({
     step,
     auditId,
