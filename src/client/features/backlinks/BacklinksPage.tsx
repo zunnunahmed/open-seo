@@ -33,10 +33,13 @@ export function BacklinksPage({
     queryKey: ["seo-provider-preferences", projectId],
     queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
   });
-  // Direct DataForSEO tables render only on the direct route; both treg
-  // routes share the treg cards (Serpstat or routed DataForSEO numbers).
+  // treg's DataForSEO relay returns the same response format as the direct
+  // transport. Both routes can therefore share the full Backlinks UI.
+  // Serpstat requires a dedicated normalized adapter before it can use it.
   const showDataForSeo =
-    providerQuery.isSuccess && providerQuery.data === "direct_dataforseo";
+    providerQuery.isSuccess &&
+    (providerQuery.data === "direct_dataforseo" ||
+      providerQuery.data === "treg_dataforseo");
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -165,8 +168,7 @@ export function BacklinksPage({
             Could not load provider settings. Research queries are paused.
           </p>
         ) : null}
-        {(providerQuery.data === "treg_serpstat" ||
-          providerQuery.data === "treg_dataforseo") && (
+        {providerQuery.data === "treg_serpstat" && (
           <>
             <TregBacklinksSummaryCard
               projectId={projectId}
