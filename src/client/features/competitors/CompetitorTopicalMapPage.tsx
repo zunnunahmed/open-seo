@@ -63,6 +63,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     clusters: Array<{ name: string; intent: string; urls: string[] }>;
   }>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
   const [aiError, setAiError] = useState("");
 
   const { data: projects } = useQuery(projectsQueryOptions());
@@ -102,7 +103,9 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       setCompleted(record.pages.length);
       setAnalysedDomain(record.domain);
       setSavedId(record.id);
-      setAiResult(await getTopicalAiAnalysis({ data: { projectId, id: record.id } }));
+      const priorAi = await getTopicalAiAnalysis({ data: { projectId, id: record.id } });
+      setAiResult(priorAi);
+      setAiProgress(priorAi?.sourcePages ?? 0);
       setAiError("");
       setComparison([]);
       setComparisonDomain("");
@@ -133,6 +136,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       });
       setSavedId(result.id);
       setAiResult(null);
+      setAiProgress(0);
       await refreshSaved();
       toast.success(complete ? "Analysis saved to your project." : "Partial results saved to your project.");
     } catch {
@@ -272,6 +276,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setAnalysedDomain(host);
     setSavedId(null);
     setAiResult(null);
+    setAiProgress(0);
     setComparison([]);
     setComparisonDomain("");
     let complete = false;
@@ -315,10 +320,22 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setAiBusy(true);
     setAiError("");
     try {
-      const result = await analyseTopicalMapWithAi({
-        data: { projectId, id: savedId, confirmCost: true },
-      });
-      setAiResult(result);
+      const previous = await getTopicalAiAnalysis({ data: { projectId, id: savedId } });
+      let offset = previous?.sourcePages ?? 0;
+      if (offset >= pages.length) {
+        toast.info("All saved pages have already been clustered. No paid request made.");
+        setAiResult(previous);
+        return;
+      }
+      while (offset < pages.length) {
+        const result = await analyseTopicalMapWithAi({
+          data: { projectId, id: savedId, confirmCost: true, startIndex: offset },
+        });
+        if (!result || result.sourcePages <= offset) throw new Error("AI analysis stopped without new results.");
+        offset = result.sourcePages;
+        setAiResult(result);
+        setAiProgress(offset);
+      }
       toast.success("AI topic groups saved with this research.");
     } catch (cause) {
       setAiError(cause instanceof Error ? cause.message : "AI clustering failed.");
@@ -439,11 +456,11 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
 
             <div className="space-y-3 rounded-lg border p-3">
               <h3 className="text-sm font-semibold">AI Topic Clustering · OpenRouter</h3>
-              <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. This first release infers topics from URL paths only, not page text, and supports up to 100 saved URLs per run. AI requests may incur OpenRouter charges.</p>
-              <Button size="sm" variant="outline" disabled={!savedId || !pages.length || pages.length > 100 || aiBusy || running || saving}
-                onClick={() => void runAiClustering()}>{aiBusy ? "Clustering…" : "Run AI clustering (paid API call)"}</Button>
+              <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. Infers topics from URL paths, not page text. Processes up to 30 URLs per paid request, saves after each batch and resumes saved progress. OpenRouter charges may apply.</p>
+              <Button size="sm" variant="outline" disabled={!savedId || !pages.length || aiBusy || running || saving || (aiResult?.sourcePages ?? 0) >= pages.length}
+                onClick={() => void runAiClustering()}>{aiBusy ? `Clustering… ${aiProgress}/${pages.length}` : aiResult && aiResult.sourcePages < pages.length ? "Resume AI clustering (paid API calls)" : "Run AI clustering (paid API calls)"}</Button>
               {!savedId && <p className="text-xs text-muted-foreground">Save or open an analysis first.</p>}
-              {pages.length > 100 && <p className="text-xs text-muted-foreground">Select a saved analysis with 100 or fewer pages for AI clustering.</p>}
+              {aiResult && aiResult.sourcePages >= pages.length && <p className="text-xs text-muted-foreground">All pages already clustered. No additional requests required.</p>}
               {aiError && <p className="text-sm text-destructive" role="alert">{aiError}</p>}
               {aiResult && (
                 <div className="space-y-2">
