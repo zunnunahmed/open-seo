@@ -117,7 +117,10 @@ describe("findContactsForDomain", () => {
     };
     stubTreg({
       "dropleads.people.search": lead,
-      "blitzapi.people.email.find": new Response("quota used", { status: 403 }),
+      "blitzapi.people.email.find": new Response(
+        "provider rejected treg's key",
+        { status: 401 },
+      ),
       "trykitt.people.email.find": { email: "jane@site.com" },
     });
     const { contacts } = await findContactsForDomain(

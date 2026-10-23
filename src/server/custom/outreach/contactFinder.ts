@@ -224,16 +224,21 @@ async function verify(email: string): Promise<Verification> {
 }
 
 /**
- * treg itself is unusable: not configured (no HTTP status), a bad token, or
- * no balance. Every other error is about one provider (treg relays its answer
- * unchanged: "not found" as a 404, a used-up daily quota as a 403), so the
- * next finder still runs.
+ * treg itself is unusable: not configured (no HTTP status), our token
+ * refused, or no balance. Every other error is about one provider, whose
+ * answer treg relays unchanged: "not found" as a 404, a used-up quota as a
+ * 403, even a 401 when the provider rejects treg's own key for it. Those are
+ * misses, so the next finder still runs.
  */
 function isTregAccountError(error: unknown): error is AppError {
   if (!(error instanceof AppError) || error.code !== "TREG_REQUEST_FAILED")
     return false;
   const status = error.details?.providerStatus;
-  return !status || status === "401" || status === "402";
+  if (!status || status === "402") return true;
+  return (
+    status === "401" &&
+    /not signed in|token is invalid/i.test(error.details?.responseBody ?? "")
+  );
 }
 
 /** What the user must fix when treg itself refused the work, else null. */
