@@ -37,6 +37,7 @@ export const saveCompetitorTopicalMap = createServerFn({ method: "POST" })
     };
     await env.R2.put(objectKey(context.projectId, id), JSON.stringify(snapshot), {
       httpMetadata: { contentType: "application/json" },
+      customMetadata: { domain: snapshot.domain, market: String(snapshot.market), requestedLimit: String(snapshot.requestedLimit), pageCount: String(snapshot.pages.length), complete: String(snapshot.complete), savedAt: snapshot.savedAt },
     });
     return { id, savedAt: snapshot.savedAt };
   });
@@ -53,21 +54,19 @@ export const listCompetitorTopicalMaps = createServerFn({ method: "POST" })
     do {
       const listing = await env.R2.list({ prefix: prefix(context.projectId), limit: 1000, cursor });
       for (const object of listing.objects) {
-        const stored = await env.R2.get(object.key);
-        if (!stored) continue;
-        try {
-          const snapshot = JSON.parse(await stored.text()) as Snapshot;
-          if (snapshot.projectId !== context.projectId) continue;
-          results.push({
-            id: snapshot.id,
-            domain: snapshot.domain,
-            market: snapshot.market,
-            requestedLimit: snapshot.requestedLimit,
-            pageCount: snapshot.pages.length,
-            complete: snapshot.complete,
-            savedAt: snapshot.savedAt,
-          });
-        } catch { /* Skip corrupt snapshots without breaking all saved research. */ }
+        const meta = object.customMetadata;
+        if (!meta?.domain || !meta.savedAt) continue;
+        const id = object.key.slice(prefix(context.projectId).length).replace(/\.json$/, "");
+        if (!z.string().uuid().safeParse(id).success) continue;
+        results.push({
+          id,
+          domain: meta.domain,
+          market: Number(meta.market),
+          requestedLimit: Number(meta.requestedLimit),
+          pageCount: Number(meta.pageCount),
+          complete: meta.complete === "true",
+          savedAt: meta.savedAt,
+        });
       }
       cursor = listing.truncated ? listing.cursor : undefined;
     } while (cursor && results.length < 100);
