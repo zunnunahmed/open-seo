@@ -144,8 +144,15 @@ const aiClusterSchema = z.object({
 const aiResultSchema = z.object({
   clusters: z.array(aiClusterSchema).min(1).max(30),
 });
+const aiIndexSchema = z.object({
+  clusters: z.array(z.object({
+    name: z.string().min(1).max(120),
+    intent: z.string().max(100),
+    indices: z.array(z.number().int().min(0).max(999)).min(1).max(30),
+  })).min(1).max(30),
+});
 const aiInput = readInput.extend({ confirmCost: z.literal(true), startIndex: z.number().int().min(0).max(999) });
-const AI_BATCH_SIZE = 30;
+const AI_BATCH_SIZE = 15;
 const aiKey = (projectId: string, id: string) => `${prefix(projectId)}ai/${id}.json`;
 
 export const getTopicalAiAnalysis = createServerFn({ method: "POST" })
@@ -200,10 +207,10 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        max_tokens: 6000,
+        max_tokens: 4000,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Group the supplied website URLs by likely subject and search intent. Return ONLY JSON of shape {clusters:[{name:string,intent:string,urls:string[]}]}. Each input URL must occur exactly once. Do not invent URLs or claim page contents were read. Classifications are inferred from URLs only; keep related local-service URLs together when sensible. Do not include explanatory prose." },
+          { role: "system", content: "Group the supplied website URL paths by likely topic and search intent. Return ONLY a JSON object: {clusters:[{name:string,intent:string,indices:number[]}]}. The indices are zero-based positions in the supplied pages array. Include each index 0 through N-1 exactly once. Never output URLs, markdown, or extra fields. Do not invent page contents; categories are inferred only from paths." },
           { role: "user", content: JSON.stringify({ domain: snapshot.domain, pages: inputs }) },
         ],
       }),
@@ -214,12 +221,27 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     const raw = payload.choices?.[0]?.message?.content;
     if (!raw) throw new Error("OpenRouter returned no analysis.");
     let parsed: z.infer<typeof aiResultSchema>;
-    try { parsed = aiResultSchema.parse(JSON.parse(raw)); }
-    catch { throw new Error("OpenRouter returned an invalid cluster format. No results saved."); }
-    const expected = new Set(inputs.map((page) => page.url));
-    const actual = parsed.clusters.flatMap((cluster) => cluster.urls);
-    if (actual.length !== expected.size || new Set(actual).size !== expected.size || actual.some((url) => !expected.has(url))) {
-      throw new Error("AI clustering did not account for every URL exactly once. No results saved.");
+    try {
+      const json = JSON.parse(raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""));
+      const indexed = aiIndexSchema.parse(json);
+      const allIndices = indexed.clusters.flatMap((cluster) => cluster.indices);
+      if (allIndices.length !== inputs.length ||
+          new Set(allIndices).size !== inputs.length ||
+          allIndices.some((index) => index >= inputs.length)) {
+        throw new Error("The AI model did not assign each input page exactly once.");
+      }
+      parsed = aiResultSchema.parse({
+        clusters: indexed.clusters.map((cluster) => ({
+          name: cluster.name,
+          intent: cluster.intent,
+          urls: cluster.indices.map((index) => inputs[index]!.url),
+        })),
+      });
+    } catch (error) {
+      const detail = error instanceof SyntaxError ? "The AI model returned incomplete or invalid JSON." :
+        error instanceof z.ZodError ? "The AI model returned unexpected JSON fields or types." :
+        error instanceof Error ? error.message : "Invalid JSON result.";
+      throw new Error(`AI output validation failed: ${detail} No results saved.`);
     }
     const clusters = [...(previous?.clusters ?? [])];
     for (const group of parsed.clusters) {
