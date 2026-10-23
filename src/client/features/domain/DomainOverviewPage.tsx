@@ -67,6 +67,7 @@ type Props = {
     replace: boolean;
   }) => void;
   onShowRecentSearches: () => void;
+  competitorMode?: boolean;
 };
 
 type DomainNavigate = Props["navigate"];
@@ -442,6 +443,7 @@ export function DomainOverviewPage({
   routeState,
   navigate,
   onShowRecentSearches,
+  competitorMode = false,
 }: Props) {
   const state = useDomainOverviewState({
     navigate,
@@ -551,8 +553,8 @@ export function DomainOverviewPage({
     <div className="px-4 py-4 md:px-6 md:py-6 pb-24 md:pb-8 overflow-auto">
       <div className="mx-auto max-w-7xl space-y-4">
         <PageHeader
-          title="Domain Overview"
-          description="Analyze any domain's SEO profile: traffic, keywords, and backlinks."
+          title={competitorMode ? "Competitor Overview" : "Domain Overview"}
+          description={competitorMode ? "Research a competitor domain using the project\u0027s selected SEO data provider. Review organic visibility, rankings and top pages." : "Analyze any domain\u0027s SEO profile: traffic, keywords, and backlinks."}
           actions={<DataSourceLabel projectId={projectId} />}
           backLink={
             routeState.domain ? (
