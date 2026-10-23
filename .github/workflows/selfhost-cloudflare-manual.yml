@@ -75,6 +75,7 @@ jobs:
           GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TREG_TOKEN: ${{ secrets.TREG_API_TOKEN }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           if [ "$CONFIRM" != "DEPLOY" ]; then echo "::error::Enter DEPLOY to authorize a deployment"; exit 1; fi
           for name in CF_TOKEN CF_ACCOUNT DFS_KEY ALLOWED_EMAILS; do
@@ -96,12 +97,15 @@ jobs:
           GOOGLE_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
           TREG_TOKEN: ${{ secrets.TREG_API_TOKEN }}
+          OPENROUTER_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           python3 - <<'PY'
           import os
           from pathlib import Path
           values = {'DATAFORSEO_API_KEY': os.environ['DFS_KEY'],
                     'ACCESS_ALLOWED_EMAILS': os.environ['ALLOWED_EMAILS']}
+          if os.environ.get('OPENROUTER_KEY'):
+              values['OPENROUTER_API_KEY'] = os.environ['OPENROUTER_KEY']
           if os.environ.get('TREG_TOKEN'):
               values['TREG_API_TOKEN'] = os.environ['TREG_TOKEN']
               values['CUSTOM_TREG_ENABLED'] = 'true'
