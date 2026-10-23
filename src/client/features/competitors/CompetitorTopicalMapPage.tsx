@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Network, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
@@ -6,6 +6,7 @@ import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
+import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap } from "@/serverFunctions/competitorTopicalMap";
 import { domainField } from "@/types/schemas/domain";
 import type { PageRow } from "@/client/features/domain/types";
 
@@ -51,6 +52,69 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [selectedTab, setSelectedTab] = useState<"map" | "pages">("map");
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const [saved, setSaved] = useState<Array<{ id: string; domain: string; market: number; requestedLimit: number; pageCount: number; complete: boolean; savedAt: string }>>([]);
+  const [saving, setSaving] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  async function refreshSaved() {
+    try {
+      setSaved(await listCompetitorTopicalMaps({ data: { projectId } }));
+    } catch {
+      toast.error("Could not load saved research.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshSaved();
+  }, [projectId]);
+
+  async function openSaved(id: string) {
+    try {
+      const record = await getCompetitorTopicalMap({ data: { projectId, id } });
+      if (!record) { toast.error("Saved analysis not found."); return; }
+      setDomain(record.domain);
+      setMarket(record.market);
+      setLimit(record.requestedLimit);
+      setPages(record.pages);
+      setCompleted(record.pages.length);
+      setAnalysedDomain(record.domain);
+      setSavedId(record.id);
+      setError("");
+      setExpanded(null);
+      toast.success("Saved research loaded. No SEO API request made.");
+    } catch {
+      toast.error("Could not open saved research.");
+    }
+  }
+
+  async function removeSaved(id: string) {
+    try {
+      await deleteCompetitorTopicalMap({ data: { projectId, id } });
+      if (savedId === id) setSavedId(null);
+      await refreshSaved();
+      toast.success("Saved research deleted.");
+    } catch {
+      toast.error("Could not delete saved research.");
+    }
+  }
+
+  async function storeSnapshot(host: string, records: PageRow[], complete: boolean) {
+    setSaving(true);
+    try {
+      const result = await saveCompetitorTopicalMap({
+        data: { projectId, domain: host, market, requestedLimit: limit, pages: records, complete },
+      });
+      setSavedId(result.id);
+      await refreshSaved();
+      toast.success(complete ? "Analysis saved to your project." : "Partial results saved to your project.");
+    } catch {
+      toast.error("Analysis finished, but saving failed. Export your results before leaving.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
   const groups = useMemo(() => {
     const grouped = new Map<string, PageRow[]>();
     for (const row of pages) {
@@ -81,6 +145,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setPages([]);
     setCompleted(0);
     setAnalysedDomain(host);
+    setSavedId(null);
+    let complete = false;
     const collected: PageRow[] = [];
     const batchSize = limit <= 50 ? 50 : limit <= 100 ? 100 : 200;
     try {
@@ -105,10 +171,12 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
         setCompleted(Math.min(limit, collected.length));
         if (!response.hasMore || response.pages.length === 0) break;
       }
+      complete = true;
       if (collected.length === 0) toast.info("No ranking pages returned for this market.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Research request failed.");
     } finally {
+      if (collected.length > 0) await storeSnapshot(host, collected, complete);
       setRunning(false);
     }
   }
@@ -172,12 +240,33 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
           </Button>
           {running && <p className="text-sm text-muted-foreground" role="status">Retrieved {completed} of up to {limit} pages. Each batch is requested separately.</p>}
         </Card>
+
+        <Card className="space-y-3 p-5">
+          <h2 className="font-semibold">Saved research</h2>
+          <p className="text-xs text-muted-foreground">Stored in your project's Cloudflare R2 storage. Opening saved research does not call the SEO provider.</p>
+          {saved.length === 0 ? <p className="text-sm text-muted-foreground">No saved analyses yet.</p> : (
+            <div className="space-y-2">
+              {saved.map((record) => (
+                <div key={record.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <p className="break-all text-sm font-medium">{record.domain}</p>
+                    <p className="text-xs text-muted-foreground">{record.pageCount} pages · {new Date(record.savedAt).toLocaleString()}{record.complete ? "" : " · Partial"}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" disabled={running} onClick={() => void openSaved(record.id)}>Open</Button>
+                    <Button size="sm" variant="ghost" disabled={running} onClick={() => void removeSaved(record.id)}>Delete</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
         {analysedDomain && (pages.length > 0 || !running) && (
           <Card className="space-y-4 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">{analysedDomain}</h2>
-                <p className="text-sm text-muted-foreground">{pages.length} ranking pages · {groups.length} URL-based groups</p>
+                <p className="text-sm text-muted-foreground">{pages.length} ranking pages · {groups.length} URL-based groups{saving ? " · Saving…" : savedId ? " · Saved" : ""}</p>
               </div>
               <Button variant="outline" disabled={!pages.length} onClick={exportCsv}><Download className="size-4" /> Export CSV</Button>
             </div>
