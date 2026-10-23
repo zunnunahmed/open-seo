@@ -331,7 +331,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
         const result = await analyseTopicalMapWithAi({
           data: { projectId, id: savedId, confirmCost: true, startIndex: offset },
         });
-        if (!result || result.sourcePages <= offset) throw new Error("AI analysis stopped without new results.");
+        if (!result.ok) throw new Error(result.message);
+        if (result.sourcePages <= offset) throw new Error("AI analysis stopped without new results.");
         offset = result.sourcePages;
         setAiResult(result);
         setAiProgress(offset);
