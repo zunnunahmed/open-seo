@@ -77,14 +77,27 @@ async function json(response: Response): Promise<unknown> {
   return response.json();
 }
 
+// Live Dropleads answers use camelCase; its docs show snake_case. Read both.
 const personSchema = z
   .object({
+    firstName: z.string().nullish(),
     first_name: z.string().nullish(),
+    lastName: z.string().nullish(),
     last_name: z.string().nullish(),
     title: z.string().nullish(),
+    linkedinUrl: z.string().nullish(),
     linkedin_url: z.string().nullish(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((person) => {
+    const linkedin = person.linkedinUrl ?? person.linkedin_url;
+    return {
+      first_name: person.firstName ?? person.first_name,
+      last_name: person.lastName ?? person.last_name,
+      title: person.title,
+      linkedin_url: linkedin?.replace(/^http:\/\//, "https://"),
+    };
+  });
 
 async function searchPeople(domain: string, kind: ContactKind) {
   const body = await json(
@@ -212,14 +225,15 @@ async function verify(email: string): Promise<Verification> {
 
 /**
  * treg itself is unusable: not configured (no HTTP status), a bad token, or
- * no balance. Every other error is the provider's own answer, which treg
- * relays unchanged (some answer "not found" with a 404 or 422).
+ * no balance. Every other error is about one provider (treg relays its answer
+ * unchanged: "not found" as a 404, a used-up daily quota as a 403), so the
+ * next finder still runs.
  */
 function isTregAccountError(error: unknown): error is AppError {
   if (!(error instanceof AppError) || error.code !== "TREG_REQUEST_FAILED")
     return false;
   const status = error.details?.providerStatus;
-  return !status || ["401", "402", "403"].includes(status);
+  return !status || status === "401" || status === "402";
 }
 
 /** What the user must fix when treg itself refused the work, else null. */

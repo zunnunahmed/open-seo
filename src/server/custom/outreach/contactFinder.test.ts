@@ -46,10 +46,11 @@ describe("findContactsForDomain", () => {
         data: {
           leads: [
             {
-              first_name: "Jane",
-              last_name: "Doe",
+              // The live answer's shape (camelCase, http LinkedIn URL).
+              firstName: "Jane",
+              lastName: "Doe",
               title: "Editor",
-              linkedin_url: "https://www.linkedin.com/in/jane",
+              linkedinUrl: "http://www.linkedin.com/in/jane",
             },
           ],
         },
@@ -116,7 +117,7 @@ describe("findContactsForDomain", () => {
     };
     stubTreg({
       "dropleads.people.search": lead,
-      "blitzapi.people.email.find": new Response("not found", { status: 404 }),
+      "blitzapi.people.email.find": new Response("quota used", { status: 403 }),
       "trykitt.people.email.find": { email: "jane@site.com" },
     });
     const { contacts } = await findContactsForDomain(
