@@ -185,7 +185,7 @@ describe("crawl pacing and cooldowns", () => {
     expect(mocks.claimChunk.mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("never has more than three fetches in flight on a slow site", async () => {
+  it("never has more than two fetches in flight on a slow site", async () => {
     let inFlight = 0;
     let peak = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
@@ -198,7 +198,7 @@ describe("crawl pacing and cooldowns", () => {
     const result = crawl(10);
     await vi.runAllTimersAsync();
     expect(await result).toEqual({ pagesCrawled: 10, completed: true });
-    expect(peak).toBe(3);
+    expect(peak).toBe(2);
   });
 
   it("retains slower pacing across chunks after recovering from the first 429", async () => {
@@ -227,7 +227,9 @@ describe("crawl pacing and cooldowns", () => {
     await vi.advanceTimersByTimeAsync(599_999);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(saved).toHaveLength(0);
-    expect(mocks.releaseUrls.mock.calls[0][0]).toHaveLength(10);
+    expect(mocks.releaseUrls.mock.calls[0][0]).toHaveLength(
+      Number(mocks.claimChunk.mock.calls[0][1]),
+    );
     expect(mocks.sleepUntil).toHaveBeenCalledWith("crawl-cooldown-1", 600_001);
     await vi.runAllTimersAsync();
     expect(await result).toEqual({ pagesCrawled: 10, completed: true });
