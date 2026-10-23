@@ -1,4 +1,5 @@
-import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
+import { getSeoProviderPreference, getBacklinksProviderPreference } from "@/server/custom/providers/projectPreference";
+import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { ProjectContextService } from "@/server/features/project-context/services/ProjectContextService";
 import { requireProjectContext } from "@/serverFunctions/middleware";
@@ -34,3 +35,23 @@ export const getProjectSeoProviderPreference = createServerFn({
   .middleware(requireProjectContext)
   .validator(getProjectContextSchema)
   .handler(async ({ context }) => getSeoProviderPreference(context.projectId));
+
+export const getProjectBacklinksProviderPreference = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(getProjectContextSchema)
+  .handler(async ({ context }) => getBacklinksProviderPreference(context.projectId));
+
+export const setProjectBacklinksProviderPreference = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(z.object({
+    projectId: z.string().min(1),
+    provider: z.enum(["direct_dataforseo", "treg_dataforseo", "treg_serpstat"]),
+  }))
+  .handler(async ({ data, context }) => {
+    await ProjectContextService.applyContextUpdates(
+      context.projectId,
+      [{ customSection: "backlinks-provider", title: "Backlinks provider", content: data.provider }],
+      "user",
+    );
+    return getBacklinksProviderPreference(context.projectId);
+  });

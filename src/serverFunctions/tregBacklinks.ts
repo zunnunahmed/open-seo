@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireProjectContext } from "@/serverFunctions/middleware";
-import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
+import { getBacklinksProviderPreference } from "@/server/custom/providers/projectPreference";
 import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 import { fetchTregBacklinksSummary, fetchTregRoutedSummary } from "@/server/custom/providers/treg/client";
 
@@ -27,7 +27,7 @@ export const runTregBacklinksSummary = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(schema)
   .handler(async ({ data, context }) => {
-    const route = await getSeoProviderPreference(context.projectId);
+    const route = await getBacklinksProviderPreference(context.projectId);
     if (route !== "treg_serpstat" && route !== "treg_dataforseo") {
       throw new Error("A treg route is not selected for this project.");
     }
