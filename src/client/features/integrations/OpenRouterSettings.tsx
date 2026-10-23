@@ -55,7 +55,7 @@ export function OpenRouterSettings({ projectId }: { projectId: string }) {
                     onClick={() => { setTestMessage(""); test.mutate(); }}>{test.isPending ? "Testing…" : "Test connection"}</Button>
                 </div>
                 {testMessage && <p role="status" className="text-muted-foreground">{testMessage}</p>}
-                <p className="text-xs text-muted-foreground">Connection test checks API authentication only; it does not run or charge for model inference. AI analysis is not enabled in Competitor Topical Map yet.</p>
+                <p className="text-xs text-muted-foreground">Connection test checks API authentication only; it does not run or charge for model inference. Competitor Topical Map uses this model for AI topic clustering.</p>
               </>
             )}
         </div>

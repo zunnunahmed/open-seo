@@ -89,6 +89,44 @@ export const getCompetitorTopicalMap = createServerFn({ method: "POST" })
     return parsed;
   });
 
+/**
+ * Fill traffic and keyword counts into a saved analysis in place. The id is
+ * kept so its AI topic groups stay attached; only metrics of URLs already in
+ * the snapshot change.
+ */
+export const updateCompetitorTopicalMapMetrics = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(readInput.extend({
+    metrics: z.array(z.object({
+      page: z.string().url().max(2048),
+      organicTraffic: z.number().nonnegative().nullable(),
+      keywords: z.number().nonnegative().nullable(),
+    })).max(1000),
+  }))
+  .handler(async ({ data, context }) => {
+    const key = objectKey(context.projectId, data.id);
+    const stored = await env.R2.get(key);
+    if (!stored) throw new Error("Saved analysis not found.");
+    const snapshot = snapshotSchema
+      .extend({ id: z.string(), savedAt: z.string() })
+      .parse(JSON.parse(await stored.text()));
+    if (snapshot.projectId !== context.projectId || snapshot.id !== data.id) {
+      throw new Error("Saved analysis does not belong to this project.");
+    }
+    const byPage = new Map(data.metrics.map((row) => [row.page, row]));
+    const pages = snapshot.pages.map((row) => {
+      const metric = byPage.get(row.page);
+      return metric
+        ? { ...row, organicTraffic: metric.organicTraffic, keywords: metric.keywords }
+        : row;
+    });
+    await env.R2.put(key, JSON.stringify({ ...snapshot, pages }), {
+      httpMetadata: { contentType: "application/json" },
+      customMetadata: stored.customMetadata,
+    });
+    return pages;
+  });
+
 export const deleteCompetitorTopicalMap = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(readInput)

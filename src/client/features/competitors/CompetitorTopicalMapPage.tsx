@@ -8,7 +8,8 @@ import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
-import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap, getCompetitorCrawlHistory, importCompetitorCrawl } from "@/serverFunctions/competitorTopicalMap";
+import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap, getCompetitorCrawlHistory, importCompetitorCrawl, updateCompetitorTopicalMapMetrics } from "@/serverFunctions/competitorTopicalMap";
+import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 import { domainField } from "@/types/schemas/domain";
 import { analyseTopicalMapWithAi, getTopicalAiAnalysis } from "@/serverFunctions/competitorTopicalMap";
 import type { PageRow } from "@/client/features/domain/types";
@@ -30,15 +31,33 @@ function clusterName(path: string): string {
   return topic.replace(/[-_]+/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
-function toCsv(rows: PageRow[]): string {
+/** Same page across http/https, www and a trailing slash. */
+function pageKey(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, "") || "/";
+    return `${parsed.hostname.replace(/^www\./, "").toLowerCase()}${path.toLowerCase()}${parsed.search}`;
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
+function toCsv(
+  rows: PageRow[],
+  aiClusters: Array<{ name: string; intent: string; urls: string[] }>,
+): string {
   const quote = (value: string | number | null) =>
     '"' + String(value ?? "").replaceAll('"', '""') + '"';
+  const aiByUrl = new Map(
+    aiClusters.flatMap((cluster) => cluster.urls.map((url) => [url, cluster] as const)),
+  );
   return [
-    ["Topic (URL-based)", "URL", "Estimated traffic", "Ranking keywords"].map(quote).join(","),
-    ...rows.map((row) =>
-      [clusterName(row.relativePath ?? new URL(row.page).pathname), row.page, row.organicTraffic, row.keywords]
-        .map(quote).join(","),
-    ),
+    ["Topic (URL-based)", "AI topic", "AI intent", "URL", "Estimated traffic", "Ranking keywords"].map(quote).join(","),
+    ...rows.map((row) => {
+      const ai = aiByUrl.get(row.page);
+      return [clusterName(row.relativePath ?? new URL(row.page).pathname), ai?.name ?? null, ai?.intent ?? null, row.page, row.organicTraffic, row.keywords]
+        .map(quote).join(",");
+    }),
   ].join("\r\n");
 }
 
@@ -57,6 +76,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
 
   const [saved, setSaved] = useState<Array<{ id: string; domain: string; market: number; requestedLimit: number; pageCount: number; complete: boolean; savedAt: string }>>([]);
   const [saving, setSaving] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<null | {
     model: string; savedAt: string; sourcePages: number;
@@ -347,9 +367,55 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     }
   }
 
+  /**
+   * Ranking pages for the analysed domain from the project's SEO data source
+   * (the Domain Overview request, so it follows the provider route), matched
+   * to these URLs and saved into the same analysis. Up to 5 paid requests of
+   * 200 pages; a URL missing from a complete ranking list ranks for nothing.
+   */
+  async function addMetrics() {
+    if (!savedId || !pages.length || enriching) return;
+    setEnriching(true);
+    setError("");
+    try {
+      const ranking = new Map<string, { organicTraffic: number | null; keywords: number | null }>();
+      let exhausted = false;
+      for (let page = 1; page <= 5; page += 1) {
+        const response = await getDomainPagesPage({
+          data: {
+            projectId, domain: analysedDomain, scope: "subdomains", locationCode: market,
+            page, pageSize: 200, sortMode: "traffic", sortOrder: "desc", filters: {},
+          },
+        });
+        for (const row of response.pages) ranking.set(pageKey(row.page), row);
+        if (!response.hasMore || response.pages.length === 0) {
+          exhausted = true;
+          break;
+        }
+        if (pages.every((row) => ranking.has(pageKey(row.page)))) break;
+      }
+      const metrics = pages.map((row) => {
+        const found = ranking.get(pageKey(row.page));
+        return {
+          page: row.page,
+          organicTraffic: found ? found.organicTraffic : exhausted ? 0 : row.organicTraffic,
+          keywords: found ? found.keywords : exhausted ? 0 : row.keywords,
+        };
+      });
+      const updated = await updateCompetitorTopicalMapMetrics({ data: { projectId, id: savedId, metrics } });
+      setPages(updated);
+      const matched = pages.filter((row) => ranking.has(pageKey(row.page))).length;
+      toast.success(`Traffic and keywords added: ${matched} of ${pages.length} pages rank in this market.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not add traffic and keywords.");
+    } finally {
+      setEnriching(false);
+    }
+  }
+
   function exportCsv() {
     if (!pages.length) return;
-    const blob = new Blob(["\uFEFF" + toCsv(pages)], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + toCsv(pages, aiResult?.clusters ?? [])], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -461,7 +527,13 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
                 <h2 className="font-semibold">{analysedDomain}</h2>
                 <p className="text-sm text-muted-foreground">{pages.length} ranking pages · {groups.length} URL-based groups{saving ? " · Saving…" : savedId ? " · Saved" : ""}</p>
               </div>
-              <Button variant="outline" disabled={!pages.length} onClick={exportCsv}><Download className="size-4" /> Export CSV</Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <DataSourceLabel projectId={projectId} />
+                <Button variant="outline" disabled={!savedId || !pages.length || enriching || running}
+                  title="Up to 5 paid SEO data requests of 200 ranking pages each"
+                  onClick={() => void addMetrics()}>{enriching ? "Adding traffic & keywords…" : "Add traffic & keywords (paid)"}</Button>
+                <Button variant="outline" disabled={!pages.length} onClick={exportCsv}><Download className="size-4" /> Export CSV</Button>
+              </div>
             </div>
 
             <div className="space-y-3 rounded-lg border border-primary/20 bg-muted/20 p-4">
