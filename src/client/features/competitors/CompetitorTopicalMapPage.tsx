@@ -10,6 +10,7 @@ import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
 import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap, getCompetitorCrawlHistory, importCompetitorCrawl, updateCompetitorTopicalMapMetrics } from "@/serverFunctions/competitorTopicalMap";
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
+import { CompetitorKeywordClusterCard } from "./CompetitorKeywordClusterCard";
 import { domainField } from "@/types/schemas/domain";
 import { analyseTopicalMapWithAi, getTopicalAiAnalysis } from "@/serverFunctions/competitorTopicalMap";
 import type { PageRow } from "@/client/features/domain/types";
@@ -496,6 +497,12 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
           </Button>
           {running && <p className="text-sm text-muted-foreground" role="status">Retrieved {completed} of up to {limit} pages. Each batch is requested separately.</p>}
         </Card>
+        <CompetitorKeywordClusterCard
+          projectId={projectId}
+          domain={domain}
+          market={market}
+          approved={acknowledged}
+        />
 
         <Card className="space-y-3 p-5">
           <button type="button" className="flex w-full items-center justify-between gap-2 text-left font-semibold" aria-expanded={showSaved} onClick={() => setShowSaved(!showSaved)}><span>Saved research ({saved.length})</span>{showSaved ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</button>
