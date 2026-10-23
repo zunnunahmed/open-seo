@@ -6,6 +6,7 @@ import { getSeoProviderPreference } from "@/server/custom/providers/projectPrefe
 import { getOptionalEnvValue } from "@/server/lib/runtime-env";
 import {
   fetchTregList,
+  fetchTregRoutedLists,
   type TregListSnapshot,
 } from "@/server/custom/providers/treg/lists";
 
@@ -17,7 +18,7 @@ const requestSchema = z.object({
   acknowledgeCost: z.boolean().optional(),
 });
 const snapshotSchema = z.object({
-  provider: z.literal("serpstat-via-treg"),
+  provider: z.enum(["serpstat-via-treg", "treg-dataforseo"]),
   kind: z.enum(["domains", "backlinks"]),
   domain: z.string(),
   fetchedAt: z.string(),
@@ -47,10 +48,11 @@ export const getTregSavedList = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(requestSchema)
   .handler(async ({ data, context }) => {
-    if ((await getSeoProviderPreference(context.projectId)) !== "treg_serpstat")
-      throw new Error("treg → Serpstat is not selected for this project.");
+    const route = await getSeoProviderPreference(context.projectId);
+    if (route !== "treg_serpstat" && route !== "treg_dataforseo")
+      throw new Error("A treg route is not selected for this project.");
     const domain = requireDomain(data.domain);
-    const key = `custom:treg:saved-list:v1:${context.projectId}:${domain}:${data.kind}`;
+    const key = `custom:treg:saved-list:v1:${context.projectId}:${domain}:${data.kind}:${route}`;
     if (!data.fetchFresh) {
       const saved = await env.KV.get(key);
       return saved
@@ -68,11 +70,10 @@ export const getTregSavedList = createServerFn({ method: "POST" })
     if (used >= 20)
       throw new Error("Daily treg list quota reached (20 per project)");
     await env.KV.put(guard, String(used + 1), { expirationTtl: 86400 });
-    const result: TregListSnapshot = await fetchTregList(
-      data.kind,
-      domain,
-      token,
-    );
+    const result: TregListSnapshot =
+      route === "treg_dataforseo"
+        ? await fetchTregRoutedLists(data.kind, domain, token)
+        : await fetchTregList(data.kind, domain, token);
     await env.KV.put(key, JSON.stringify(result));
     return { ...result, saved: false };
   });

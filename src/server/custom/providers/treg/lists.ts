@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  aggregateReferringDomains,
+  callTregRouted,
+  parseRoutedBacklinks,
+  type TregRoutedBacklink,
+} from "./routed";
 
 const rawRow = z.record(z.string(), z.unknown());
 const replySchema = z.object({
@@ -19,7 +25,7 @@ export type TregListRow = {
   linkCount: number | null;
 };
 export type TregListSnapshot = {
-  provider: "serpstat-via-treg";
+  provider: "serpstat-via-treg" | "treg-dataforseo";
   kind: TregListKind;
   domain: string;
   rows: TregListRow[];
@@ -104,4 +110,69 @@ export async function fetchTregList(
     domain,
     new Date().toISOString(),
   );
+}
+
+/** Upper bound shown before a routed DataForSEO list call runs. */
+export const TREG_DATAFORSEO_LIST_COST_USD = 0.05;
+
+function toListRow(row: TregRoutedBacklink): TregListRow {
+  return {
+    source: row.source,
+    target: row.target,
+    anchor: row.anchor,
+    linkType: row.linkType,
+    firstSeen: row.firstSeen,
+    authority: row.authority,
+    linkCount: null,
+  };
+}
+
+/**
+ * Referring domains and backlinks through treg's DataForSEO route, in the
+ * same snapshot shape as the Serpstat path. The domains tab aggregates the
+ * sampled backlinks, so it covers fewer domains than a dedicated domain
+ * endpoint would; totals stay null instead of invented.
+ */
+export async function fetchTregRoutedLists(
+  kind: TregListKind,
+  domain: string,
+  token: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TregListSnapshot> {
+  const { output, chargedUsd } = await callTregRouted(
+    "treg.web.backlinks.list",
+    { target: domain, limit: kind === "domains" ? 100 : 20 },
+    { token, prefer: "dataforseo", fetchImpl },
+  );
+  const rows = parseRoutedBacklinks(output);
+  const fetchedAt = new Date().toISOString();
+  if (kind === "backlinks") {
+    return {
+      provider: "treg-dataforseo",
+      kind,
+      domain,
+      rows: rows.slice(0, 20).map(toListRow),
+      total: null,
+      fetchedAt,
+      estimatedCostUsd: chargedUsd > 0 ? chargedUsd : TREG_DATAFORSEO_LIST_COST_USD,
+    };
+  }
+  const aggregated = aggregateReferringDomains(rows).map((entry) => ({
+    source: entry.domain,
+    target: null as string | null,
+    anchor: null as string | null,
+    linkType: null as string | null,
+    firstSeen: null as string | null,
+    authority: entry.authority,
+    linkCount: entry.linkCount,
+  }));
+  return {
+    provider: "treg-dataforseo",
+    kind,
+    domain,
+    rows: aggregated,
+    total: null,
+    fetchedAt,
+    estimatedCostUsd: chargedUsd > 0 ? chargedUsd : TREG_DATAFORSEO_LIST_COST_USD,
+  };
 }

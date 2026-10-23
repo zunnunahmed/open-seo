@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  callTregRouted,
+  parseRoutedSummary,
+} from "@/server/custom/providers/treg/routed";
 
 /**
  * Isolated treg transport. Never expose TREG_API_TOKEN to browser code.
@@ -8,7 +12,7 @@ const TREG_BACKLINKS_ENDPOINT = "serpstat.web.backlinks.summary";
 const TREG_BACKLINKS_ESTIMATED_USD = 0.0025;
 
 type TregBacklinksSummary = {
-  provider: "serpstat-via-treg";
+  provider: "serpstat-via-treg" | "treg-dataforseo";
   target: string;
   backlinks: number | null;
   referringDomains: number | null;
@@ -92,4 +96,33 @@ export async function fetchTregBacklinksSummary(
     target,
     options.now?.() ?? new Date(),
   );
+}
+
+/** Upper bound shown before a routed DataForSEO summary runs. */
+export const TREG_DATAFORSEO_SUMMARY_COST_USD = 0.05;
+
+/**
+ * Domain summary through treg's DataForSEO route: same normalized shape as
+ * the Serpstat path, DataForSEO-sourced numbers. `authority` stays null —
+ * DataForSEO's rank is a different scale and inventing parity would mislead.
+ */
+export async function fetchTregRoutedSummary(
+  target: string,
+  options: TregRequestOptions,
+): Promise<TregBacklinksSummary> {
+  const { output, chargedUsd } = await callTregRouted(
+    "treg.web.backlinks.summary",
+    { target },
+    { token: options.token, prefer: "dataforseo", fetchImpl: options.fetchImpl },
+  );
+  const { backlinks, referringDomains } = parseRoutedSummary(output);
+  return {
+    provider: "treg-dataforseo",
+    target,
+    backlinks,
+    referringDomains,
+    authority: null,
+    fetchedAt: (options.now?.() ?? new Date()).toISOString(),
+    estimatedCostUsd: chargedUsd > 0 ? chargedUsd : TREG_DATAFORSEO_SUMMARY_COST_USD,
+  };
 }

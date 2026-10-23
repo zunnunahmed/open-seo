@@ -7,6 +7,7 @@ import { DataTable, useDataTable } from "@/client/components/table/DataTable";
 import { DataTableToolbar } from "@/client/components/table/DataTableToolbar";
 import { TablePagination } from "@/client/components/table/TablePagination";
 import { getTregSavedList } from "@/serverFunctions/tregLists";
+import { toBareDomain } from "@/shared/urls";
 import type {
   TregListKind,
   TregListSnapshot,
@@ -107,7 +108,7 @@ function TregListTable({
       table={table}
       empty={{
         title: "No rows in this snapshot",
-        description: "Serpstat returned nothing for this domain.",
+        description: `${snapshot.provider === "treg-dataforseo" ? "DataForSEO" : "Serpstat"} returned nothing for this domain.`,
       }}
       toolbar={
         <DataTableToolbar>
@@ -179,18 +180,21 @@ function exportCsv(data: TregListSnapshot) {
 export function TregSavedLists({
   projectId,
   target,
+  route,
 }: {
   projectId: string;
   target: string;
+  route: "treg_serpstat" | "treg_dataforseo";
 }) {
   const [kind, setKind] = useState<TregListKind>("domains");
   const [snapshot, setSnapshot] = useState<TregListSnapshot | null>(null);
-  const domain = target.toLowerCase().trim();
-  const valid =
-    /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(domain);
+  const domain = toBareDomain(target);
+  const valid = domain != null;
+  const isDataforseo = route === "treg_dataforseo";
   const mutation = useMutation({
-    mutationFn: (fetchFresh: boolean) =>
-      getTregSavedList({
+    mutationFn: (fetchFresh: boolean) => {
+      if (domain == null) throw new Error("Enter a bare domain, not a URL.");
+      return getTregSavedList({
         data: {
           projectId,
           domain,
@@ -198,17 +202,19 @@ export function TregSavedLists({
           fetchFresh,
           acknowledgeCost: fetchFresh,
         },
-      }),
+      });
+    },
     onSuccess: (result) => setSnapshot(result),
   });
   useEffect(() => {
     setSnapshot(null);
     mutation.reset();
-    if (valid) mutation.mutate(false);
+    if (domain != null) mutation.mutate(false);
     // Deliberately tied to the query domain and tab; no paid fetch on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain, kind, projectId]);
-  const canShow = snapshot?.domain === domain && snapshot.kind === kind;
+  const canShow =
+    domain != null && snapshot?.domain === domain && snapshot.kind === kind;
   return (
     <section className="rounded-xl border border-border bg-card p-4 space-y-3">
       <h2 className="font-semibold">treg · Saved Backlink Research</h2>
@@ -231,7 +237,8 @@ export function TregSavedLists({
       </div>
       {!valid ? (
         <p className="text-sm text-muted-foreground">
-          Search a bare domain first.
+          Search a bare domain first. Full URLs are fine — the domain is used
+          automatically.
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
@@ -241,7 +248,9 @@ export function TregSavedLists({
           >
             {mutation.isPending
               ? "Loading…"
-              : "Fetch & save first 20 (paid API)"}
+              : isDataforseo
+                ? "Fetch & save (paid API)"
+                : "Fetch & save first 20 (paid API)"}
           </Button>
           {canShow ? (
             <Button variant="outline" onClick={() => exportCsv(snapshot)}>
@@ -251,9 +260,19 @@ export function TregSavedLists({
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        Estimated provider charge up to about $0.01 per request; actual billing
-        may vary by rows. Requesting the same list again refreshes the saved
-        snapshot and may incur another charge.
+        {isDataforseo ? (
+          <>
+            Estimated provider charge up to about $0.05 per request; the domains
+            tab aggregates the sampled backlinks. Requesting the same list again
+            refreshes the saved snapshot and may incur another charge.
+          </>
+        ) : (
+          <>
+            Estimated provider charge up to about $0.01 per request; actual
+            billing may vary by rows. Requesting the same list again refreshes
+            the saved snapshot and may incur another charge.
+          </>
+        )}
       </p>
       {mutation.isError ? (
         <p role="alert" className="text-sm text-destructive">

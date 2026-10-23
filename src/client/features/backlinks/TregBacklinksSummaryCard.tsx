@@ -1,13 +1,16 @@
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/client/components/ui/button";
+import { toBareDomain } from "@/shared/urls";
 import { runTregBacklinksSummary } from "@/serverFunctions/tregBacklinks";
 
 export function TregBacklinksSummaryCard({
   projectId,
   target,
+  route,
 }: {
   projectId: string;
   target: string;
+  route: "treg_serpstat" | "treg_dataforseo";
 }) {
   const mutation = useMutation({
     mutationFn: (domain: string) =>
@@ -15,23 +18,40 @@ export function TregBacklinksSummaryCard({
         data: { projectId, domain, acknowledgeCost: true },
       }),
   });
-  const domain = target.toLowerCase().trim();
-  const validDomain =
-    /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$/i.test(domain);
+  const domain = toBareDomain(target);
+  const validDomain = domain != null;
   // A new domain must never display the previous target's research.
-  const result = mutation.data?.target === domain ? mutation.data : null;
+  const result =
+    domain != null && mutation.data?.target === domain ? mutation.data : null;
+  const isDataforseo = route === "treg_dataforseo";
 
   return (
     <section className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <h2 className="font-semibold">treg · Serpstat Backlinks Summary</h2>
+      <h2 className="font-semibold">
+        {isDataforseo
+          ? "treg · DataForSEO Backlinks Summary"
+          : "treg · Serpstat Backlinks Summary"}
+      </h2>
       <p className="text-sm text-muted-foreground">
         An optional one-time summary for this project. Click to request data.
-        Estimated provider cost: $0.0025 per uncached request; a result is
-        cached for 24 hours. No automatic calls or paid retries.
+        {isDataforseo ? (
+          <>
+            {" "}
+            Estimated provider cost: up to about $0.05 per uncached request; a
+            result is cached for 24 hours. No automatic calls or paid retries.
+          </>
+        ) : (
+          <>
+            {" "}
+            Estimated provider cost: $0.0025 per uncached request; a result is
+            cached for 24 hours. No automatic calls or paid retries.
+          </>
+        )}
       </p>
-      {!validDomain ? (
+      {!validDomain || domain == null ? (
         <p className="text-sm text-muted-foreground">
           Search for a bare domain such as example.com to use treg summary.
+          Full URLs are fine — the domain is used automatically.
         </p>
       ) : (
         <Button
@@ -40,7 +60,9 @@ export function TregBacklinksSummaryCard({
         >
           {mutation.isPending
             ? "Checking…"
-            : "Run treg summary (up to $0.0025)"}
+            : isDataforseo
+              ? "Run treg summary (up to about $0.05)"
+              : "Run treg summary (up to $0.0025)"}
         </Button>
       )}
       {mutation.isError ? (
@@ -53,15 +75,19 @@ export function TregBacklinksSummaryCard({
       {result ? (
         <div className="space-y-2 text-sm" aria-live="polite">
           <p className="text-muted-foreground">
-            Source: Serpstat via treg ·{" "}
-            {result.cached ? "Cached" : "New API request"} ·{" "}
+            Source: {isDataforseo ? "DataForSEO via treg" : "Serpstat via treg"}{" "}
+            · {result.cached ? "Cached" : "New API request"} ·{" "}
             {new Date(result.fetchedAt).toLocaleString()}
+            {domain != null ? ` · ${domain}` : null}
           </p>
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
               ["Backlinks", result.backlinks],
               ["Referring domains", result.referringDomains],
-              ["Authority (Serpstat)", result.authority],
+              [
+                isDataforseo ? "Authority" : "Authority (Serpstat)",
+                result.authority,
+              ],
             ].map(([label, value]) => (
               <div key={String(label)}>
                 <dt className="text-muted-foreground">{label}</dt>
@@ -74,8 +100,9 @@ export function TregBacklinksSummaryCard({
             ))}
           </dl>
           <p className="text-xs text-muted-foreground">
-            Provider figures can differ from DataForSEO; do not treat them as
-            identical metrics.
+            {isDataforseo
+              ? "DataForSEO via treg reports backlinks and referring domains; authority is not provided on this route."
+              : "Provider figures can differ from DataForSEO; do not treat them as identical metrics."}
           </p>
         </div>
       ) : null}
