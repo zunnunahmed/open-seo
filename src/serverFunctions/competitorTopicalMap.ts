@@ -144,7 +144,8 @@ const aiClusterSchema = z.object({
 const aiResultSchema = z.object({
   clusters: z.array(aiClusterSchema).min(1).max(30),
 });
-const aiInput = readInput.extend({ confirmCost: z.literal(true) });
+const aiInput = readInput.extend({ confirmCost: z.literal(true), startIndex: z.number().int().min(0).max(999) });
+const AI_BATCH_SIZE = 30;
 const aiKey = (projectId: string, id: string) => `${prefix(projectId)}ai/${id}.json`;
 
 export const getTopicalAiAnalysis = createServerFn({ method: "POST" })
@@ -170,17 +171,25 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
       throw new Error("Saved analysis does not belong to this project.");
     }
     if (snapshot.pages.length === 0) throw new Error("No saved URLs available.");
-    // First release: 100 URLs per inference; limit cost, prompt size and Worker lifetime.
-    if (snapshot.pages.length > 100) {
-      throw new Error("AI clustering currently supports up to 100 saved pages per run. Select a 100-page analysis.");
+    const existingObject = await env.R2.get(aiKey(context.projectId, data.id));
+    const previous = existingObject ? JSON.parse(await existingObject.text()) as {
+      model: string; savedAt: string; sourcePages: number;
+      clusters: z.infer<typeof aiClusterSchema>[];
+    } : null;
+    const currentOffset = previous?.sourcePages ?? 0;
+    if (data.startIndex !== currentOffset) {
+      throw new Error("Saved AI progress has changed. Reopen this analysis and resume.");
     }
+    if (currentOffset >= snapshot.pages.length) return previous;
+
     const { getOptionalEnvValue } = await import("@/server/lib/runtime-env");
     const { ProjectContextRepository } = await import("@/server/features/project-context/repositories/ProjectContextRepository");
     const apiKey = await getOptionalEnvValue("OPENROUTER_API_KEY");
     if (!apiKey) throw new Error("Configure OpenRouter under Project Integrations first.");
     const sections = await ProjectContextRepository.listSections(context.projectId);
     const model = sections.find((entry) => entry.key === "custom:openrouter-model")?.content || "openai/gpt-4o-mini";
-    const inputs = snapshot.pages.map((page) => ({
+    if (previous && previous.model !== model) throw new Error("The AI model has changed. Use the original model to resume this analysis.");
+    const inputs = snapshot.pages.slice(currentOffset, currentOffset + AI_BATCH_SIZE).map((page) => ({
       url: page.page,
       path: page.relativePath ?? new URL(page.page).pathname,
     }));
@@ -190,7 +199,7 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model,
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 6000,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Group the supplied website URLs by likely subject and search intent. Return ONLY JSON of shape {clusters:[{name:string,intent:string,urls:string[]}]}. Each input URL must occur exactly once. Do not invent URLs or claim page contents were read. Classifications are inferred from URLs only; keep related local-service URLs together when sensible. Do not include explanatory prose." },
@@ -211,7 +220,13 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     if (actual.length !== expected.size || new Set(actual).size !== expected.size || actual.some((url) => !expected.has(url))) {
       throw new Error("AI clustering did not account for every URL exactly once. No results saved.");
     }
-    const result = { model, savedAt: new Date().toISOString(), sourcePages: inputs.length, clusters: parsed.clusters };
+    const clusters = [...(previous?.clusters ?? [])];
+    for (const group of parsed.clusters) {
+      const match = clusters.find((old) => old.name.toLowerCase() === group.name.toLowerCase());
+      if (match) match.urls.push(...group.urls);
+      else clusters.push(group);
+    }
+    const result = { model, savedAt: new Date().toISOString(), sourcePages: currentOffset + inputs.length, clusters };
     await env.R2.put(aiKey(context.projectId, data.id), JSON.stringify(result), {
       httpMetadata: { contentType: "application/json" },
     });
