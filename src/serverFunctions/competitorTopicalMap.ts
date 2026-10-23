@@ -104,9 +104,9 @@ export const getCompetitorCrawlHistory = createServerFn({ method: "POST" })
   .validator(projectInput)
   .handler(async ({ context }) => {
     const history = await AuditRepository.getAuditsByProject(context.projectId);
-    return history.filter((audit) => audit.status === "completed").map((audit) => ({
+    return history.map((audit) => ({
       id: audit.id, startUrl: audit.startUrl, pagesCrawled: audit.pagesCrawled,
-      completedAt: audit.completedAt,
+      completedAt: audit.completedAt, status: audit.status,
     }));
   });
 
@@ -115,8 +115,8 @@ export const importCompetitorCrawl = createServerFn({ method: "POST" })
   .validator(crawlImportSchema)
   .handler(async ({ data, context }) => {
     const result = await AuditRepository.getAuditResultsForProject(data.auditId, context.projectId);
-    if (!result.audit || result.audit.status !== "completed") {
-      throw new Error("Choose a completed crawl from this project.");
+    if (!result.audit) {
+      throw new Error("Audit not found in this project.");
     }
     const crawlHost = new URL(result.audit.startUrl).hostname.replace(/^www\./, "").toLowerCase();
     if (crawlHost !== data.competitorDomain) {
@@ -127,6 +127,7 @@ export const importCompetitorCrawl = createServerFn({ method: "POST" })
         return new URL(p.url).hostname.replace(/^www\./, "").toLowerCase() === data.competitorDomain;
       } catch { return false; }
     }).slice(0, data.maxPages);
+    if (pages.length === 0) throw new Error("No saved pages are available for this audit yet.");
     return pages.map((p) => ({
       page: p.url,
       relativePath: new URL(p.url).pathname,
