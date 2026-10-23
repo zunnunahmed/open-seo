@@ -4,7 +4,7 @@ import { AppError } from "@/server/lib/errors";
 import { errorHandlingMiddleware } from "@/middleware/errorHandling";
 import type { EnsuredUserContext } from "@/middleware/ensure-user/types";
 import { ensureUserMiddleware } from "@/middleware/ensureUser";
-import { getSeoProviderPreference } from "@/server/custom/providers/projectPreference";
+import { getSeoProviderPreference, getBacklinksProviderPreference } from "@/server/custom/providers/projectPreference";
 import { runWithSeoProviderRoute } from "@/server/custom/providers/treg/dataforseoTransport";
 
 const ensuredUserContextSchema: z.ZodType<EnsuredUserContext> = z.object({
@@ -73,6 +73,15 @@ export const requireProjectSeoRoute = [
     .middleware(requireProjectContext)
     .server(async ({ next, context }) => {
       const route = await getSeoProviderPreference(context.projectId);
+      return runWithSeoProviderRoute(route, () => next());
+    }),
+] as const;
+
+export const requireBacklinksSeoRoute = [
+  createMiddleware({ type: "function" })
+    .middleware(requireProjectContext)
+    .server(async ({ next, context }) => {
+      const route = await getBacklinksProviderPreference(context.projectId);
       return runWithSeoProviderRoute(route, () => next());
     }),
 ] as const;
