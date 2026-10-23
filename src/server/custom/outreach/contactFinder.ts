@@ -13,8 +13,8 @@ import {
  *   -> TryKitt, name + domain ($0.005) for Blitz misses
  *   -> Tomba domain emails ($0.0089, 5 calls a day) when no person yields one
  *   -> MillionVerifier on every email ($0.0018; catch-all/unknown free).
- * Only emails on the prospect's own domain are kept, so a person's email at a
- * previous employer is never pitched.
+ * A person's email on the prospect's own domain is preferred; one on another
+ * domain is kept when TryKitt finds none on the site.
  */
 type Verification = "valid" | "catch_all" | "unknown" | "invalid";
 
@@ -211,8 +211,7 @@ export async function findContactsForDomain(
   /** Keeps a usable email; false means try the next finder. */
   const keep = (contact: Omit<FoundContact, "verification">): boolean => {
     const email = contact.email.trim().toLowerCase();
-    if (!onDomain(email, domain) || seen.has(email) || skip.has(email))
-      return false;
+    if (seen.has(email) || skip.has(email)) return false;
     seen.add(email);
     found.push({ ...contact, email });
     return true;
@@ -231,19 +230,29 @@ export async function findContactsForDomain(
       title: person.title?.trim() || null,
       linkedinUrl: person.linkedin_url ?? null,
     };
-    let email = person.linkedin_url
+    const fromLinkedin = person.linkedin_url
       ? await attempt("blitz", () => emailFromLinkedin(person.linkedin_url!))
       : null;
-    if (email) costUsd += PRICE.blitz;
-    // An email at another company (a stale profile) is a miss for this site.
-    if (email && keep({ ...base, email, foundVia: "blitz" })) continue;
+    if (fromLinkedin) costUsd += PRICE.blitz;
+    if (
+      fromLinkedin &&
+      onDomain(fromLinkedin, domain) &&
+      keep({ ...base, email: fromLinkedin, foundVia: "blitz" })
+    )
+      continue;
+    // The site's own address is likelier current, so try for one by name.
     const fullName = [firstName, lastName].filter(Boolean).join(" ");
-    if (!fullName || !lastName || lastName.includes("*")) continue;
-    email = await attempt("trykitt", () => emailFromName(fullName, domain));
-    if (email) {
+    const fromName =
+      fullName && lastName && !lastName.includes("*")
+        ? await attempt("trykitt", () => emailFromName(fullName, domain))
+        : null;
+    if (fromName) {
       costUsd += PRICE.trykitt;
-      keep({ ...base, email, foundVia: "trykitt" });
+      if (keep({ ...base, email: fromName, foundVia: "trykitt" })) continue;
     }
+    // Otherwise an address on another domain (personal, or another company
+    // the person works for) still reaches them.
+    if (fromLinkedin) keep({ ...base, email: fromLinkedin, foundVia: "blitz" });
   }
 
   if (found.length === 0) {

@@ -79,6 +79,32 @@ describe("findContactsForDomain", () => {
     );
   });
 
+  it("keeps an email on another domain when none is found on the site", async () => {
+    stubTreg({
+      "dropleads.people.search": {
+        data: {
+          leads: [
+            {
+              first_name: "Jane",
+              last_name: "Doe",
+              linkedin_url: "https://www.linkedin.com/in/jane",
+            },
+          ],
+        },
+      },
+      "blitzapi.people.email.find": { found: true, email: "jane@gmail.com" },
+      "trykitt.people.email.find": { email: "no-results-found" },
+    });
+    const { contacts } = await findContactsForDomain(
+      "site.com",
+      "link",
+      new Set(),
+    );
+    expect(contacts).toEqual([
+      expect.objectContaining({ email: "jane@gmail.com", foundVia: "blitz" }),
+    ]);
+  });
+
   it("treats a provider's error answer as a miss and an empty treg balance as fatal", async () => {
     const lead = {
       data: {
