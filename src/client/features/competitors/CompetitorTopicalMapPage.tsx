@@ -10,6 +10,7 @@ import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
 import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap, getCompetitorCrawlHistory, importCompetitorCrawl } from "@/serverFunctions/competitorTopicalMap";
 import { domainField } from "@/types/schemas/domain";
+import { analyseTopicalMapWithAi, getTopicalAiAnalysis } from "@/serverFunctions/competitorTopicalMap";
 import type { PageRow } from "@/client/features/domain/types";
 
 const LIMITS = [25, 50, 100, 200, 500, 1000] as const;
@@ -57,6 +58,13 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [saved, setSaved] = useState<Array<{ id: string; domain: string; market: number; requestedLimit: number; pageCount: number; complete: boolean; savedAt: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<null | {
+    model: string; savedAt: string; sourcePages: number;
+    clusters: Array<{ name: string; intent: string; urls: string[] }>;
+  }>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   const { data: projects } = useQuery(projectsQueryOptions());
   const mySite = projects?.find((project) => project.id === projectId)?.domain ?? "";
   const [comparison, setComparison] = useState<PageRow[]>([]);
@@ -94,6 +102,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       setCompleted(record.pages.length);
       setAnalysedDomain(record.domain);
       setSavedId(record.id);
+      setAiResult(await getTopicalAiAnalysis({ data: { projectId, id: record.id } }));
+      setAiError("");
       setComparison([]);
       setComparisonDomain("");
       setError("");
@@ -122,6 +132,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
         data: { projectId, domain: host, market, requestedLimit: limit, pages: records, complete },
       });
       setSavedId(result.id);
+      setAiResult(null);
       await refreshSaved();
       toast.success(complete ? "Analysis saved to your project." : "Partial results saved to your project.");
     } catch {
@@ -260,6 +271,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setCompleted(0);
     setAnalysedDomain(host);
     setSavedId(null);
+    setAiResult(null);
     setComparison([]);
     setComparisonDomain("");
     let complete = false;
@@ -294,6 +306,24 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     } finally {
       if (collected.length > 0) await storeSnapshot(host, collected, complete);
       setRunning(false);
+    }
+  }
+
+
+  async function runAiClustering() {
+    if (!savedId || !pages.length || aiBusy) return;
+    setAiBusy(true);
+    setAiError("");
+    try {
+      const result = await analyseTopicalMapWithAi({
+        data: { projectId, id: savedId, confirmCost: true },
+      });
+      setAiResult(result);
+      toast.success("AI topic groups saved with this research.");
+    } catch (cause) {
+      setAiError(cause instanceof Error ? cause.message : "AI clustering failed.");
+    } finally {
+      setAiBusy(false);
     }
   }
 
@@ -405,6 +435,31 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
                 <p className="text-sm text-muted-foreground">{pages.length} ranking pages · {groups.length} URL-based groups{saving ? " · Saving…" : savedId ? " · Saved" : ""}</p>
               </div>
               <Button variant="outline" disabled={!pages.length} onClick={exportCsv}><Download className="size-4" /> Export CSV</Button>
+            </div>
+
+            <div className="space-y-3 rounded-lg border p-3">
+              <h3 className="text-sm font-semibold">AI Topic Clustering · OpenRouter</h3>
+              <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. This first release infers topics from URL paths only, not page text, and supports up to 100 saved URLs per run. AI requests may incur OpenRouter charges.</p>
+              <Button size="sm" variant="outline" disabled={!savedId || !pages.length || pages.length > 100 || aiBusy || running || saving}
+                onClick={() => void runAiClustering()}>{aiBusy ? "Clustering…" : "Run AI clustering (paid API call)"}</Button>
+              {!savedId && <p className="text-xs text-muted-foreground">Save or open an analysis first.</p>}
+              {pages.length > 100 && <p className="text-xs text-muted-foreground">Select a saved analysis with 100 or fewer pages for AI clustering.</p>}
+              {aiError && <p className="text-sm text-destructive" role="alert">{aiError}</p>}
+              {aiResult && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">{aiResult.clusters.length} inferred topic groups across {aiResult.sourcePages} URLs · {aiResult.model} · Saved {new Date(aiResult.savedAt).toLocaleString()}</p>
+                  {aiResult.clusters.map((cluster) => (
+                    <details key={cluster.name} className="rounded-lg border p-3">
+                      <summary className="cursor-pointer text-sm font-medium">{cluster.name} · {cluster.urls.length} pages</summary>
+                      <p className="mt-2 text-xs text-muted-foreground">Likely intent: {cluster.intent}</p>
+                      <div className="mt-2 space-y-1">
+                        {cluster.urls.map((url) => <a key={url} href={url} target="_blank" rel="noopener noreferrer"
+                          className="block break-all text-xs text-primary hover:underline">{url}</a>)}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">Preliminary grouping based on URL paths. These groups are not validated topic clusters or inferred pillar pages. Full semantic extraction, saved resumable jobs and gap analysis are planned separately.</p>
             <div className="flex gap-2 border-b pb-2">
