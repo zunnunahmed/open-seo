@@ -13,6 +13,7 @@ import {
   ListPlus,
   MessageSquare,
   Network,
+  Map,
   Search,
   TrendingUp,
 } from "lucide-react";
@@ -67,6 +68,11 @@ const projectNavItems = [
     to: "/p/$projectId/domain" as const,
     label: "Domain Overview",
     icon: Globe,
+  },
+  {
+    to: "/p/$projectId/competitor-topical-map" as const,
+    label: "Topical Map",
+    icon: Map,
   },
   {
     to: "/p/$projectId/competitor-overview" as const,
@@ -160,7 +166,10 @@ export function getProjectNavGroups(projectId: string) {
     },
     {
       label: "Competitor Intelligence",
-      items: [byPath("/p/$projectId/competitor-overview")],
+      items: [
+        byPath("/p/$projectId/competitor-overview"),
+        byPath("/p/$projectId/competitor-topical-map"),
+      ],
     },
     {
       label: "Outreach",
