@@ -50,6 +50,7 @@ import { Route as AppPProjectIdBacklinksRouteImport } from './routes/_app/p/$pro
 import { Route as AppPProjectIdBrandLookupRouteImport } from './routes/_app/p/$projectId/brand-lookup'
 import { Route as AppPProjectIdContextRouteImport } from './routes/_app/p/$projectId/context'
 import { Route as AppPProjectIdDomainRouteImport } from './routes/_app/p/$projectId/domain'
+import { Route as AppPProjectIdCompetitorOverviewRouteImport } from './routes/_app/p/$projectId/competitor-overview'
 import { Route as AppPProjectIdKeywordClusteringRouteImport } from './routes/_app/p/$projectId/keyword-clustering'
 import { Route as AppPProjectIdKeywordsRouteImport } from './routes/_app/p/$projectId/keywords'
 import { Route as AppPProjectIdPromptExplorerRouteImport } from './routes/_app/p/$projectId/prompt-explorer'
@@ -283,6 +284,11 @@ const AppPProjectIdDomainRoute = AppPProjectIdDomainRouteImport.update({
   path: '/domain',
   getParentRoute: () => AppPProjectIdRouteRoute,
 } as any)
+const AppPProjectIdCompetitorOverviewRoute = AppPProjectIdCompetitorOverviewRouteImport.update({
+  id: '/competitor-overview',
+  path: '/competitor-overview',
+  getParentRoute: () => AppPProjectIdRouteRoute,
+} as any)
 const AppPProjectIdKeywordClusteringRoute =
   AppPProjectIdKeywordClusteringRouteImport.update({
     id: '/keyword-clustering',
@@ -465,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
   '/p/$projectId/context': typeof AppPProjectIdContextRoute
   '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
+  '/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -527,6 +534,7 @@ export interface FileRoutesByTo {
   '/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
   '/p/$projectId/context': typeof AppPProjectIdContextRoute
   '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
+  '/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -594,6 +602,7 @@ export interface FileRoutesById {
   '/_app/p/$projectId/brand-lookup': typeof AppPProjectIdBrandLookupRoute
   '/_app/p/$projectId/context': typeof AppPProjectIdContextRoute
   '/_app/p/$projectId/domain': typeof AppPProjectIdDomainRoute
+  '/_app/p/$projectId/competitor-overview': typeof AppPProjectIdCompetitorOverviewRoute
   '/_app/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/_app/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
   '/_app/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
@@ -1128,6 +1137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectIdDomainRouteImport
       parentRoute: typeof AppPProjectIdRouteRoute
     }
+    '/_app/p/$projectId/competitor-overview': {
+      id: '/_app/p/$projectId/competitor-overview'
+      path: '/competitor-overview'
+      fullPath: '/p/$projectId/competitor-overview'
+      preLoaderRoute: typeof AppPProjectIdCompetitorOverviewRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
     '/_app/p/$projectId/keyword-clustering': {
       id: '/_app/p/$projectId/keyword-clustering'
       path: '/keyword-clustering'
@@ -1381,6 +1397,7 @@ interface AppPProjectIdRouteRouteChildren {
   AppPProjectIdBrandLookupRoute: typeof AppPProjectIdBrandLookupRoute
   AppPProjectIdContextRoute: typeof AppPProjectIdContextRoute
   AppPProjectIdDomainRoute: typeof AppPProjectIdDomainRoute
+  AppPProjectIdCompetitorOverviewRoute: typeof AppPProjectIdCompetitorOverviewRoute
   AppPProjectIdKeywordClusteringRoute: typeof AppPProjectIdKeywordClusteringRoute
   AppPProjectIdKeywordsRoute: typeof AppPProjectIdKeywordsRoute
   AppPProjectIdPromptExplorerRoute: typeof AppPProjectIdPromptExplorerRoute
@@ -1405,6 +1422,7 @@ const AppPProjectIdRouteRouteChildren: AppPProjectIdRouteRouteChildren = {
   AppPProjectIdBrandLookupRoute: AppPProjectIdBrandLookupRoute,
   AppPProjectIdContextRoute: AppPProjectIdContextRoute,
   AppPProjectIdDomainRoute: AppPProjectIdDomainRoute,
+  AppPProjectIdCompetitorOverviewRoute: AppPProjectIdCompetitorOverviewRoute,
   AppPProjectIdKeywordClusteringRoute: AppPProjectIdKeywordClusteringRoute,
   AppPProjectIdKeywordsRoute: AppPProjectIdKeywordsRoute,
   AppPProjectIdPromptExplorerRoute: AppPProjectIdPromptExplorerRoute,

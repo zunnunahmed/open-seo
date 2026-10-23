@@ -5,6 +5,7 @@ import {
   ChartLine,
   ClipboardCheck,
   Crosshair,
+  Users,
   FileText,
   Globe,
   LayoutDashboard,
@@ -66,6 +67,11 @@ const projectNavItems = [
     to: "/p/$projectId/domain" as const,
     label: "Domain Overview",
     icon: Globe,
+  },
+  {
+    to: "/p/$projectId/competitor-overview" as const,
+    label: "Competitor Overview",
+    icon: Users,
   },
   {
     to: "/p/$projectId/backlinks" as const,
@@ -151,6 +157,10 @@ export function getProjectNavGroups(projectId: string) {
         byPath("/p/$projectId/serp-checker"),
         byPath("/p/$projectId/domain"),
       ],
+    },
+    {
+      label: "Competitor Intelligence",
+      items: [byPath("/p/$projectId/competitor-overview")],
     },
     {
       label: "Outreach",
