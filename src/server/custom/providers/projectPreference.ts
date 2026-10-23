@@ -27,3 +27,16 @@ export async function getSeoProviderPreference(
   const section = sections.find((row) => row.key === SEO_PROVIDER_SECTION_KEY);
   return parseSeoProviderPreference(section?.content);
 }
+
+/** Backlinks-only preference; never alters the project's SEO research provider. */
+const BACKLINKS_PROVIDER_KEY = "custom:backlinks-provider";
+
+export async function getBacklinksProviderPreference(
+  projectId: string,
+): Promise<SeoProviderRoute> {
+  const sections = await ProjectContextRepository.listSections(projectId);
+  const section = sections.find((row) => row.key === BACKLINKS_PROVIDER_KEY);
+  // Existing projects default to direct DataForSEO for Backlinks independently
+  // of the global research preference.
+  return parseSeoProviderPreference(section?.content);
+}
