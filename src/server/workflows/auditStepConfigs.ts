@@ -69,10 +69,10 @@ const MAX_CHUNK_TARGET_PAGES = 200;
 /**
  * Every page fetch is an outgoing subrequest, and Workers Free allows 50 per
  * invocation: past that, each fetch throws at once and the page is recorded
- * as Failed. 40 leaves room for 429 retries. A Workers Paid deployment can
+ * as Failed. Smaller chunks also reduce CPU pressure on Workers Free. Paid deployments can
  * raise it with AUDIT_PAGES_PER_STEP (fewer, larger steps).
  */
-const DEFAULT_CHUNK_TARGET_PAGES = 40;
+const DEFAULT_CHUNK_TARGET_PAGES = 5;
 
 export async function chunkTargetPages(
   renderJavaScript: boolean,
