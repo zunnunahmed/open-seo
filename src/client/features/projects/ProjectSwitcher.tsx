@@ -113,11 +113,11 @@ export function ProjectSwitcher({
             className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-l-lg px-3 py-1.5 text-left hover:bg-accent"
           >
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-medium">
+              <span className="break-words text-sm font-medium">
                 {activeProject?.name ?? "Select project"}
               </span>
               {activeProject?.domain ? (
-                <span className="truncate text-xs text-muted-foreground">
+                <span className="break-all text-xs text-muted-foreground">
                   {activeProject.domain}
                 </span>
               ) : null}
