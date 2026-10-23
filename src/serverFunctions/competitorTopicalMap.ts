@@ -223,7 +223,26 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     let parsed: z.infer<typeof aiResultSchema>;
     try {
       const json = JSON.parse(raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""));
-      const indexed = aiIndexSchema.parse(json);
+      // Some models omit intent or use "groups" / "page_indices".
+      // Accept those presentation variations, but never infer missing page assignments.
+      const object = z.record(z.string(), z.unknown()).parse(json);
+      const entries = object.clusters ?? object.groups;
+      if (!Array.isArray(entries)) throw new Error("Expected a clusters array.");
+      const normalized = entries.map((entry) => {
+        const item = z.record(z.string(), z.unknown()).parse(entry);
+        const rawIndices = item.indices ?? item.page_indices;
+        return {
+          name: item.name ?? item.topic,
+          intent: item.intent ?? "",
+          indices: rawIndices,
+        };
+      });
+      const validation = aiIndexSchema.safeParse({ clusters: normalized });
+      if (!validation.success) {
+        const first = validation.error.issues[0];
+        throw new Error(`Unexpected cluster structure at ${first?.path.join(".") || "root"}: ${first?.message || "invalid value"}`);
+      }
+      const indexed = validation.data;
       const allIndices = indexed.clusters.flatMap((cluster) => cluster.indices);
       if (allIndices.length !== inputs.length ||
           new Set(allIndices).size !== inputs.length ||
