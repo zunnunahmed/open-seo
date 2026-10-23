@@ -164,6 +164,7 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(aiInput)
   .handler(async ({ data, context }) => {
+    try {
     const stored = await env.R2.get(objectKey(context.projectId, data.id));
     if (!stored) throw new Error("Save competitor research before starting AI clustering.");
     const snapshot = JSON.parse(await stored.text()) as Snapshot;
@@ -180,7 +181,7 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     if (data.startIndex !== currentOffset) {
       throw new Error("Saved AI progress has changed. Reopen this analysis and resume.");
     }
-    if (currentOffset >= snapshot.pages.length) return previous;
+    if (currentOffset >= snapshot.pages.length) return { ok: true as const, ...previous! };
 
     const { getOptionalEnvValue } = await import("@/server/lib/runtime-env");
     const { ProjectContextRepository } = await import("@/server/features/project-context/repositories/ProjectContextRepository");
@@ -230,5 +231,10 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     await env.R2.put(aiKey(context.projectId, data.id), JSON.stringify(result), {
       httpMetadata: { contentType: "application/json" },
     });
-    return result;
+    return { ok: true as const, ...result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI request failed.";
+      console.error("Competitor AI clustering failed", { projectId: context.projectId, error: message });
+      return { ok: false as const, message: message.slice(0, 300) };
+    }
   });
