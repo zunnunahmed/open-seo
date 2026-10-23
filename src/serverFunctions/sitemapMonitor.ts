@@ -63,7 +63,7 @@ function checkSitemapUrl(value: string, domain: string): string {
     throw new SitemapUserError(
       error instanceof TypeError
         ? "Enter a valid sitemap URL"
-        : `Sitemap must use HTTPS on ${domain}`,
+        : `Sitemap must be an HTTPS URL on ${domain} (www or not)`,
     );
   }
 }

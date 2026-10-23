@@ -34,6 +34,16 @@ function urlsFrom(node: unknown, key: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The project's site, with or without "www.": sites commonly redirect the
+ * bare domain to www (or back), and their sitemaps list the canonical host.
+ */
+const bareHost = (value: string) => value.toLowerCase().replace(/^www\./, "");
+
+function isProjectHost(hostname: string, host: string): boolean {
+  return bareHost(hostname) === bareHost(host);
+}
+
 export function validateSitemapUrl(value: string, host: string): string {
   const url = new URL(value);
   if (
@@ -41,7 +51,7 @@ export function validateSitemapUrl(value: string, host: string): string {
     url.username ||
     url.password ||
     url.port ||
-    url.hostname.toLowerCase() !== host.toLowerCase()
+    !isProjectHost(url.hostname, host)
   ) {
     throw new Error("Sitemap must use HTTPS on the configured project domain");
   }
@@ -78,7 +88,7 @@ function collectPages(
     try {
       const url = new URL(page);
       if (
-        url.hostname.toLowerCase() !== host.toLowerCase() ||
+        !isProjectHost(url.hostname, host) ||
         !["https:", "http:"].includes(url.protocol)
       )
         continue;

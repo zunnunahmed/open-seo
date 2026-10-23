@@ -12,6 +12,26 @@ describe("sitemap monitor", () => {
     expect(() =>
       validateSitemapUrl("http://example.com/sitemap.xml", "example.com"),
     ).toThrow();
+    // Sites redirect the bare domain to www; both are the project's site.
+    expect(
+      validateSitemapUrl("https://www.example.com/sitemap.xml", "example.com"),
+    ).toBe("https://www.example.com/sitemap.xml");
+  });
+
+  it("counts www pages for a bare project domain", async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        `<urlset><url><loc>https://www.example.com/a</loc></url><url><loc>https://www.example.com/b</loc></url></urlset>`,
+      ),
+    );
+
+    const snapshot = await crawlSitemaps(
+      "example.com",
+      "https://www.example.com/sitemap.xml",
+      fetcher,
+    );
+
+    expect(snapshot).toMatchObject({ urlCount: 2 });
   });
 
   it("counts unique URLs across sitemap indexes and flags duplicates", async () => {
