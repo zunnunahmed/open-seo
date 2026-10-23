@@ -82,18 +82,19 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setCompleted(0);
     setAnalysedDomain(host);
     const collected: PageRow[] = [];
+    const batchSize = limit <= 50 ? 50 : limit <= 100 ? 100 : 200;
     try {
       // Each batch is a separate Worker request. Never process 1,000 pages
       // in one Worker invocation or exceed the upstream page size limit.
-      for (let offset = 0; offset < limit; offset += 200) {
+      for (let offset = 0; offset < limit; offset += batchSize) {
         const response = await getDomainPagesPage({
           data: {
             projectId,
             domain: host,
             scope: "domain",
             locationCode: market,
-            page: Math.floor(offset / 200) + 1,
-            pageSize: 200,
+            page: Math.floor(offset / batchSize) + 1,
+            pageSize: batchSize,
             sortMode: "traffic",
             sortOrder: "desc",
             filters: {},
