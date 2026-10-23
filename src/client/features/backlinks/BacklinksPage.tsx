@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getProjectSeoProviderPreference } from "@/serverFunctions/projectContext";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getProjectBacklinksProviderPreference, setProjectBacklinksProviderPreference } from "@/serverFunctions/projectContext";
 import { TregBacklinksSummaryCard } from "./TregBacklinksSummaryCard";
 import { TregSavedLists } from "./TregSavedLists";
 import type { SortingState, Updater } from "@tanstack/react-table";
@@ -21,7 +21,7 @@ import {
   BACKLINKS_DEFAULT_SORT,
   DEFAULT_BACKLINKS_PAGE_SIZE,
 } from "@/types/schemas/backlinks";
-import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/client/components/ui/select";
 
 export function BacklinksPage({
   projectId,
@@ -29,14 +29,26 @@ export function BacklinksPage({
   navigate,
 }: BacklinksPageProps) {
   const filters = useBacklinksFilters();
+  const queryClient = useQueryClient();
   const providerQuery = useQuery({
-    queryKey: ["seo-provider-preferences", projectId],
-    queryFn: () => getProjectSeoProviderPreference({ data: { projectId } }),
+    queryKey: ["backlinks-provider-preferences", projectId],
+    queryFn: () => getProjectBacklinksProviderPreference({ data: { projectId } }),
   });
-  // Direct DataForSEO tables render only on the direct route; both treg
-  // routes share the treg cards (Serpstat or routed DataForSEO numbers).
+  const providerMutation = useMutation({
+    mutationFn: (provider: "direct_dataforseo" | "treg_dataforseo" | "treg_serpstat") =>
+      setProjectBacklinksProviderPreference({ data: { projectId, provider } }),
+    onSuccess: async (provider) => {
+      queryClient.setQueryData(["backlinks-provider-preferences", projectId], provider);
+      await queryClient.invalidateQueries({ queryKey: ["backlinksOverview"] });
+      await queryClient.invalidateQueries({ queryKey: ["backlinksRows"] });
+      await queryClient.invalidateQueries({ queryKey: ["backlinksReferringDomains"] });
+      await queryClient.invalidateQueries({ queryKey: ["backlinksTopPages"] });
+    },
+  });
   const showDataForSeo =
-    providerQuery.isSuccess && providerQuery.data === "direct_dataforseo";
+    providerQuery.isSuccess &&
+    (providerQuery.data === "direct_dataforseo" ||
+      providerQuery.data === "treg_dataforseo");
 
   // Sort lives in the URL so sort changes and the page reset commit in one
   // navigation (no transient fetch of the old page with the new sort).
@@ -125,7 +137,7 @@ export function BacklinksPage({
       <div className="mx-auto max-w-7xl space-y-4">
         <PageHeader
           title="Backlinks"
-          actions={<DataSourceLabel projectId={projectId} />}
+          actions={<span className="text-xs text-muted-foreground">Backlinks data source</span>}
           description="Understand who links to a site, what changed recently, and which pages attract links."
           backLink={
             searchState.target ? (
@@ -149,6 +161,29 @@ export function BacklinksPage({
           }
         />
 
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-3">
+          <label className="text-sm font-medium">Backlinks provider</label>
+          <Select
+            value={providerQuery.data ?? "direct_dataforseo"}
+            disabled={!providerQuery.isSuccess || providerMutation.isPending}
+            onValueChange={(value) => {
+              if (value === "direct_dataforseo" || value === "treg_dataforseo" || value === "treg_serpstat") {
+                providerMutation.mutate(value);
+              }
+            }}
+          >
+            <SelectTrigger aria-label="Backlinks provider" className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="direct_dataforseo">Direct DataForSEO</SelectItem>
+              <SelectItem value="treg_dataforseo">treg → DataForSEO</SelectItem>
+              <SelectItem value="treg_serpstat">treg → Serpstat</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">Only affects Backlinks.</span>
+          {providerMutation.isError ? <p role="alert" className="text-sm text-destructive">Could not save provider.</p> : null}
+        </div>
         <BacklinksSearchCard
           initialValues={data.searchCardInitialValues}
           onSubmit={(values) => {
@@ -165,8 +200,7 @@ export function BacklinksPage({
             Could not load provider settings. Research queries are paused.
           </p>
         ) : null}
-        {(providerQuery.data === "treg_serpstat" ||
-          providerQuery.data === "treg_dataforseo") && (
+        {providerQuery.data === "treg_serpstat" && (
           <>
             <TregBacklinksSummaryCard
               projectId={projectId}
