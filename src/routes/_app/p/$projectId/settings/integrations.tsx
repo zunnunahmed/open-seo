@@ -4,6 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConnectionCard";
 import { CrawlerAccessSettings } from "@/client/features/settings/CrawlerAccessSettings";
 import { SeoDataProviderSettings } from "@/client/features/integrations/SeoDataProviderSettings";
+import { OpenRouterSettings } from "@/client/features/integrations/OpenRouterSettings";
 import { IndexNowSettings } from "@/client/features/settings/IndexNowSettings";
 
 export const Route = createFileRoute(
@@ -38,6 +39,8 @@ function ProjectIntegrationsRoute() {
       </section>
 
       <SeoDataProviderSettings projectId={projectId} />
+
+      <OpenRouterSettings projectId={projectId} />
 
       <IndexNowSettings projectId={projectId} />
 
