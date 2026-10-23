@@ -550,7 +550,7 @@ export const outreachContacts = pgTable(
     title: text("title"),
     linkedinUrl: text("linkedin_url"),
     foundVia: text("found_via", {
-      enum: ["blitz", "trykitt", "tomba", "import"],
+      enum: ["blitz", "trykitt", "tomba", "hunter", "import"],
     }).notNull(),
     verification: text("verification", {
       enum: ["valid", "catch_all", "unknown", "invalid", "unverified"],

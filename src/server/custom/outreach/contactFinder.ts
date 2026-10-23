@@ -7,14 +7,17 @@ import {
 } from "@/server/custom/providers/treg/dataforseoTransport";
 
 /**
- * Find and verify contacts at one prospect domain through treg, cheapest
- * first; each finder bills only when it returns an email:
- *   Dropleads people search (free) -> BlitzAPI, LinkedIn to email ($0.0005)
- *   -> TryKitt, name + domain ($0.005) for Blitz misses
- *   -> Tomba domain emails ($0.0089, 5 calls a day) when no person yields one
+ * Find and verify up to two contacts at one prospect domain through treg.
+ * One domain lookup answers most sites, so those go first; each bills only
+ * when it returns emails:
+ *   Tomba domain emails ($0.0089; treg allows only a few calls a minute)
+ *   -> Hunter domain emails ($0.0245) when Tomba finds none or is busy
+ *   -> per person, only when neither lists anyone: Dropleads people search
+ *      (free) -> BlitzAPI, LinkedIn to email ($0.0005) -> TryKitt, name +
+ *      domain ($0.005)
  *   -> MillionVerifier on every email ($0.0018; catch-all/unknown free).
- * A person's email on the prospect's own domain is preferred; one on another
- * domain is kept when TryKitt finds none on the site.
+ * Named people come before generic addresses such as info@. A person's email
+ * on the site's own domain is preferred to one on another domain.
  */
 type Verification = "valid" | "catch_all" | "unknown" | "invalid";
 
@@ -24,7 +27,7 @@ type FoundContact = {
   lastName: string | null;
   title: string | null;
   linkedinUrl: string | null;
-  foundVia: "blitz" | "trykitt" | "tomba";
+  foundVia: "blitz" | "trykitt" | "tomba" | "hunter";
   verification: Verification;
 };
 
@@ -43,13 +46,14 @@ const TITLES: Record<ContactKind, string[]> = {
   pr: ["editor", "journalist", "reporter", "writer", "news", "producer"],
 };
 const PEOPLE_PER_DOMAIN = 3;
-const MAX_CONTACTS = 3;
+const MAX_CONTACTS = 2;
 
 // Approximate treg prices per billed result, for the cost shown to the user.
 const PRICE = {
   blitz: 0.000495,
   trykitt: 0.005,
   tomba: 0.0089,
+  hunter: 0.0245,
   verify: 0.00178,
 };
 
@@ -159,6 +163,38 @@ async function domainEmails(domain: string) {
   );
 }
 
+const hunterEmailSchema = z
+  .object({
+    value: z.unknown(),
+    first_name: z.string().nullish(),
+    last_name: z.string().nullish(),
+    position: z.string().nullish(),
+    linkedin: z.string().nullish(),
+    type: z.string().nullish(),
+  })
+  .passthrough();
+
+async function hunterDomainEmails(domain: string) {
+  const body = await json(
+    // Hunter bills per 10 emails returned, so 10 costs the same as 1.
+    await getFromTreg("hunter.companies.emails", {
+      domain: bareHost(domain),
+      limit: 10,
+    }),
+  );
+  const parsed = z
+    .object({
+      data: z.object({ emails: z.array(hunterEmailSchema) }).passthrough(),
+    })
+    .passthrough()
+    .safeParse(body);
+  if (!parsed.success) return [];
+  return sort(
+    parsed.data.data.emails.filter((entry) => looksLikeEmail(entry.value)),
+    (a, b) => Number(a.type === "generic") - Number(b.type === "generic"),
+  );
+}
+
 async function verify(email: string): Promise<Verification> {
   const body = await json(
     await getFromTreg("millionverifier.people.email.verify", {
@@ -220,6 +256,49 @@ async function attempt<T>(
   }
 }
 
+type Keep = (contact: Omit<FoundContact, "verification">) => boolean;
+
+/** One person's email, the site's own address first; returns the cost. */
+async function contactForPerson(
+  person: z.infer<typeof personSchema>,
+  domain: string,
+  keep: Keep,
+): Promise<number> {
+  let costUsd = 0;
+  const firstName = person.first_name?.trim() || null;
+  const lastName = person.last_name?.trim() || null;
+  const base = {
+    firstName,
+    lastName,
+    title: person.title?.trim() || null,
+    linkedinUrl: person.linkedin_url ?? null,
+  };
+  const fromLinkedin = person.linkedin_url
+    ? await attempt("blitz", () => emailFromLinkedin(person.linkedin_url!))
+    : null;
+  if (fromLinkedin) costUsd += PRICE.blitz;
+  if (
+    fromLinkedin &&
+    onDomain(fromLinkedin, domain) &&
+    keep({ ...base, email: fromLinkedin, foundVia: "blitz" })
+  )
+    return costUsd;
+  // The site's own address is likelier current, so try for one by name.
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+  const fromName =
+    fullName && lastName && !lastName.includes("*")
+      ? await attempt("trykitt", () => emailFromName(fullName, domain))
+      : null;
+  if (fromName) {
+    costUsd += PRICE.trykitt;
+    if (keep({ ...base, email: fromName, foundVia: "trykitt" })) return costUsd;
+  }
+  // Otherwise an address on another domain (personal, or another company the
+  // person works for) still reaches them.
+  if (fromLinkedin) keep({ ...base, email: fromLinkedin, foundVia: "blitz" });
+  return costUsd;
+}
+
 export async function findContactsForDomain(
   domain: string,
   kind: ContactKind,
@@ -229,7 +308,7 @@ export async function findContactsForDomain(
   const found: Array<Omit<FoundContact, "verification">> = [];
   const seen = new Set<string>();
   /** Keeps a usable email; false means try the next finder. */
-  const keep = (contact: Omit<FoundContact, "verification">): boolean => {
+  const keep: Keep = (contact) => {
     const email = contact.email.trim().toLowerCase();
     if (seen.has(email) || skip.has(email)) return false;
     seen.add(email);
@@ -237,56 +316,45 @@ export async function findContactsForDomain(
     return true;
   };
 
-  // A treg account problem still surfaces instead of silently finding nobody.
-  const people =
-    (await attempt("dropleads", () => searchPeople(domain, kind))) ?? [];
-  for (const person of people) {
+  const tomba = (await attempt("tomba", () => domainEmails(domain))) ?? [];
+  if (tomba.length > 0) costUsd += PRICE.tomba;
+  for (const entry of tomba) {
     if (found.length >= MAX_CONTACTS) break;
-    const firstName = person.first_name?.trim() || null;
-    const lastName = person.last_name?.trim() || null;
-    const base = {
-      firstName,
-      lastName,
-      title: person.title?.trim() || null,
-      linkedinUrl: person.linkedin_url ?? null,
-    };
-    const fromLinkedin = person.linkedin_url
-      ? await attempt("blitz", () => emailFromLinkedin(person.linkedin_url!))
-      : null;
-    if (fromLinkedin) costUsd += PRICE.blitz;
-    if (
-      fromLinkedin &&
-      onDomain(fromLinkedin, domain) &&
-      keep({ ...base, email: fromLinkedin, foundVia: "blitz" })
-    )
-      continue;
-    // The site's own address is likelier current, so try for one by name.
-    const fullName = [firstName, lastName].filter(Boolean).join(" ");
-    const fromName =
-      fullName && lastName && !lastName.includes("*")
-        ? await attempt("trykitt", () => emailFromName(fullName, domain))
-        : null;
-    if (fromName) {
-      costUsd += PRICE.trykitt;
-      if (keep({ ...base, email: fromName, foundVia: "trykitt" })) continue;
-    }
-    // Otherwise an address on another domain (personal, or another company
-    // the person works for) still reaches them.
-    if (fromLinkedin) keep({ ...base, email: fromLinkedin, foundVia: "blitz" });
+    keep({
+      email: String(entry.email),
+      firstName: entry.first_name ?? null,
+      lastName: entry.last_name ?? null,
+      title: entry.position ?? null,
+      linkedinUrl: null,
+      foundVia: "tomba",
+    });
   }
 
-  if (found.length === 0) {
-    const listed = (await attempt("tomba", () => domainEmails(domain))) ?? [];
-    if (listed.length > 0) costUsd += PRICE.tomba;
-    for (const entry of listed.slice(0, MAX_CONTACTS))
+  if (found.length < MAX_CONTACTS) {
+    const hunter =
+      (await attempt("hunter", () => hunterDomainEmails(domain))) ?? [];
+    if (hunter.length > 0) costUsd += PRICE.hunter;
+    for (const entry of hunter) {
+      if (found.length >= MAX_CONTACTS) break;
       keep({
-        email: String(entry.email),
+        email: String(entry.value),
         firstName: entry.first_name ?? null,
         lastName: entry.last_name ?? null,
         title: entry.position ?? null,
-        linkedinUrl: null,
-        foundVia: "tomba",
+        linkedinUrl: entry.linkedin ?? null,
+        foundVia: "hunter",
       });
+    }
+  }
+
+  // Neither directory lists the site: look people up one by one.
+  const people =
+    found.length > 0
+      ? []
+      : ((await attempt("dropleads", () => searchPeople(domain, kind))) ?? []);
+  for (const person of people) {
+    if (found.length >= MAX_CONTACTS) break;
+    costUsd += await contactForPerson(person, domain, keep);
   }
 
   const contacts: FoundContact[] = [];

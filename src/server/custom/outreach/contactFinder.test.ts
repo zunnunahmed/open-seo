@@ -40,8 +40,8 @@ const calledEndpoints = (fetchMock: ReturnType<typeof stubTreg>) =>
   );
 
 describe("findContactsForDomain", () => {
-  it("finds emails cheapest first, keeps only the prospect's domain and verifies them", async () => {
-    const fetchMock = stubTreg({
+  it("looks people up one by one when no directory lists the site, preferring the site's own address", async () => {
+    stubTreg({
       "dropleads.people.search": {
         data: {
           leads: [
@@ -74,9 +74,6 @@ describe("findContactsForDomain", () => {
         title: "Editor",
       }),
     ]);
-    expect(calledEndpoints(fetchMock)).not.toContain(
-      "tomba.companies.emails.list",
-    );
   });
 
   it("keeps an email on another domain when none is found on the site", async () => {
@@ -138,14 +135,21 @@ describe("findContactsForDomain", () => {
     ).rejects.toThrow("treg HTTP 402");
   });
 
-  it("falls back to the domain's listed emails and reports catch-all honestly", async () => {
-    stubTreg({
-      "dropleads.people.search": { data: { leads: [] } },
+  it("takes two emails from Tomba first, then Hunter, named people first", async () => {
+    const fetchMock = stubTreg({
       "tomba.companies.emails.list": {
         data: {
           emails: [
             { email: "hello@site.com", type: "generic" },
             { email: "sam@site.com", type: "personal", position: "Founder" },
+          ],
+        },
+      },
+      "hunter.companies.emails": {
+        data: {
+          emails: [
+            { value: "alex@site.com", type: "personal", first_name: "Alex" },
+            { value: "pat@site.com", type: "personal" },
           ],
         },
       },
@@ -164,6 +168,8 @@ describe("findContactsForDomain", () => {
         foundVia: "tomba",
         verification: "catch_all",
       }),
+      expect.objectContaining({ email: "alex@site.com", foundVia: "hunter" }),
     ]);
+    expect(calledEndpoints(fetchMock)).not.toContain("dropleads.people.search");
   });
 });
