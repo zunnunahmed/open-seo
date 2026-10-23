@@ -112,12 +112,21 @@ export function ProjectSwitcher({
             aria-label="Switch project"
             className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-l-lg px-3 py-1.5 text-left hover:bg-accent"
           >
-            <span className="flex min-w-0 flex-col">
-              <span className="break-words text-sm font-medium">
+            <span
+              className="flex min-w-0 flex-col"
+              title={
+                activeProject
+                  ? [activeProject.name, activeProject.domain]
+                      .filter(Boolean)
+                      .join("\n")
+                  : undefined
+              }
+            >
+              <span className="truncate text-sm font-medium">
                 {activeProject?.name ?? "Select project"}
               </span>
               {activeProject?.domain ? (
-                <span className="break-all text-xs text-muted-foreground">
+                <span className="truncate text-xs text-muted-foreground">
                   {activeProject.domain}
                 </span>
               ) : null}
