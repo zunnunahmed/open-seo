@@ -201,7 +201,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     try {
       const history = await getCompetitorCrawlHistory({ data: { projectId } });
       const host = domainField.safeParse(domain);
-      const matching = host.success ? history.filter((audit) => new URL(audit.startUrl).hostname.replace(/^www\\./, "").toLowerCase() === host.data) : history;
+      const matching = host.success ? history.filter((audit) => new URL(audit.startUrl).hostname.replace(/^www\./, "").toLowerCase() === host.data) : history;
       setCrawls(matching);
       setCrawlId(matching[0]?.id ?? "");
       setCrawlsChecked(true);
