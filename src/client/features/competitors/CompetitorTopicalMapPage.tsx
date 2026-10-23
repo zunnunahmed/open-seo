@@ -6,7 +6,7 @@ import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
-import { normalizeDomain } from "@/types/schemas/domain";
+import { domainField } from "@/types/schemas/domain";
 import type { PageRow } from "@/client/features/domain/types";
 
 const LIMITS = [25, 50, 100, 200, 500, 1000] as const;
@@ -67,8 +67,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   async function analyse() {
     let host: string;
     try {
-      host = normalizeDomain(domain);
-      if (!/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(host)) throw new Error("Invalid domain");
+      host = domainField.parse(domain);
     } catch {
       setError("Enter a valid competitor domain.");
       return;
@@ -100,7 +99,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
             filters: {},
           },
         });
-        collected.push(...response.pages);
+        collected.push(...response.pages.slice(0, limit - offset));
         setPages([...collected]);
         setCompleted(Math.min(limit, collected.length));
         if (!response.hasMore || response.pages.length === 0) break;
