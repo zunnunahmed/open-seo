@@ -67,11 +67,11 @@ describe("adjustCrawlWindow", () => {
     expect(adjustCrawlWindow(1, [page("error", 15_000)])).toBe(1);
   });
 
-  it("grows toward eight concurrent requests on a fast site", () => {
+  it("caps fast-site concurrency at two requests on the free-tier profile", () => {
     const recent = Array.from({ length: 25 }, () => page("ok", 400));
-    expect(adjustCrawlWindow(2, recent)).toBe(7);
-    expect(adjustCrawlWindow(1, recent)).toBe(6);
-    expect(adjustCrawlWindow(7, recent)).toBe(8);
+    expect(adjustCrawlWindow(2, recent)).toBe(2);
+    expect(adjustCrawlWindow(1, recent)).toBe(2);
+    expect(adjustCrawlWindow(7, recent)).toBe(2);
   });
 
   it("preserves the byte budget if page sizes increase", () => {
