@@ -9,6 +9,7 @@ import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
+import { KeywordAreaField } from "@/client/features/keywords/page/KeywordAreaField";
 import { ProjectMarketFields } from "@/client/features/projects/ProjectMarketFields";
 import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
 import { createClusterJob } from "@/serverFunctions/keywordClustering";
@@ -38,6 +39,7 @@ export function ClusterRunForm({
     locationCode: number;
     languageCode: string;
   } | null>(null);
+  const [locationName, setLocationName] = useState<string | undefined>();
   const [fetchVolume, setFetchVolume] = useState(true);
   const activeMarket =
     market ??
@@ -64,6 +66,7 @@ export function ClusterRunForm({
           keywords: parsed.keywords,
           fetchVolume: fetchVolume && missingVolume > 0,
           ...activeMarket,
+          locationName: locationName ?? null,
         },
       });
       if (!result.ok) throw new Error(result.error);
@@ -168,7 +171,28 @@ export function ClusterRunForm({
           </p>
         </div>
         {activeMarket ? (
-          <ProjectMarketFields value={activeMarket} onChange={setMarket} />
+          <div className="space-y-1">
+            <ProjectMarketFields
+              value={activeMarket}
+              onChange={(next) => {
+                // A city belongs to one country.
+                if (next.locationCode !== activeMarket.locationCode)
+                  setLocationName(undefined);
+                setMarket(next);
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <KeywordAreaField
+                locationCode={activeMarket.locationCode}
+                value={locationName}
+                onChange={setLocationName}
+              />
+              <span className="text-xs text-muted-foreground">
+                Optional: cluster on one city’s Google results (best for local
+                services). Leave empty for the whole country.
+              </span>
+            </div>
+          </div>
         ) : null}
         <Label className="font-normal">
           <Checkbox

@@ -124,6 +124,57 @@ export const importOutreachProspects = createServerFn({ method: "POST" })
   });
 
 /**
+ * Add sites picked on the Backlinks page (already-fetched research, no new
+ * paid request). The linking page becomes {{prospect_url}} in Instantly.
+ */
+export const addProspectsFromBacklinks = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(
+    projectInput.extend({
+      target: z.string().trim().min(1).max(253),
+      items: z
+        .array(
+          z.object({
+            domain: z.string().min(3).max(253),
+            sourceUrl: z.string().url().max(2048).nullish(),
+            authority: z.number().int().nullish(),
+          }),
+        )
+        .min(1)
+        .max(500),
+    }),
+  )
+  .handler(async ({ data, context }) => {
+    const own = ownDomain(context.project);
+    const byDomain = new Map<
+      string,
+      {
+        domain: string;
+        source: "backlinks";
+        sourceDetail: string;
+        sourceUrl: string | null;
+        authority: number | null;
+      }
+    >();
+    for (const item of data.items) {
+      const domain = bareDomain(item.domain);
+      if (!domain || domain === own || byDomain.has(domain)) continue;
+      byDomain.set(domain, {
+        domain,
+        source: "backlinks",
+        sourceDetail: data.target,
+        sourceUrl: item.sourceUrl ?? null,
+        authority: item.authority ?? null,
+      });
+    }
+    const prospects = await keepUnsuppressed(context.projectId, [
+      ...byDomain.values(),
+    ]);
+    await OutreachRepository.addProspects(context.projectId, prospects);
+    return { found: prospects.length };
+  });
+
+/**
  * Find and verify contacts for up to 3 prospects. Each prospect makes up to
  * ~11 paid-on-success treg calls, so a batch stays inside the Workers Free
  * subrequest cap; the page calls this repeatedly for larger selections.

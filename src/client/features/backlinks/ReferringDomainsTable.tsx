@@ -17,6 +17,10 @@ import {
   formatNumber,
 } from "./backlinksPageUtils";
 import type { DomainRatings } from "./useAhrefsDomainRatings";
+import {
+  AddProspectButton,
+  type AddToProspects,
+} from "@/client/features/outreach/AddProspectButton";
 
 const columnHelper = createColumnHelper<ReferringDomainRow>();
 
@@ -172,17 +176,37 @@ export function ReferringDomainsTable({
   domainRatings,
   sorting,
   onSortingChange,
+  prospects,
   ...frame
 }: DataTableFrameProps & {
   rows: ReferringDomainRow[];
   domainRatings: DomainRatings | null;
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
+  /** Adds a referring domain to Outreach → Link Prospects. */
+  prospects?: AddToProspects;
 }) {
-  const columns = useMemo(
-    () => buildReferringDomainColumns(domainRatings),
-    [domainRatings],
-  );
+  const columns = useMemo(() => {
+    const base = buildReferringDomainColumns(domainRatings);
+    if (!prospects) return base;
+    return [
+      ...base,
+      columnHelper.display({
+        id: "prospect",
+        header: () => <span className="sr-only">Link Prospects</span>,
+        cell: ({ row }) =>
+          row.original.domain ? (
+            <AddProspectButton
+              prospects={prospects}
+              candidate={{
+                domain: row.original.domain,
+                authority: row.original.rank,
+              }}
+            />
+          ) : null,
+      }),
+    ];
+  }, [domainRatings, prospects]);
 
   const table = useDataTable({
     data: rows,

@@ -64,7 +64,11 @@ function ClusterDetails({
 const columnHelper = createColumnHelper<KeywordCluster>();
 const PAGE_SIZES = [25, 50, 100] as const;
 
-function buildColumns(ownDomain: string | null, competitors: string[]) {
+function buildColumns(
+  ownDomain: string | null,
+  competitors: string[],
+  hubOf: Map<number, string>,
+) {
   return [
     columnHelper.accessor((cluster) => cluster.main.keyword, {
       id: "main",
@@ -84,7 +88,7 @@ function buildColumns(ownDomain: string | null, competitors: string[]) {
           </span>
           {row.original.features.length ? (
             <div className="text-xs font-normal text-muted-foreground">
-              {row.original.features.map(featureLabel).join(" Â· ")}
+              {row.original.features.map(featureLabel).join(" · ")}
             </div>
           ) : null}
         </div>
@@ -108,6 +112,15 @@ function buildColumns(ownDomain: string | null, competitors: string[]) {
         headerClassName: "text-right",
         cellClassName: "text-right tabular-nums",
       },
+    }),
+    columnHelper.accessor((cluster) => hubOf.get(cluster.id) ?? "", {
+      id: "hub",
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Topic hub" />
+      ),
+      cell: ({ getValue }) => (
+        <span className="text-xs">{getValue() || "—"}</span>
+      ),
     }),
     columnHelper.accessor("pageType", {
       header: ({ column }) => (
@@ -164,17 +177,23 @@ export function ClusterTable({
   clusters,
   ownDomain,
   competitors,
+  hubOf,
 }: {
   clusters: KeywordCluster[];
   ownDomain: string | null;
   competitors: string[];
+  hubOf: Map<number, string>;
 }) {
   // competitors is a fresh array each render; key the columns on its content.
   const competitorKey = competitors.join(",");
   const columns = useMemo(
     () =>
-      buildColumns(ownDomain, competitorKey ? competitorKey.split(",") : []),
-    [ownDomain, competitorKey],
+      buildColumns(
+        ownDomain,
+        competitorKey ? competitorKey.split(",") : [],
+        hubOf,
+      ),
+    [ownDomain, competitorKey, hubOf],
   );
   const [sorting, setSorting] = useState<SortingState>([]);
   const [page, setPage] = useState(0);
@@ -208,7 +227,7 @@ export function ClusterTable({
       toolbar={
         <DataTableToolbar>
           <span className="text-sm tabular-nums text-muted-foreground">
-            {clusters.length.toLocaleString()} clusters Â· click a row for its
+            {clusters.length.toLocaleString()} clusters · click a row for its
             keywords and URLs
           </span>
         </DataTableToolbar>

@@ -106,7 +106,8 @@ const makeResources = (stage: string) => {
                 id: "dataforseo-cache-expiry",
                 prefix: "dataforseo-cache/",
                 deleteObjectsTransition: {
-                  condition: { type: "Age", maxAge: 7 * 24 * 60 * 60 },
+                  // 30 days: Backlinks research is kept 28 days (r2-cache TTL).
+                  condition: { type: "Age", maxAge: 30 * 24 * 60 * 60 },
                 },
               },
             ],

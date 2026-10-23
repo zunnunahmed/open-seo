@@ -61,8 +61,10 @@ export type ReferringDomainsPageServiceInput = Omit<
 >;
 export type TopPagesPageServiceInput = Omit<TopPagesPageInput, "projectId">;
 
-const BACKLINKS_OVERVIEW_TTL_SECONDS = 6 * 60 * 60;
-const BACKLINKS_TAB_TTL_SECONDS = 6 * 60 * 60;
+// Backlinks research is kept 28 days so earlier lookups stay usable (for
+// example to pick outreach prospects); "Refresh" fetches new data on demand.
+const BACKLINKS_OVERVIEW_TTL_SECONDS = 28 * 24 * 60 * 60;
+const BACKLINKS_TAB_TTL_SECONDS = 28 * 24 * 60 * 60;
 
 const backlinksOverviewCacheSchema = z.object({
   overview: backlinksOverviewSchema,

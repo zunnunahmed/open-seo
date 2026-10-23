@@ -1,4 +1,5 @@
 import { sort } from "remeda";
+import { isPlatformDomain } from "./serpPlatforms";
 
 /**
  * SERP-based keyword clustering: keywords whose top-10 Google results share
@@ -181,7 +182,37 @@ type ClusterOptions = {
   primaryBy: ClusterPrimaryBy;
   /** Project domain, to find your ranking pages and cannibalization. */
   ownDomain?: string | null;
+  /** Leave directories, social and marketplace URLs out of the matching. */
+  ignorePlatforms?: boolean;
+  /** A shared #1-3 result counts more than a shared #7-10. */
+  weightTop?: boolean;
 };
+
+/** Settings a user picks for a run; saved with it. */
+export type ClusterSettings = {
+  threshold: number;
+  mode: ClusterMode;
+  primaryBy: ClusterPrimaryBy;
+  competitors: string;
+  ignorePlatforms: boolean;
+  weightTop: boolean;
+};
+
+export const DEFAULT_CLUSTER_SETTINGS: ClusterSettings = {
+  threshold: 4,
+  mode: "balanced",
+  primaryBy: "volume",
+  competitors: "",
+  ignorePlatforms: true,
+  weightTop: true,
+};
+
+/** Weight of a shared result by its 0-based position in the top 10. */
+function positionWeight(position: number): number {
+  if (position < 3) return 1.5;
+  if (position < 6) return 1;
+  return 0.75;
+}
 
 // A URL in hundreds of SERPs (a giant directory page) links unrelated
 // keywords and makes pair counting quadratic, so it is ignored.
@@ -195,24 +226,36 @@ function requiredShare(mode: ClusterMode, size: number): number {
   return 0.6;
 }
 
-function overlapGraph(items: ClusterableKeyword[]): Array<Map<number, number>> {
-  const byUrl = new Map<string, number[]>();
+/**
+ * Pairwise overlap score between keywords: the shared top-10 URLs, each
+ * counting 1, or by position when `weightTop` is on. SERP URLs are stored in
+ * rank order, so a URL's index is its position.
+ */
+function overlapGraph(
+  items: ClusterableKeyword[],
+  options: Pick<ClusterOptions, "ignorePlatforms" | "weightTop">,
+): Array<Map<number, number>> {
+  const byUrl = new Map<string, Array<[number, number]>>();
   items.forEach((item, index) => {
-    for (const url of item.urls) {
+    item.urls.forEach((url, position) => {
+      if (options.ignorePlatforms && isPlatformDomain(urlDomain(url))) return;
       const list = byUrl.get(url);
-      if (list) list.push(index);
-      else byUrl.set(url, [index]);
-    }
+      if (list) list.push([index, position]);
+      else byUrl.set(url, [[index, position]]);
+    });
   });
   const graph = items.map(() => new Map<number, number>());
   for (const list of byUrl.values()) {
     if (list.length < 2 || list.length > MAX_SERPS_PER_URL) continue;
     for (let a = 0; a < list.length; a++) {
       for (let b = a + 1; b < list.length; b++) {
-        const x = list[a];
-        const y = list[b];
-        graph[x].set(y, (graph[x].get(y) ?? 0) + 1);
-        graph[y].set(x, (graph[y].get(x) ?? 0) + 1);
+        const [x, px] = list[a];
+        const [y, py] = list[b];
+        const score = options.weightTop
+          ? (positionWeight(px) + positionWeight(py)) / 2
+          : 1;
+        graph[x].set(y, (graph[x].get(y) ?? 0) + score);
+        graph[y].set(x, (graph[y].get(x) ?? 0) + score);
       }
     }
   }
@@ -306,7 +349,7 @@ export function clusterKeywords(
       metric(b.item, options.primaryBy) - metric(a.item, options.primaryBy) ||
       a.index - b.index,
   ).map(({ item }) => item);
-  const graph = overlapGraph(order);
+  const graph = overlapGraph(order, options);
   const t = Math.max(1, options.threshold);
   const clusterOf = Array.from({ length: order.length }, () => -1);
   const groups: number[][] = [];

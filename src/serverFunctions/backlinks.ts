@@ -59,3 +59,15 @@ export const getBacklinksTopPages = createServerFn({
   .handler(({ data, context }) =>
     BacklinksService.profileTopPagesPage(data, context),
   );
+
+/** Retire this target's saved research so the next lookups fetch fresh data. */
+export const refreshBacklinksTarget = createServerFn({ method: "POST" })
+  .middleware(requireBacklinksSeoRoute)
+  .validator(backlinksOverviewInputSchema)
+  .handler(async ({ data, context }) => {
+    await BacklinksService.markRefreshed(
+      { target: data.target, scope: data.scope },
+      context,
+    );
+    return { ok: true as const };
+  });

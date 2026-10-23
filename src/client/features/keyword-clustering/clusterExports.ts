@@ -20,9 +20,11 @@ export function exportKeywordsCsv(
   name: string,
   clusters: KeywordCluster[],
   failed: Array<{ keyword: string; error: string }>,
+  hubOf: Map<number, string>,
 ) {
   const rows: CsvValue[][] = clusters.flatMap((cluster) =>
     cluster.keywords.map((k) => [
+      hubOf.get(cluster.id) ?? "",
       cluster.keywords.length > 1 ? cluster.main.keyword : "(unclustered)",
       k.keyword,
       k.keyword === cluster.main.keyword ? "yes" : "",
@@ -37,6 +39,7 @@ export function exportKeywordsCsv(
   );
   for (const f of failed)
     rows.push([
+      "",
       "(no SERP data)",
       f.keyword,
       "",
@@ -51,6 +54,7 @@ export function exportKeywordsCsv(
   downloadFile(
     buildCsv(
       [
+        "Topic hub",
         "Cluster",
         "Keyword",
         "Main keyword",
@@ -70,10 +74,15 @@ export function exportKeywordsCsv(
 }
 
 /** One row per cluster of two or more keywords. */
-export function exportClustersCsv(name: string, clusters: KeywordCluster[]) {
+export function exportClustersCsv(
+  name: string,
+  clusters: KeywordCluster[],
+  hubOf: Map<number, string>,
+) {
   downloadFile(
     buildCsv(
       [
+        "Topic hub",
         "Main keyword",
         "Keywords",
         "Cluster volume",
@@ -85,6 +94,7 @@ export function exportClustersCsv(name: string, clusters: KeywordCluster[]) {
         "Member keywords",
       ],
       clusters.map((c) => [
+        hubOf.get(c.id) ?? "",
         c.main.keyword,
         c.keywords.length,
         c.totalVolume,

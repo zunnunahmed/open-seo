@@ -34,6 +34,15 @@ const chunkSchema = z.object({
 });
 type ClusterChunk = z.infer<typeof chunkSchema>;
 
+export const clusterSettingsSchema = z.object({
+  threshold: z.number().int().min(1).max(10),
+  mode: z.enum(["soft", "strict", "balanced"]),
+  primaryBy: z.enum(["volume", "cpc"]),
+  competitors: z.string().max(1000),
+  ignorePlatforms: z.boolean(),
+  weightTop: z.boolean(),
+});
+
 export const metaSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -56,7 +65,28 @@ export const metaSchema = z.object({
   route: z
     .enum(["direct_dataforseo", "treg_serpstat", "treg_dataforseo"])
     .default("direct_dataforseo"),
+  // City, county or region for local SERPs; null searches the whole country.
+  locationName: z.string().nullable().default(null),
+  // The user's clustering settings, saved so a reopened run looks the same.
+  settings: clusterSettingsSchema.nullable().default(null),
 });
+
+/** Save a run's clustering settings (meta and the run list). */
+export async function saveJobSettings(
+  bucket: Bucket,
+  projectId: string,
+  id: string,
+  settings: z.infer<typeof clusterSettingsSchema>,
+) {
+  const record = await readJson(bucket, metaKey(projectId, id), metaSchema);
+  if (!record) return null;
+  const meta = { ...record.value, settings };
+  await writeJson(bucket, metaKey(projectId, id), meta);
+  await updateIndex(bucket, projectId, (jobs) =>
+    jobs.map((job) => (job.id === id ? meta : job)),
+  );
+  return meta;
+}
 type ClusterJobMeta = z.infer<typeof metaSchema>;
 const indexSchema = z.array(metaSchema);
 
@@ -192,6 +222,7 @@ export async function createJob(
     fetchVolume: boolean;
     locationCode: number;
     languageCode: string;
+    locationName?: string | null;
     route: SeoProviderRoute;
   },
 ): Promise<ClusterJobMeta> {
@@ -232,6 +263,8 @@ export async function createJob(
     ),
     lockUntil: 0,
     route: input.route,
+    locationName: input.locationName ?? null,
+    settings: null,
   };
   await writeJson(bucket, metaKey(projectId, id), meta);
   let removed: ClusterJobMeta[] = [];

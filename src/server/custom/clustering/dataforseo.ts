@@ -26,6 +26,8 @@ export async function postClusterSerpTasks(input: {
   tasks: ClusterSerpTaskInput[];
   locationCode: number;
   languageCode: string;
+  /** City, county or region; replaces the country for local results. */
+  locationName?: string | null;
 }): Promise<DataforseoApiResponse<PostedClusterSerpTask[]>> {
   if (input.tasks.length === 0 || input.tasks.length > MAX_TASKS_PER_POST) {
     throw new AppError(
@@ -39,7 +41,9 @@ export async function postClusterSerpTasks(input: {
     "/v3/serp/google/organic/task_post",
     input.tasks.map((task) => ({
       keyword: task.keyword,
-      location_code: input.locationCode,
+      ...(input.locationName
+        ? { location_name: input.locationName }
+        : { location_code: input.locationCode }),
       language_code: input.languageCode,
       device: "desktop",
       os: "windows",

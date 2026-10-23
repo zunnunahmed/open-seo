@@ -12,11 +12,13 @@ import {
   runWithSeoProviderRoute,
 } from "@/server/custom/providers/treg/dataforseoTransport";
 import {
+  clusterSettingsSchema,
   createJob,
   deleteJob,
   getChunk,
   getJob,
   listJobs,
+  saveJobSettings,
 } from "@/server/custom/clustering/jobStore";
 import {
   cleanKeywordList,
@@ -50,6 +52,8 @@ export const createClusterJob = createServerFn({ method: "POST" })
       fetchVolume: z.boolean(),
       locationCode: z.number().int().positive(),
       languageCode: z.string().min(2).max(10),
+      // A canonical DataForSEO location name for city-level SERPs.
+      locationName: z.string().trim().min(2).max(200).nullish(),
     }),
   )
   .handler(async ({ data, context }) => {
@@ -61,6 +65,13 @@ export const createClusterJob = createServerFn({ method: "POST" })
         ok: false as const,
         error: `Up to ${MAX_CLUSTER_KEYWORDS.toLocaleString()} keywords per run (got ${keywords.length.toLocaleString()} after removing duplicates).`,
       };
+    const route = activeSeoProviderRoute();
+    if (data.locationName && route === "treg_serpstat")
+      return {
+        ok: false as const,
+        error:
+          "Serpstat has country-level results only. Clear the city, or switch this project to a DataForSEO route.",
+      };
     const job = await createJob(env.R2, context.projectId, {
       name:
         data.name ||
@@ -69,7 +80,8 @@ export const createClusterJob = createServerFn({ method: "POST" })
       fetchVolume: data.fetchVolume,
       locationCode: data.locationCode,
       languageCode: data.languageCode,
-      route: activeSeoProviderRoute(),
+      locationName: data.locationName ?? null,
+      route,
     });
     return { ok: true as const, job };
   });
@@ -127,5 +139,14 @@ export const deleteClusterJob = createServerFn({ method: "POST" })
   .validator(jobRequest)
   .handler(async ({ data, context }) => {
     await deleteJob(env.R2, context.projectId, data.jobId);
+    return { ok: true as const };
+  });
+
+/** Save the threshold, mode and other settings a user picked for a run. */
+export const saveClusterJobSettings = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(jobRequest.extend({ settings: clusterSettingsSchema }))
+  .handler(async ({ data, context }) => {
+    await saveJobSettings(env.R2, context.projectId, data.jobId, data.settings);
     return { ok: true as const };
   });

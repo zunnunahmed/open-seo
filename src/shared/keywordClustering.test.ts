@@ -9,6 +9,7 @@ import {
   parseKeywordLines,
   type ClusterableKeyword,
 } from "./keywordClustering";
+import { groupTopicHubs } from "./keywordClusterHubs";
 
 function kw(
   keyword: string,
@@ -156,5 +157,64 @@ describe("clusterKeywords", () => {
       { threshold: 3, mode: "soft", primaryBy: "cpc" },
     );
     expect(cluster.main.keyword).toBe("pricey");
+  });
+});
+
+const groups = (clusters: ReturnType<typeof clusterKeywords>) =>
+  clusters.map((c) => c.keywords.map((k) => k.keyword));
+
+describe("clustering options", () => {
+  const options = {
+    threshold: 3,
+    mode: "balanced",
+    primaryBy: "volume",
+  } as const;
+
+  it("ignores directory and social URLs when asked", () => {
+    const shared = ["clutch.co/au", "www.yelp.com/x", "facebook.com/y"];
+    const items = [
+      kw("seo sydney", 20, [...shared, ...u(1)]),
+      kw("plumber sydney", 10, [...shared, ...u(2)]),
+    ];
+    expect(groups(clusterKeywords(items, options))).toContainEqual([
+      "seo sydney",
+      "plumber sydney",
+    ]);
+    expect(
+      groups(clusterKeywords(items, { ...options, ignorePlatforms: true })),
+    ).toEqual([["seo sydney"], ["plumber sydney"]]);
+  });
+
+  it("counts shared top-3 results more when weighting is on", () => {
+    // Two shared URLs, both at the top: 2 unweighted, 3 weighted.
+    const items = [
+      kw("a", 20, [...u(1, 2), ...u(3, 4)]),
+      kw("b", 10, [...u(1, 2), ...u(5, 6)]),
+    ];
+    expect(groups(clusterKeywords(items, options))).toHaveLength(2);
+    expect(
+      groups(clusterKeywords(items, { ...options, weightTop: true })),
+    ).toEqual([["a", "b"]]);
+  });
+});
+
+describe("groupTopicHubs", () => {
+  it("joins clusters whose core pages overlap and leaves others out", () => {
+    const clusters = clusterKeywords(
+      [
+        kw("a1", 100, u(1, 2, 3, 4, 5, 6)),
+        kw("a2", 90, u(1, 2, 3, 4, 5, 6)),
+        kw("b1", 50, u(1, 2, 3, 7, 8, 9)),
+        kw("b2", 40, u(1, 2, 3, 7, 8, 9)),
+        kw("c1", 30, u(20, 21, 22, 23)),
+        kw("c2", 20, u(20, 21, 22, 23)),
+      ],
+      { threshold: 4, mode: "strict", primaryBy: "volume" },
+    );
+    const hubs = groupTopicHubs(clusters, { ignorePlatforms: false });
+    expect(hubs).toHaveLength(1);
+    expect(hubs[0].name).toBe("a1");
+    expect(hubs[0].clusterIds).toHaveLength(2);
+    expect(hubs[0].totalVolume).toBe(280);
   });
 });

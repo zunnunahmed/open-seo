@@ -1,0 +1,65 @@
+/**
+ * Directories, social networks, marketplaces and reference sites rank for
+ * many unrelated searches (a Clutch list for every city, a Facebook page for
+ * every brand), so a shared one says little about intent.
+ */
+const PLATFORM_DOMAINS = [
+  "facebook.com",
+  "instagram.com",
+  "linkedin.com",
+  "twitter.com",
+  "x.com",
+  "youtube.com",
+  "tiktok.com",
+  "pinterest.com",
+  "reddit.com",
+  "quora.com",
+  "wikipedia.org",
+  "medium.com",
+  "google.com",
+  "maps.google.com",
+  "clutch.co",
+  "designrush.com",
+  "sortlist.com",
+  "goodfirms.co",
+  "themanifest.com",
+  "upwork.com",
+  "fiverr.com",
+  "freelancer.com",
+  "freelancer.com.au",
+  "airtasker.com",
+  "bark.com",
+  "yelp.com",
+  "yelp.com.au",
+  "trustpilot.com",
+  "productreview.com.au",
+  "yellowpages.com.au",
+  "truelocal.com.au",
+  "localsearch.com.au",
+  "hotfrog.com.au",
+  "startlocal.com.au",
+  "oneflare.com.au",
+  "hipages.com.au",
+  "word-of-mouth.com.au",
+  "seek.com.au",
+  "indeed.com",
+  "au.indeed.com",
+  "glassdoor.com",
+  "amazon.com",
+  "amazon.com.au",
+  "ebay.com.au",
+  "gumtree.com.au",
+  "canva.com",
+  "wix.com",
+  "squarespace.com",
+  "godaddy.com",
+  "shopify.com",
+  "wordpress.com",
+  "wordpress.org",
+];
+
+export function isPlatformDomain(domain: string): boolean {
+  return PLATFORM_DOMAINS.some(
+    (platform) => domain === platform || domain.endsWith(`.${platform}`),
+  );
+}

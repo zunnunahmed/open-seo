@@ -96,9 +96,7 @@ export function OutreachSendCard({
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={includeCatchAll}
-              onCheckedChange={(checked) =>
-                setIncludeCatchAll(checked)
-              }
+              onCheckedChange={(checked) => setIncludeCatchAll(checked)}
             />
             Include catch-all emails (higher bounce risk)
           </label>

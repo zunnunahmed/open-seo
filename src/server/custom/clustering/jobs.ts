@@ -105,6 +105,7 @@ async function stepPost(
       })),
       locationCode: meta.locationCode,
       languageCode: meta.languageCode,
+      locationName: meta.locationName,
     });
     for (const task of posted) {
       const keyword = chunk.keywords[Number(task.tag)]?.keyword;
@@ -161,6 +162,7 @@ async function stepLive(
             keyword,
             locationCode: meta.locationCode,
             languageCode: meta.languageCode,
+            locationName: meta.locationName ?? undefined,
             depth: CLUSTER_SERP_DEPTH,
             creditFeature: "keyword_research",
           });

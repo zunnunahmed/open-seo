@@ -8,6 +8,7 @@ import {
 } from "./BacklinksOverviewPanels";
 import { BacklinksResultsCard } from "./BacklinksPageSections";
 import { BacklinksLoadingState } from "./BacklinksPageStates";
+import { BacklinksRefreshButton } from "./BacklinksRefreshButton";
 import type { BacklinksSearchHistoryItem } from "@/client/hooks/useBacklinksSearchHistory";
 import type {
   BacklinksSearchState,
@@ -160,6 +161,13 @@ export function BacklinksBody({
         <BacklinksOverviewPanels
           data={overviewData}
           summaryStats={summaryStats}
+          refreshAction={
+            <BacklinksRefreshButton
+              projectId={projectId}
+              target={searchState.target}
+              scope={searchState.scope}
+            />
+          }
         />
         <div className="px-4 pb-4">
           <BacklinksResultsCard

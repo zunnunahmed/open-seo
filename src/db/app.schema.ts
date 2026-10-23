@@ -512,7 +512,7 @@ export const outreachProspects = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     domain: text("domain").notNull(),
     source: text("source", {
-      enum: ["link_gap", "guest_post", "pr", "import"],
+      enum: ["link_gap", "guest_post", "pr", "import", "backlinks"],
     }).notNull(),
     // Competitor domain (link gap), search query (guest post), topic (PR).
     sourceDetail: text("source_detail"),

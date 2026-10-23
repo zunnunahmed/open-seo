@@ -12,6 +12,10 @@ import {
 import type { BacklinksRow } from "./backlinksPageTypes";
 import type { BacklinksDomainExpansion } from "./useBacklinksDomainExpansion";
 import type { DomainRatings } from "./useAhrefsDomainRatings";
+import {
+  AddProspectButton,
+  type AddToProspects,
+} from "@/client/features/outreach/AddProspectButton";
 
 /** Interleaves expanded domains' extra links beneath their page row. */
 function buildDisplayRows(
@@ -87,6 +91,7 @@ export function BacklinksTable({
   sorting,
   onSortingChange,
   expansion,
+  prospects,
   ...frame
 }: DataTableFrameProps & {
   rows: BacklinksRow[];
@@ -95,18 +100,42 @@ export function BacklinksTable({
   onSortingChange: OnChangeFn<SortingState>;
   /** Present in the one-per-domain view; null when listing all links. */
   expansion: BacklinksDomainExpansion | null;
+  /** Adds a row's linking site to Outreach → Link Prospects. */
+  prospects?: AddToProspects;
 }) {
-  const columns = useMemo(
-    () =>
-      buildBacklinksColumns(domainRatings, expansion?.toggleDomain).map(
-        (column) => ({
-          ...column,
-          // Tints a domain's expanded links and its status row.
-          meta: { ...column.meta, cellClassName: tintExpandedRow },
-        }),
-      ),
-    [domainRatings, expansion?.toggleDomain],
-  );
+  const columns = useMemo(() => {
+    const base = buildBacklinksColumns(domainRatings, expansion?.toggleDomain);
+    const withProspects: typeof base = prospects
+      ? [
+          ...base,
+          {
+            id: "prospect",
+            header: () => <span className="sr-only">Link Prospects</span>,
+            enableSorting: false,
+            cell: ({ row }) => {
+              const displayRow = row.original;
+              if (displayRow.kind !== "link" || !displayRow.row.domainFrom)
+                return null;
+              return (
+                <AddProspectButton
+                  prospects={prospects}
+                  candidate={{
+                    domain: displayRow.row.domainFrom,
+                    sourceUrl: displayRow.row.urlFrom,
+                    authority: displayRow.row.domainFromRank,
+                  }}
+                />
+              );
+            },
+          },
+        ]
+      : base;
+    return withProspects.map((column) => ({
+      ...column,
+      // Tints a domain's expanded links and its status row.
+      meta: { ...column.meta, cellClassName: tintExpandedRow },
+    }));
+  }, [domainRatings, expansion?.toggleDomain, prospects]);
   const displayRows = useMemo(
     () => buildDisplayRows(rows, expansion),
     [rows, expansion],

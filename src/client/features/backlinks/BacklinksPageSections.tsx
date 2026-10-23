@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
-import { List, Rows3 } from "lucide-react";
+import { List, Rows3, Send } from "lucide-react";
+import { Button } from "@/client/components/ui/button";
+import { useAddToProspects } from "@/client/features/outreach/useAddToProspects";
 import type { OnChangeFn, SortingState } from "@tanstack/react-table";
 import { BacklinksFilterPanel } from "./BacklinksFilterPanel";
 import { backlinksFilterConditionLimit } from "./backlinksFilterTypes";
@@ -103,6 +105,7 @@ export function BacklinksResultsCard({
     isLoading: isLoadingRatings,
     loadRatings,
   } = useAhrefsDomainRatings(projectId);
+  const prospects = useAddToProspects(projectId, exportTarget);
   const activeFilterCount = filters[activeTab].activeFilterCount;
   const exportTable = useMemo(
     () =>
@@ -183,6 +186,38 @@ export function BacklinksResultsCard({
                 }
               />
               {activeTab !== "pages" ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!showTable}
+                  title="Add every site on this page to Outreach → Link Prospects (no new data request)"
+                  onClick={() =>
+                    void prospects.add(
+                      activeTab === "backlinks"
+                        ? tabRows.backlinks.flatMap((row) =>
+                            row.domainFrom
+                              ? [
+                                  {
+                                    domain: row.domainFrom,
+                                    sourceUrl: row.urlFrom,
+                                    authority: row.domainFromRank,
+                                  },
+                                ]
+                              : [],
+                          )
+                        : tabRows.referringDomains.flatMap((row) =>
+                            row.domain
+                              ? [{ domain: row.domain, authority: row.rank }]
+                              : [],
+                          ),
+                    )
+                  }
+                >
+                  <Send className="size-4" />
+                  Add page to Link Prospects
+                </Button>
+              ) : null}
+              {activeTab !== "pages" ? (
                 <BacklinksActionsMenu
                   isLoadingRatings={isLoadingRatings}
                   loadRatings={loadRatings}
@@ -261,6 +296,7 @@ export function BacklinksResultsCard({
           sorting={sorting}
           onSortingChange={onSortingChange}
           expansion={view === "all" ? null : domainExpansion}
+          prospects={prospects}
           {...frame}
         />
       ) : null}
@@ -270,6 +306,7 @@ export function BacklinksResultsCard({
           domainRatings={domainRatings}
           sorting={sorting}
           onSortingChange={onSortingChange}
+          prospects={prospects}
           {...frame}
         />
       ) : null}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { MetricsTable } from "@/client/components/MetricsTable";
 import { Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/client/components/ui/alert";
@@ -39,9 +40,11 @@ export function BacklinksScopeAlert({
 export function BacklinksOverviewPanels({
   data,
   summaryStats,
+  refreshAction,
 }: {
   data: BacklinksOverviewData;
   summaryStats: SummaryStat[];
+  refreshAction?: ReactNode;
 }) {
   return (
     <>
@@ -52,9 +55,12 @@ export function BacklinksOverviewPanels({
           </h2>
           <Badge variant="outline">{RESEARCH_SCOPE_LABELS[data.scope]}</Badge>
         </div>
-        <p className="ml-auto text-xs text-muted-foreground">
-          Updated {formatRelativeTimestamp(data.fetchedAt)}
-        </p>
+        <div className="ml-auto flex items-center gap-1">
+          <p className="text-xs text-muted-foreground">
+            Updated {formatRelativeTimestamp(data.fetchedAt)} · kept 28 days
+          </p>
+          {refreshAction}
+        </div>
       </div>
       <div className="px-4 pb-4">
         <OverviewGrid data={data} summaryStats={summaryStats} />

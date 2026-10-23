@@ -166,7 +166,8 @@ export function ClusterRunView({
       >
         <div className="space-y-3 text-sm">
           <p>
-            {job.total.toLocaleString()} keywords. Estimated{" "}
+            {job.total.toLocaleString()} keywords
+            {job.locationName ? ` in ${job.locationName}` : ""}. Estimated{" "}
             {job.route === "direct_dataforseo" ? "DataForSEO" : "treg"} cost:{" "}
             <strong>{usd(total)}</strong> (top-10 Google results{" "}
             {usd(job.estimatedUsd.serps)}
@@ -245,6 +246,9 @@ export function ClusterRunView({
     <div className="space-y-3">
       <DataSourceLabel projectId={projectId} route={job.route} />
       <ClusterResults
+        projectId={projectId}
+        jobId={jobId}
+        savedSettings={job.settings}
         name={job.name}
         items={results.data.items}
         failed={results.data.failed}

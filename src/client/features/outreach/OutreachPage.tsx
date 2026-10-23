@@ -26,6 +26,13 @@ import {
 } from "@/serverFunctions/outreach";
 import { OutreachFinders } from "./OutreachFinders";
 import { OutreachSendCard } from "./OutreachSendCard";
+import { ContactList } from "./OutreachContactList";
+import {
+  applyOutreachFilters,
+  EMPTY_FILTERS,
+  OutreachFilters,
+  tldOptions,
+} from "./OutreachFilters";
 
 type Outreach = Awaited<ReturnType<typeof getOutreach>>;
 type Contact = Outreach["contacts"][number];
@@ -36,15 +43,8 @@ const SOURCE_LABEL: Record<Prospect["source"], string> = {
   guest_post: "Guest post",
   pr: "PR",
   import: "Import",
+  backlinks: "Backlinks",
 };
-
-const VERIFICATION_VARIANT = {
-  valid: "success",
-  catch_all: "warning",
-  unknown: "secondary",
-  invalid: "destructive",
-  unverified: "secondary",
-} as const;
 
 const PAGE_SIZES = [25, 50, 100] as const;
 // Each prospect costs up to ~11 treg calls; 3 per request fits Workers Free.
@@ -136,35 +136,6 @@ function buildColumns(anchor: ReturnType<typeof useSelectionAnchor>) {
   ];
 }
 
-function ContactList({ contacts }: { contacts: Contact[] }) {
-  if (contacts.length === 0)
-    return (
-      <p className="text-sm text-muted-foreground">
-        No contacts yet. Select this prospect and click Find emails.
-      </p>
-    );
-  return (
-    <ul className="space-y-1 text-sm">
-      {contacts.map((contact) => (
-        <li key={contact.id} className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{contact.email}</span>
-          <Badge variant={VERIFICATION_VARIANT[contact.verification]} size="sm">
-            {contact.verification.replace("_", "-")}
-          </Badge>
-          <span className="text-muted-foreground">
-            {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-            {contact.title ? ` · ${contact.title}` : ""} · via{" "}
-            {contact.foundVia}
-            {contact.sentAt
-              ? ` · sent ${new Date(contact.sentAt).toLocaleDateString()}`
-              : ""}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /**
  * Outreach → Link Prospects: find link-gap, guest-post and PR prospects,
  * find and verify their emails through treg (cheapest first, paid only on a
@@ -188,6 +159,11 @@ export function OutreachPage({ projectId }: { projectId: string }) {
     }));
   }, [query.data]);
 
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const visible = useMemo(
+    () => applyOutreachFilters(prospects, filters),
+    [prospects, filters],
+  );
   const anchor = useSelectionAnchor();
   const columns = useMemo(() => buildColumns(anchor), [anchor]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -201,7 +177,7 @@ export function OutreachPage({ projectId }: { projectId: string }) {
   const stopFinding = useRef(false);
 
   const table = useDataTable({
-    data: prospects,
+    data: visible,
     columns,
     withSorting: true,
     withExpanded: true,
@@ -216,7 +192,7 @@ export function OutreachPage({ projectId }: { projectId: string }) {
     },
   });
 
-  const selected = prospects.filter((prospect) => rowSelection[prospect.id]);
+  const selected = visible.filter((prospect) => rowSelection[prospect.id]);
   const unsentContactIds = selected.flatMap((prospect) =>
     prospect.contacts
       .filter((contact) => !contact.sentAt)
@@ -305,70 +281,83 @@ export function OutreachPage({ projectId }: { projectId: string }) {
             <ContactList contacts={row.original.contacts} />
           )}
           toolbar={
-            <DataTableToolbar
-              actions={
-                selected.length > 0 ? (
-                  <>
-                    <Button
-                      size="sm"
-                      disabled={finding !== null || unchecked === 0}
-                      title="Cheapest first: about US$0.005 per email found, misses free"
-                      onClick={() => void findEmails()}
-                    >
-                      {finding
-                        ? `Finding emails… ${finding.done}/${finding.total}`
-                        : `Find emails (${unchecked}, paid)`}
-                    </Button>
-                    {finding ? (
+            <>
+              <DataTableToolbar
+                actions={
+                  selected.length > 0 ? (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={finding !== null || unchecked === 0}
+                        title="Cheapest first: about US$0.005 per email found, misses free"
+                        onClick={() => void findEmails()}
+                      >
+                        {finding
+                          ? `Finding emails… ${finding.done}/${finding.total}`
+                          : `Find emails (${unchecked}, paid)`}
+                      </Button>
+                      {finding ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            stopFinding.current = true;
+                          }}
+                        >
+                          Stop
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void setStatus("replied")}
+                      >
+                        Replied
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void setStatus("won")}
+                      >
+                        Link won
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void setStatus("skipped")}
+                      >
+                        Skip
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          stopFinding.current = true;
-                        }}
+                        onClick={() => void doNotContact()}
                       >
-                        Stop
+                        Do not contact
                       </Button>
-                    ) : null}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void setStatus("replied")}
-                    >
-                      Replied
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void setStatus("won")}
-                    >
-                      Link won
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void setStatus("skipped")}
-                    >
-                      Skip
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void doNotContact()}
-                    >
-                      Do not contact
-                    </Button>
-                  </>
-                ) : null
-              }
-            >
-              <span className="font-semibold">2. Prospects</span>
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {prospects.length.toLocaleString()} prospects
-                {selected.length ? ` · ${selected.length} selected` : ""} ·
-                click a row for its contacts
-              </span>
-            </DataTableToolbar>
+                    </>
+                  ) : null
+                }
+              >
+                <span className="font-semibold">2. Prospects</span>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {visible.length === prospects.length
+                    ? `${prospects.length.toLocaleString()} prospects`
+                    : `${visible.length.toLocaleString()} of ${prospects.length.toLocaleString()} prospects`}
+                  {selected.length ? ` · ${selected.length} selected` : ""} ·
+                  click a row for its contacts
+                </span>
+              </DataTableToolbar>
+              <OutreachFilters
+                value={filters}
+                onChange={(next) => {
+                  setFilters(next);
+                  setPage(0);
+                  setRowSelection({});
+                }}
+                tlds={tldOptions(prospects)}
+              />
+            </>
           }
           footer={
             prospects.length > 0 ? (
@@ -376,7 +365,7 @@ export function OutreachPage({ projectId }: { projectId: string }) {
                 page={page + 1}
                 pageSize={pageSize}
                 pageSizes={PAGE_SIZES}
-                totalCount={prospects.length}
+                totalCount={visible.length}
                 onPageChange={(next) => setPage(next - 1)}
                 onPageSizeChange={(size) => {
                   setPageSize(size);
