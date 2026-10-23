@@ -176,4 +176,34 @@ describe("findContactsForDomain", () => {
     ]);
     expect(calledEndpoints(fetchMock)).not.toContain("dropleads.people.search");
   });
+
+  it("still looks for a named person when the lists only have addresses like hello@", async () => {
+    stubTreg({
+      "hunter.companies.emails": {
+        data: { emails: [{ value: "hello@site.com", type: "generic" }] },
+      },
+      "dropleads.people.search": {
+        data: {
+          leads: [
+            {
+              firstName: "Dan",
+              lastName: "Martin",
+              title: "Owner",
+              linkedinUrl: "https://www.linkedin.com/in/dan",
+            },
+          ],
+        },
+      },
+      "blitzapi.people.email.find": { found: true, email: "dan@site.com" },
+    });
+    const { contacts } = await findContactsForDomain(
+      "site.com",
+      "link",
+      new Set(),
+    );
+    expect(contacts.map((c) => [c.email, c.firstName])).toEqual([
+      ["hello@site.com", null],
+      ["dan@site.com", "Dan"],
+    ]);
+  });
 });

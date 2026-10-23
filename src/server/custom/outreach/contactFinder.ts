@@ -366,11 +366,13 @@ export async function findContactsForDomain(
     }
   }
 
-  // Neither directory lists the site: look people up one by one.
-  const people =
-    found.length > 0
-      ? []
-      : ((await attempt("dropleads", () => searchPeople(domain, kind))) ?? []);
+  // No named person yet (none listed, or only addresses like hello@): look
+  // people up one by one, keeping one general address as a fallback.
+  const named = found.some((contact) => contact.firstName);
+  if (!named) found.splice(1);
+  const people = named
+    ? []
+    : ((await attempt("dropleads", () => searchPeople(domain, kind))) ?? []);
   for (const person of people) {
     if (found.length >= MAX_CONTACTS) break;
     costUsd += await contactForPerson(person, domain, keep);

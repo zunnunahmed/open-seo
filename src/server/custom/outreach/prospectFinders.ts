@@ -33,6 +33,64 @@ const PLATFORMS = [
   "tumblr.com",
 ];
 
+/**
+ * Sites that don't answer link outreach: government and military, and giant
+ * publishers and platforms whose editors never place links on request.
+ */
+const UNPITCHABLE_DOMAINS = [
+  "forbes.com",
+  "nytimes.com",
+  "washingtonpost.com",
+  "wsj.com",
+  "bbc.com",
+  "bbc.co.uk",
+  "cnn.com",
+  "theguardian.com",
+  "reuters.com",
+  "bloomberg.com",
+  "businessinsider.com",
+  "huffpost.com",
+  "usatoday.com",
+  "foxnews.com",
+  "nbcnews.com",
+  "cbsnews.com",
+  "abc.net.au",
+  "news.com.au",
+  "smh.com.au",
+  "yahoo.com",
+  "msn.com",
+  "google.com",
+  "blog.google",
+  "youtube.com",
+  "wikipedia.org",
+  "facebook.com",
+  "instagram.com",
+  "linkedin.com",
+  "twitter.com",
+  "x.com",
+  "tiktok.com",
+  "pinterest.com",
+  "reddit.com",
+  "quora.com",
+  "medium.com",
+  "amazon.com",
+  "apple.com",
+  "microsoft.com",
+  "github.com",
+  "wordpress.org",
+  "wordpress.com",
+  "blogspot.com",
+];
+
+/** True for .gov/.mil sites (also gov.au style) and the giants above. */
+export function isUnpitchableDomain(domain: string): boolean {
+  const host = bareDomain(domain) ?? domain.toLowerCase();
+  if (/(^|\.)(gov|mil)(\.[a-z]{2})?$/.test(host)) return true;
+  return UNPITCHABLE_DOMAINS.some(
+    (giant) => host === giant || host.endsWith(`.${giant}`),
+  );
+}
+
 export function bareDomain(value: string): string | null {
   const text = value.trim().toLowerCase();
   if (!text) return null;

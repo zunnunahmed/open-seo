@@ -21,6 +21,7 @@ import { TablePagination } from "@/client/components/table/TablePagination";
 import {
   findOutreachContacts,
   getOutreach,
+  removeOutreachProspects,
   suppressOutreach,
   updateOutreachStatus,
 } from "@/serverFunctions/outreach";
@@ -250,6 +251,15 @@ export function OutreachPage({ projectId }: { projectId: string }) {
     refresh();
   }
 
+  async function remove() {
+    await removeOutreachProspects({
+      data: { projectId, prospectIds: selected.map((p) => p.id) },
+    });
+    setRowSelection({});
+    toast.success(`Removed ${selected.length} from Link Prospects.`);
+    refresh();
+  }
+
   async function doNotContact() {
     await suppressOutreach({
       data: {
@@ -331,6 +341,13 @@ export function OutreachPage({ projectId }: { projectId: string }) {
                         onClick={() => void setStatus("skipped")}
                       >
                         Skip
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void remove()}
+                      >
+                        Remove
                       </Button>
                       <Button
                         size="sm"

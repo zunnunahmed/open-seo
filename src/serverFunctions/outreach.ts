@@ -10,6 +10,7 @@ import { OutreachRepository } from "@/server/custom/outreach/OutreachRepository"
 import {
   bareDomain,
   guestPostProspects,
+  isUnpitchableDomain,
   linkGapProspects,
   prProspects,
 } from "@/server/custom/outreach/prospectFinders";
@@ -47,7 +48,10 @@ async function keepUnsuppressed<T extends { domain: string }>(
   prospects: T[],
 ): Promise<T[]> {
   const suppressed = await OutreachRepository.listSuppressions(projectId);
-  return prospects.filter((prospect) => !suppressed.has(prospect.domain));
+  return prospects.filter(
+    (prospect) =>
+      !suppressed.has(prospect.domain) && !isUnpitchableDomain(prospect.domain),
+  );
 }
 
 /** Sites linking to 1–3 competitors but not to the project (paid backlinks data). */
@@ -339,6 +343,20 @@ export const updateOutreachStatus = createServerFn({ method: "POST" })
       context.projectId,
       data.prospectIds,
       data.status,
+    );
+    return { ok: true as const };
+  });
+
+/** Delete prospects and their contacts; they can be found again later. */
+export const removeOutreachProspects = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(
+    projectInput.extend({ prospectIds: z.array(z.string()).min(1).max(500) }),
+  )
+  .handler(async ({ data, context }) => {
+    await OutreachRepository.deleteProspects(
+      context.projectId,
+      data.prospectIds,
     );
     return { ok: true as const };
   });
