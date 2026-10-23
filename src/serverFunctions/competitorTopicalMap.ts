@@ -135,3 +135,85 @@ export const importCompetitorCrawl = createServerFn({ method: "POST" })
       keywords: null,
     }));
   });
+
+const aiClusterSchema = z.object({
+  name: z.string().min(1).max(120),
+  intent: z.string().max(100),
+  urls: z.array(z.string().url()).max(100),
+});
+const aiResultSchema = z.object({
+  clusters: z.array(aiClusterSchema).min(1).max(30),
+});
+const aiInput = readInput.extend({ confirmCost: z.literal(true) });
+const aiKey = (projectId: string, id: string) => `${prefix(projectId)}ai/${id}.json`;
+
+export const getTopicalAiAnalysis = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(readInput)
+  .handler(async ({ data, context }) => {
+    const stored = await env.R2.get(aiKey(context.projectId, data.id));
+    if (!stored) return null;
+    return JSON.parse(await stored.text()) as {
+      model: string; savedAt: string; sourcePages: number;
+      clusters: z.infer<typeof aiClusterSchema>[];
+    };
+  });
+
+export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(aiInput)
+  .handler(async ({ data, context }) => {
+    const stored = await env.R2.get(objectKey(context.projectId, data.id));
+    if (!stored) throw new Error("Save competitor research before starting AI clustering.");
+    const snapshot = JSON.parse(await stored.text()) as Snapshot;
+    if (snapshot.id !== data.id || snapshot.projectId !== context.projectId) {
+      throw new Error("Saved analysis does not belong to this project.");
+    }
+    if (snapshot.pages.length === 0) throw new Error("No saved URLs available.");
+    // First release: 100 URLs per inference; limit cost, prompt size and Worker lifetime.
+    if (snapshot.pages.length > 100) {
+      throw new Error("AI clustering currently supports up to 100 saved pages per run. Select a 100-page analysis.");
+    }
+    const { getOptionalEnvValue } = await import("@/server/lib/runtime-env");
+    const { ProjectContextRepository } = await import("@/server/features/project-context/repositories/ProjectContextRepository");
+    const apiKey = await getOptionalEnvValue("OPENROUTER_API_KEY");
+    if (!apiKey) throw new Error("Configure OpenRouter under Project Integrations first.");
+    const sections = await ProjectContextRepository.listSections(context.projectId);
+    const model = sections.find((entry) => entry.key === "custom:openrouter-model")?.content || "openai/gpt-4o-mini";
+    const inputs = snapshot.pages.map((page) => ({
+      url: page.page,
+      path: page.relativePath ?? new URL(page.page).pathname,
+    }));
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        max_tokens: 3000,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "Group the supplied website URLs by likely subject and search intent. Return ONLY JSON of shape {clusters:[{name:string,intent:string,urls:string[]}]}. Each input URL must occur exactly once. Do not invent URLs or claim page contents were read. Classifications are inferred from URLs only; keep related local-service URLs together when sensible. Do not include explanatory prose." },
+          { role: "user", content: JSON.stringify({ domain: snapshot.domain, pages: inputs }) },
+        ],
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!response.ok) throw new Error(`OpenRouter request failed (HTTP ${response.status}). Check the model and available credits.`);
+    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = payload.choices?.[0]?.message?.content;
+    if (!raw) throw new Error("OpenRouter returned no analysis.");
+    let parsed: z.infer<typeof aiResultSchema>;
+    try { parsed = aiResultSchema.parse(JSON.parse(raw)); }
+    catch { throw new Error("OpenRouter returned an invalid cluster format. No results saved."); }
+    const expected = new Set(inputs.map((page) => page.url));
+    const actual = parsed.clusters.flatMap((cluster) => cluster.urls);
+    if (actual.length !== expected.size || new Set(actual).size !== expected.size || actual.some((url) => !expected.has(url))) {
+      throw new Error("AI clustering did not account for every URL exactly once. No results saved.");
+    }
+    const result = { model, savedAt: new Date().toISOString(), sourcePages: inputs.length, clusters: parsed.clusters };
+    await env.R2.put(aiKey(context.projectId, data.id), JSON.stringify(result), {
+      httpMetadata: { contentType: "application/json" },
+    });
+    return result;
+  });
