@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -144,11 +145,29 @@ export function IndexCoverageSummary({
     queryKey,
     queryFn: () => getIndexCoverage({ data: { projectId } }),
   });
+  // One click checks every due URL: each batch is its own request (within
+  // the Workers subrequest cap) until nothing is due, the daily limit is
+  // reached, or the user stops.
+  const stopRequested = useRef(false);
+  const [checkedSoFar, setCheckedSoFar] = useState(0);
   const check = useMutation({
     mutationFn: async () => {
-      const result = await checkIndexCoverageNow({ data: { projectId } });
-      if (!result.ok) throw new Error(result.error);
-      return result;
+      stopRequested.current = false;
+      setCheckedSoFar(0);
+      let inspected = 0;
+      while (!stopRequested.current) {
+        const result = await checkIndexCoverageNow({ data: { projectId } });
+        if (!result.ok) throw new Error(result.error);
+        if (result.inspected === 0) break;
+        inspected += result.inspected;
+        setCheckedSoFar(inspected);
+        void client.invalidateQueries({ queryKey });
+      }
+      if (inspected === 0)
+        throw new Error(
+          "Nothing to check: run a sitemap check first, or today's limit is reached, or all URLs were checked in the last 7 days.",
+        );
+      return { inspected, stopped: stopRequested.current };
     },
     onSettled: () => void client.invalidateQueries({ queryKey }),
   });
@@ -297,8 +316,20 @@ export function IndexCoverageSummary({
             <RefreshCw
               className={`size-4 ${check.isPending ? "animate-spin" : ""}`}
             />
-            {check.isPending ? "Checking…" : "Check indexing now"}
+            {check.isPending
+              ? `Checking… ${checkedSoFar.toLocaleString()} checked`
+              : "Check indexing now"}
           </Button>
+          {check.isPending ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                stopRequested.current = true;
+              }}
+            >
+              Stop after this batch
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             disabled={exportCsv.isPending}
@@ -314,7 +345,8 @@ export function IndexCoverageSummary({
           ) : null}
           {check.isSuccess ? (
             <p role="status" className="text-sm text-muted-foreground">
-              Checked {check.data.inspected} URLs.
+              {check.data.stopped ? "Stopped after checking" : "Checked"}{" "}
+              {check.data.inspected.toLocaleString()} URLs.
             </p>
           ) : null}
         </div>

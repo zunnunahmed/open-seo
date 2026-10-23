@@ -36,7 +36,11 @@ export const getIndexCoverage = createServerFn({ method: "POST" })
     };
   });
 
-/** Inspect one small batch now (counts toward the daily limit). */
+/**
+ * Inspect one small batch now (counts toward the daily limit). Batches stay
+ * small so one request fits the Workers Free subrequest cap; the page calls
+ * this repeatedly, and `inspected: 0` means nothing is due.
+ */
 export const checkIndexCoverageNow = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
   .validator(request)
@@ -54,12 +58,6 @@ export const checkIndexCoverageNow = createServerFn({ method: "POST" })
       inspect,
     );
     if (outcome.error) return { ok: false as const, error: outcome.error };
-    if (outcome.inspected === 0)
-      return {
-        ok: false as const,
-        error:
-          "Nothing to check: run a sitemap check first, or today's limit is reached, or all URLs were checked in the last 7 days.",
-      };
     return { ok: true as const, inspected: outcome.inspected };
   });
 
