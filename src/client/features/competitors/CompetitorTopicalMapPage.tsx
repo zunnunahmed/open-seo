@@ -78,6 +78,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [loadingCrawls, setLoadingCrawls] = useState(false);
   const [crawlsChecked, setCrawlsChecked] = useState(false);
   const [crawlLookupError, setCrawlLookupError] = useState("");
+  const [showCrawler, setShowCrawler] = useState(false);
+  const [showSaved, setShowSaved] = useState(true);
 
 
   async function refreshSaved() {
@@ -361,9 +363,10 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       <div className="mx-auto max-w-5xl space-y-5">
         <PageHeader
           title="Competitor Topical Map"
-          description="Discover competitor ranking pages and explore a preliminary topic map."
+          description="Collect competitor URLs, organise topics and compare opportunities with your site."
         />
         <Card className="space-y-4 p-5">
+          <h2 className="font-semibold">1. Collect competitor pages</h2>
           <div className="space-y-1.5">
             <label htmlFor="competitor-domain" className="text-sm font-medium">Competitor website</label>
             <Input id="competitor-domain" value={domain} onChange={(event) => setDomain(event.target.value)}
@@ -398,8 +401,10 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
             I approve potentially chargeable SEO data requests for this analysis.
           </label>
           <div className="space-y-3 rounded-lg border border-border p-3">
+            <button type="button" className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium" aria-expanded={showCrawler} onClick={() => setShowCrawler(!showCrawler)}><span>Reuse existing Site Audit crawl <span className="font-normal text-muted-foreground">(no new request)</span></span>{showCrawler ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</button>
+            {showCrawler && <div className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold">Reuse existing Site Audit crawl</h2>
+              <h2 className="text-sm font-semibold">Import previously saved URLs</h2>
               <p className="text-xs text-muted-foreground">Import saved competitor URLs from completed, failed or running Site Audits, including pages without rankings. Failed and running audits may contain only partial results. No new crawl or paid SEO provider calls.</p>
             </div>
             <Button type="button" size="sm" variant="outline" disabled={running || loadingCrawls}
@@ -416,17 +421,19 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
                   onClick={() => void useCrawl()}>Import saved pages</Button>
               </div>
             )}
+            </div>}
           </div>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <Button onClick={() => void analyse()} disabled={running || !domain.trim() || !acknowledged}>
             <Network className="size-4" />
-            {running ? "Analysing…" : "Analyse Competitor"}
+            {running ? "Collecting pages…" : "Collect competitor pages"}
           </Button>
           {running && <p className="text-sm text-muted-foreground" role="status">Retrieved {completed} of up to {limit} pages. Each batch is requested separately.</p>}
         </Card>
 
         <Card className="space-y-3 p-5">
-          <h2 className="font-semibold">Saved research</h2>
+          <button type="button" className="flex w-full items-center justify-between gap-2 text-left font-semibold" aria-expanded={showSaved} onClick={() => setShowSaved(!showSaved)}><span>Saved research ({saved.length})</span>{showSaved ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</button>
+          {showSaved && <>
           <p className="text-xs text-muted-foreground">Stored in your project's Cloudflare R2 storage. Opening saved research does not call the SEO provider.</p>
           {saved.length === 0 ? <p className="text-sm text-muted-foreground">No saved analyses yet.</p> : (
             <div className="space-y-2">
@@ -444,9 +451,11 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
               ))}
             </div>
           )}
+          </>}
         </Card>
         {analysedDomain && (pages.length > 0 || !running) && (
           <Card className="space-y-4 p-5">
+            <h2 className="font-semibold">2. Analyse and review results</h2>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">{analysedDomain}</h2>
@@ -455,14 +464,15 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
               <Button variant="outline" disabled={!pages.length} onClick={exportCsv}><Download className="size-4" /> Export CSV</Button>
             </div>
 
-            <div className="space-y-3 rounded-lg border p-3">
-              <h3 className="text-sm font-semibold">AI Topic Clustering · OpenRouter</h3>
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold">AI topic clustering</h3><span className="rounded-md border px-2 py-1 text-xs text-muted-foreground">OpenRouter · Optional paid API</span></div>
               <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. Infers topics from URL paths, not page text. Processes up to 30 URLs per paid request, saves after each batch and resumes saved progress. OpenRouter charges may apply.</p>
               <Button size="sm" variant="outline" disabled={!savedId || !pages.length || aiBusy || running || saving || (aiResult?.sourcePages ?? 0) >= pages.length}
                 onClick={() => void runAiClustering()}>{aiBusy ? `Clustering… ${aiProgress}/${pages.length}` : aiResult && aiResult.sourcePages < pages.length ? "Resume AI clustering (paid API calls)" : "Run AI clustering (paid API calls)"}</Button>
               {!savedId && <p className="text-xs text-muted-foreground">Save or open an analysis first.</p>}
               {aiResult && aiResult.sourcePages >= pages.length && <p className="text-xs text-muted-foreground">All pages already clustered. No additional requests required.</p>}
-              {aiError && <p className="text-sm text-destructive" role="alert">{aiError}</p>}
+              {aiBusy && <p role="status" className="text-sm text-muted-foreground">Processing {aiProgress} of {pages.length} URLs…</p>}
+              {aiError && <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive" role="alert"><p className="font-medium">AI analysis could not complete</p><p className="mt-1 break-words">{aiError}</p><p className="mt-2 text-xs">Saved competitor pages are unaffected.</p></div>}
               {aiResult && (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">{aiResult.clusters.length} inferred topic groups across {aiResult.sourcePages} URLs · {aiResult.model} · Saved {new Date(aiResult.savedAt).toLocaleString()}</p>
@@ -479,8 +489,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">Preliminary grouping based on URL paths. These groups are not validated topic clusters or inferred pillar pages. Full semantic extraction, saved resumable jobs and gap analysis are planned separately.</p>
-            <div className="flex gap-2 border-b pb-2">
+            <p className="text-xs text-muted-foreground">The map below groups URL paths, not verified page topics. AI-generated topic groups appear above when available.</p>
+            <div className="flex flex-wrap gap-2 border-b pb-2" role="group" aria-label="Research views">
               <Button variant={selectedTab === "map" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("map")}>Topical Map</Button>
               <Button variant={selectedTab === "pages" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("pages")}>Pages</Button>
               <Button variant={selectedTab === "compare" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("compare")}>Compare with My Site</Button>
