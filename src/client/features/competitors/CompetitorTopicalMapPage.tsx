@@ -64,7 +64,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [comparisonDomain, setComparisonDomain] = useState("");
   const [comparisonError, setComparisonError] = useState("");
 
-  const [crawls, setCrawls] = useState<Array<{ id: string; startUrl: string; pagesCrawled: number; completedAt: string | null }>>([]);
+  const [crawls, setCrawls] = useState<Array<{ id: string; startUrl: string; pagesCrawled: number; completedAt: string | null; status: string }>>([]);
   const [crawlId, setCrawlId] = useState("");
   const [loadingCrawls, setLoadingCrawls] = useState(false);
   const [crawlsChecked, setCrawlsChecked] = useState(false);
@@ -206,7 +206,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       setCrawlId(matching[0]?.id ?? "");
       setCrawlsChecked(true);
     } catch {
-      setCrawlLookupError("Could not load completed crawls. Try again.");
+      setCrawlLookupError("Could not load audit history. Try again.");
     } finally {
       setLoadingCrawls(false);
     }
@@ -215,7 +215,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   async function useCrawl() {
     try {
       const host = domainField.parse(domain);
-      if (!crawlId) { setError("Select a completed crawl first."); return; }
+      if (!crawlId) { setError("Select an audit first."); return; }
       setRunning(true);
       setError("");
       const crawled = await importCompetitorCrawl({
@@ -233,7 +233,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       setCompleted(merged.length);
       setComparison([]);
       setComparisonDomain("");
-      if (merged.length > 0) await storeSnapshot(host, merged, true);
+      if (merged.length > 0) await storeSnapshot(host, merged, crawls.find((audit) => audit.id === crawlId)?.status === "completed");
       toast.success("Crawl URLs imported. Ranking metrics are kept where already available.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not import crawl.");
@@ -352,20 +352,20 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
           <div className="space-y-3 rounded-lg border border-border p-3">
             <div>
               <h2 className="text-sm font-semibold">Reuse existing Site Audit crawl</h2>
-              <p className="text-xs text-muted-foreground">Import previously crawled competitor URLs, including pages without rankings. No new crawl or paid SEO provider calls. The crawl must have been completed within this project.</p>
+              <p className="text-xs text-muted-foreground">Import saved competitor URLs from completed, failed or running Site Audits, including pages without rankings. Failed and running audits may contain only partial results. No new crawl or paid SEO provider calls.</p>
             </div>
             <Button type="button" size="sm" variant="outline" disabled={running || loadingCrawls}
-              onClick={() => void loadCrawls()}>{loadingCrawls ? "Loading…" : "Find completed crawls"}</Button>
+              onClick={() => void loadCrawls()}>{loadingCrawls ? "Loading…" : "Find Site Audit crawls"}</Button>
             {crawlLookupError && <p className="text-sm text-destructive" role="alert">{crawlLookupError}</p>}
-            {crawlsChecked && crawls.length === 0 && <p className="text-sm text-muted-foreground" role="status">No completed Site Audit crawl found for this competitor in the current project. This option imports existing crawls only; it does not start a new crawl. Run a Site Audit for this domain first, then return to import it.</p>}
+            {crawlsChecked && crawls.length === 0 && <p className="text-sm text-muted-foreground" role="status">No Site Audit found for this competitor in the current project. Run a Site Audit for this domain first, then return to import its saved pages.</p>}
             {crawls.length > 0 && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <select value={crawlId} onChange={(event) => setCrawlId(event.target.value)}
                   className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm">
-                  {crawls.map((crawl) => <option key={crawl.id} value={crawl.id}>{new URL(crawl.startUrl).hostname} — {crawl.pagesCrawled} pages</option>)}
+                  {crawls.map((crawl) => <option key={crawl.id} value={crawl.id}>{new URL(crawl.startUrl).hostname} — {crawl.pagesCrawled} crawled · {crawl.status}</option>)}
                 </select>
                 <Button type="button" variant="secondary" disabled={running || !crawlId || !domain.trim()}
-                  onClick={() => void useCrawl()}>Import crawl pages</Button>
+                  onClick={() => void useCrawl()}>Import saved pages</Button>
               </div>
             )}
           </div>
