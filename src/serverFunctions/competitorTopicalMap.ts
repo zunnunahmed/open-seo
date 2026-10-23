@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { readModelClusters } from "@/server/custom/competitors/aiClusters";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { domainField } from "@/types/schemas/domain";
 import { AuditRepository } from "@/server/features/audit/repositories/AuditRepository";
@@ -144,17 +145,6 @@ const aiClusterSchema = z.object({
 const aiResultSchema = z.object({
   clusters: z.array(aiClusterSchema).min(1).max(30),
 });
-// Models paraphrase: long labels are trimmed and non-integer indices dropped
-// here, and range/duplicate checks happen below, instead of failing the batch.
-const aiIndexSchema = z.object({
-  clusters: z.array(z.object({
-    name: z.string().trim().min(1).transform((name) => name.slice(0, 120)),
-    intent: z.string().catch("").transform((intent) => intent.slice(0, 100)),
-    indices: z.array(z.unknown()).transform((values) =>
-      values.filter((value): value is number => Number.isInteger(value)),
-    ),
-  })).min(1),
-});
 const UNASSIGNED_CLUSTER = "Other (not grouped by the model)";
 const aiInput = readInput.extend({ confirmCost: z.literal(true), startIndex: z.number().int().min(0).max(999) });
 const AI_BATCH_SIZE = 15;
@@ -238,28 +228,18 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
     let parsed: z.infer<typeof aiResultSchema>;
     try {
       const json = JSON.parse(raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""));
-      const indexed = aiIndexSchema.parse(json);
-      // Keep each page's first valid assignment; pages the model skipped go
-      // to one "Other" group so a near-miss answer is still saved.
-      const assigned = new Set<number>();
-      const clusters = indexed.clusters.map((cluster) => ({
-        name: cluster.name,
-        intent: cluster.intent,
-        urls: cluster.indices
-          .filter((index) => index >= 0 && index < inputs.length && !assigned.has(index) && assigned.add(index))
-          .map((index) => inputs[index]!.url),
-      })).filter((cluster) => cluster.urls.length > 0);
-      if (clusters.length === 0) throw new Error("The AI model did not group any of the pages.");
-      const skipped = inputs.filter((_, index) => !assigned.has(index));
+      const { clusters, skipped } = readModelClusters(json, inputs);
       if (skipped.length > 0) {
-        clusters.push({ name: UNASSIGNED_CLUSTER, intent: "unknown", urls: skipped.map((input) => input.url) });
+        clusters.push({ name: UNASSIGNED_CLUSTER, intent: "unknown", urls: skipped });
       }
       parsed = aiResultSchema.parse({ clusters: clusters.slice(0, 30) });
     } catch (error) {
       const detail = error instanceof SyntaxError ? "The AI model returned incomplete or invalid JSON." :
-        error instanceof z.ZodError ? "The AI model returned unexpected JSON fields or types." :
+        error instanceof z.ZodError ? `The AI model returned unexpected values (${error.issues[0]?.path.join(".") || "root"}: ${error.issues[0]?.message ?? "invalid"}).` :
         error instanceof Error ? error.message : "Invalid JSON result.";
-      throw new Error(`AI output validation failed: ${detail} No results saved.`);
+      // A short preview of the answer makes a model-specific shape diagnosable.
+      const preview = raw.replace(/\s+/g, " ").slice(0, 160);
+      throw new Error(`AI output validation failed: ${detail} Model answer starts: ${preview} No results saved.`, { cause: error });
     }
     const clusters = [...(previous?.clusters ?? [])];
     for (const group of parsed.clusters) {
