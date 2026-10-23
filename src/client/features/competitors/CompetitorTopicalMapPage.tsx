@@ -457,7 +457,7 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
 
             <div className="space-y-3 rounded-lg border p-3">
               <h3 className="text-sm font-semibold">AI Topic Clustering · OpenRouter</h3>
-              <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. Infers topics from URL paths, not page text. Processes up to 30 URLs per paid request, saves after each batch and resumes saved progress. OpenRouter charges may apply.</p>
+              <p className="text-xs text-muted-foreground">Uses the AI model selected in Project Integrations. Infers topics from URL paths, not page text. Processes up to 15 URLs per paid request, saves after each batch and resumes saved progress. OpenRouter charges may apply.</p>
               <Button size="sm" variant="outline" disabled={!savedId || !pages.length || aiBusy || running || saving || (aiResult?.sourcePages ?? 0) >= pages.length}
                 onClick={() => void runAiClustering()}>{aiBusy ? `Clustering… ${aiProgress}/${pages.length}` : aiResult && aiResult.sourcePages < pages.length ? "Resume AI clustering (paid API calls)" : "Run AI clustering (paid API calls)"}</Button>
               {!savedId && <p className="text-xs text-muted-foreground">Save or open an analysis first.</p>}
