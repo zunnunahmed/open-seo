@@ -44,7 +44,7 @@ import {
 /** Stop launching new fetches after this long; leftover leases are released. */
 const CHUNK_SOFT_DEADLINE_MS = 90_000;
 /** Crawled pages are persisted in sub-batches of this size. */
-const PERSIST_BATCH_SIZE = 25;
+const PERSIST_BATCH_SIZE = 5;
 /**
  * The first sub-batch of a chunk is deliberately small: the crawl window
  * only adapts when a sub-batch persists, and on a heavy-page site a full
@@ -59,7 +59,7 @@ const FIRST_PERSIST_BATCH_SIZE = 5;
  * site, unpersisted page results would otherwise pile up in memory without
  * bound.
  */
-const MAX_QUEUED_PERSIST_BATCHES = 2;
+const MAX_QUEUED_PERSIST_BATCHES = 1;
 
 /**
  * Mega-menu/footer-heavy sites can carry 1000+ links per page; cap what we
