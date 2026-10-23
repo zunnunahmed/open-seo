@@ -1,6 +1,13 @@
 import { sort } from "remeda";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import { Input } from "@/client/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/client/components/ui/select";
 
 /** Country codes a domain can end with, e.g. site.com.au -> au. */
 const COUNTRIES: Record<string, string> = {
@@ -54,17 +61,71 @@ type OutreachFilterState = {
   validEmailOnly: boolean;
 };
 
+/** Shows every status except skipped. */
+const ACTIVE = "active";
+
 export const EMPTY_FILTERS: OutreachFilterState = {
   country: "",
   tld: "",
   source: "",
-  status: "",
+  status: ACTIVE,
   minAuthority: "",
   validEmailOnly: false,
 };
 
-const SELECT =
-  "h-8 rounded-md border bg-background px-2 text-sm text-foreground";
+const ALL = "all";
+
+/** One filter dropdown; "" in the state means no filter. */
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  const items = [{ value: ALL, label }, ...options];
+  return (
+    <Select
+      items={items}
+      value={value || ALL}
+      onValueChange={(next) => onChange(!next || next === ALL ? "" : next)}
+    >
+      <SelectTrigger size="sm" className="w-auto min-w-36" aria-label={label}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+const SOURCES = [
+  { value: "backlinks", label: "Backlinks" },
+  { value: "link_gap", label: "Link gap" },
+  { value: "guest_post", label: "Guest post" },
+  { value: "pr", label: "PR" },
+  { value: "import", label: "Import" },
+];
+
+const STATUSES = [
+  { value: ACTIVE, label: "Hide skipped" },
+  { value: "new", label: "New" },
+  { value: "contacts_found", label: "Emails found" },
+  { value: "no_contacts", label: "No emails" },
+  { value: "sent", label: "Sent" },
+  { value: "replied", label: "Replied" },
+  { value: "won", label: "Link won" },
+  { value: "skipped", label: "Skipped" },
+];
 
 /** Narrow the prospect list by country, domain ending, source and more. */
 export function OutreachFilters({
@@ -81,63 +142,38 @@ export function OutreachFilters({
     onChange({ ...value, ...patch });
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2.5 text-sm">
-      <select
-        className={SELECT}
-        aria-label="Country"
+      <FilterSelect
+        label="All countries"
         value={value.country}
-        onChange={(event) => set({ country: event.target.value })}
-      >
-        <option value="">All countries</option>
-        {Object.entries(COUNTRIES).map(([code, name]) => (
-          <option key={code} value={code}>
-            {name} (.{code})
-          </option>
-        ))}
-        <option value={GLOBAL}>Global (.com, .org, …)</option>
-      </select>
-      <select
-        className={SELECT}
-        aria-label="Domain ending"
+        onChange={(country) => set({ country })}
+        options={[
+          ...Object.entries(COUNTRIES).map(([code, name]) => ({
+            value: code,
+            label: `${name} (.${code})`,
+          })),
+          { value: GLOBAL, label: "Global (.com, .org, …)" },
+        ]}
+      />
+      <FilterSelect
+        label="All endings"
         value={value.tld}
-        onChange={(event) => set({ tld: event.target.value })}
-      >
-        <option value="">All endings</option>
-        {tlds.map((tld) => (
-          <option key={tld} value={tld}>
-            {tld}
-          </option>
-        ))}
-      </select>
-      <select
-        className={SELECT}
-        aria-label="Source"
+        onChange={(tld) => set({ tld })}
+        options={tlds.map((tld) => ({ value: tld, label: tld }))}
+      />
+      <FilterSelect
+        label="All sources"
         value={value.source}
-        onChange={(event) => set({ source: event.target.value })}
-      >
-        <option value="">All sources</option>
-        <option value="backlinks">Backlinks</option>
-        <option value="link_gap">Link gap</option>
-        <option value="guest_post">Guest post</option>
-        <option value="pr">PR</option>
-        <option value="import">Import</option>
-      </select>
-      <select
-        className={SELECT}
-        aria-label="Status"
+        onChange={(source) => set({ source })}
+        options={SOURCES}
+      />
+      <FilterSelect
+        label="All statuses"
         value={value.status}
-        onChange={(event) => set({ status: event.target.value })}
-      >
-        <option value="">All statuses</option>
-        <option value="new">New</option>
-        <option value="contacts_found">Contacts found</option>
-        <option value="no_contacts">No contacts</option>
-        <option value="sent">Sent</option>
-        <option value="replied">Replied</option>
-        <option value="won">Won</option>
-        <option value="skipped">Skipped</option>
-      </select>
+        onChange={(status) => set({ status })}
+        options={STATUSES}
+      />
       <Input
-        className="h-8 w-36"
+        className="h-8 w-32"
         type="number"
         min={0}
         placeholder="Min authority"
@@ -175,7 +211,9 @@ export function applyOutreachFilters<T extends Filterable>(
         domainCountry(prospect.domain) === filters.country) &&
       (!filters.tld || domainTld(prospect.domain) === filters.tld) &&
       (!filters.source || prospect.source === filters.source) &&
-      (!filters.status || prospect.status === filters.status) &&
+      (filters.status === ACTIVE
+        ? prospect.status !== "skipped"
+        : !filters.status || prospect.status === filters.status) &&
       (!filters.minAuthority || (prospect.authority ?? 0) >= minAuthority) &&
       (!filters.validEmailOnly ||
         prospect.contacts.some((c) => c.verification === "valid")),

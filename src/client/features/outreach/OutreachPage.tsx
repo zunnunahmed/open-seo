@@ -8,7 +8,6 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/client/components/PageHeader";
 import { Badge } from "@/client/components/ui/badge";
-import { Button } from "@/client/components/ui/button";
 import { SortableHeader } from "@/client/components/table/SortableHeader";
 import {
   DataTable,
@@ -27,7 +26,12 @@ import {
 } from "@/serverFunctions/outreach";
 import { OutreachFinders } from "./OutreachFinders";
 import { OutreachSendCard } from "./OutreachSendCard";
-import { ContactList } from "./OutreachContactList";
+import { OutreachActions, type MarkableStatus } from "./OutreachActions";
+import {
+  ContactList,
+  ContactsSummary,
+  StatusBadge,
+} from "./OutreachContactList";
 import {
   applyOutreachFilters,
   EMPTY_FILTERS,
@@ -114,25 +118,19 @@ function buildColumns(anchor: ReturnType<typeof useSelectionAnchor>) {
     columnHelper.accessor((prospect) => prospect.contacts.length, {
       id: "contacts",
       header: ({ column }) => (
-        <SortableHeader column={column} label="Contacts" align="right" />
+        <SortableHeader column={column} label="Contacts" />
       ),
-      cell: ({ row }) => {
-        const valid = row.original.contacts.filter(
-          (contact) => contact.verification === "valid",
-        ).length;
-        return row.original.contacts.length === 0
-          ? "—"
-          : `${valid} valid / ${row.original.contacts.length}`;
-      },
-      meta: { cellClassName: "text-right tabular-nums whitespace-nowrap" },
+      cell: ({ row }) => (
+        <ContactsSummary
+          contacts={row.original.contacts}
+          checked={Boolean(row.original.contactsCheckedAt)}
+        />
+      ),
+      meta: { cellClassName: "max-w-[200px]" },
     }),
     columnHelper.accessor("status", {
       header: ({ column }) => <SortableHeader column={column} label="Status" />,
-      cell: ({ getValue }) => (
-        <Badge variant="secondary" size="sm">
-          {getValue().replace("_", " ")}
-        </Badge>
-      ),
+      cell: ({ getValue }) => <StatusBadge status={getValue()} />,
     }),
   ];
 }
@@ -202,11 +200,8 @@ export function OutreachPage({ projectId }: { projectId: string }) {
   const refresh = () => void query.refetch();
 
   async function findEmails() {
-    const targets = selected.filter((prospect) => !prospect.contactsCheckedAt);
-    if (targets.length === 0) {
-      toast.info("The selected prospects were already checked for emails.");
-      return;
-    }
+    const targets = selected.filter((prospect) => !prospect.contacts.length);
+    if (targets.length === 0) return;
     stopFinding.current = false;
     setFinding({ done: 0, total: targets.length });
     let found = 0;
@@ -244,7 +239,7 @@ export function OutreachPage({ projectId }: { projectId: string }) {
     }
   }
 
-  async function setStatus(status: "replied" | "won" | "skipped" | "new") {
+  async function setStatus(status: MarkableStatus) {
     await updateOutreachStatus({
       data: { projectId, prospectIds: selected.map((p) => p.id), status },
     });
@@ -273,7 +268,6 @@ export function OutreachPage({ projectId }: { projectId: string }) {
     refresh();
   }
 
-  const unchecked = selected.filter((p) => !p.contactsCheckedAt).length;
   return (
     <div className="px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
@@ -292,71 +286,29 @@ export function OutreachPage({ projectId }: { projectId: string }) {
           }}
           onRowClick={(row) => row.toggleExpanded()}
           renderExpandedRow={(row) => (
-            <ContactList contacts={row.original.contacts} />
+            <ContactList
+              contacts={row.original.contacts}
+              checked={Boolean(row.original.contactsCheckedAt)}
+            />
           )}
           toolbar={
             <>
               <DataTableToolbar
                 actions={
                   selected.length > 0 ? (
-                    <>
-                      <Button
-                        size="sm"
-                        disabled={finding !== null || unchecked === 0}
-                        title="Cheapest first: about US$0.005 per email found, misses free"
-                        onClick={() => void findEmails()}
-                      >
-                        {finding
-                          ? `Finding emails… ${finding.done}/${finding.total}`
-                          : `Find emails (${unchecked}, paid)`}
-                      </Button>
-                      {finding ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            stopFinding.current = true;
-                          }}
-                        >
-                          Stop
-                        </Button>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void setStatus("replied")}
-                      >
-                        Replied
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void setStatus("won")}
-                      >
-                        Link won
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void setStatus("skipped")}
-                      >
-                        Skip
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void remove()}
-                      >
-                        Remove
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void doNotContact()}
-                      >
-                        Do not contact
-                      </Button>
-                    </>
+                    <OutreachActions
+                      findable={
+                        selected.filter((p) => !p.contacts.length).length
+                      }
+                      finding={finding}
+                      onFind={() => void findEmails()}
+                      onStop={() => {
+                        stopFinding.current = true;
+                      }}
+                      onMark={(status) => void setStatus(status)}
+                      onRemove={() => void remove()}
+                      onDoNotContact={() => void doNotContact()}
+                    />
                   ) : null
                 }
               >
@@ -365,8 +317,9 @@ export function OutreachPage({ projectId }: { projectId: string }) {
                   {visible.length === prospects.length
                     ? `${prospects.length.toLocaleString()} prospects`
                     : `${visible.length.toLocaleString()} of ${prospects.length.toLocaleString()} prospects`}
-                  {selected.length ? ` · ${selected.length} selected` : ""} ·
-                  click a row for its contacts
+                  {selected.length
+                    ? ` · ${selected.length} selected`
+                    : " · select prospects to find emails, click a row for its contacts"}
                 </span>
               </DataTableToolbar>
               <OutreachFilters
