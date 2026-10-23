@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { domainField } from "@/types/schemas/domain";
+import { AuditRepository } from "@/server/features/audit/repositories/AuditRepository";
 
 const projectInput = z.object({ projectId: z.string().uuid() });
 const pageSchema = z.object({
@@ -91,8 +92,6 @@ export const deleteCompetitorTopicalMap = createServerFn({ method: "POST" })
     await env.R2.delete(objectKey(context.projectId, data.id));
     return { deleted: true };
   });
-
-import { AuditRepository } from "@/server/features/audit/repositories/AuditRepository";
 
 const crawlImportSchema = projectInput.extend({
   auditId: z.string().uuid(),
