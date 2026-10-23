@@ -1,3 +1,4 @@
+import { activeSeoProviderRoute } from "@/server/custom/providers/treg/dataforseoTransport";
 import { buildCacheKey, getCached, setCached } from "@/server/lib/r2-cache";
 import { normalizeBacklinksTarget } from "@/server/lib/dataforseo";
 import type {
@@ -121,6 +122,7 @@ function buildTargetCacheInput(
 
   return {
     organizationId: billingCustomer.organizationId,
+    providerRoute: activeSeoProviderRoute(),
     target: normalizedTarget.apiTarget,
     scope: normalizedTarget.scope,
     // Subfolder scope keeps the hostname as the API target, so the path must
