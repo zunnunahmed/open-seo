@@ -13,6 +13,24 @@ type ModelCluster = { name: string; intent: string; urls: string[] };
 
 class ModelOutputError extends Error {}
 
+/**
+ * The JSON in a model reply: plain JSON, fenced in markdown, or wrapped in
+ * prose ("Here are the groups: {...}"). Throws SyntaxError when there is none.
+ */
+export function parseModelJson(raw: string): unknown {
+  const text = raw
+    .replace(/^\s*```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "");
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const start = text.search(/[[{]/);
+    const end = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
+    if (start < 0 || end <= start) throw error;
+    return JSON.parse(text.slice(start, end + 1));
+  }
+}
+
 const record = z.record(z.string(), z.unknown());
 const list = z.array(z.unknown());
 

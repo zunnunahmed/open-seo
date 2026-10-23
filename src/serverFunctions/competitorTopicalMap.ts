@@ -1,7 +1,10 @@
 import { env } from "cloudflare:workers";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { readModelClusters } from "@/server/custom/competitors/aiClusters";
+import {
+  parseModelJson,
+  readModelClusters,
+} from "@/server/custom/competitors/aiClusters";
 import { requireProjectContext } from "@/serverFunctions/middleware";
 import { domainField } from "@/types/schemas/domain";
 import { AuditRepository } from "@/server/features/audit/repositories/AuditRepository";
@@ -146,6 +149,11 @@ const aiResultSchema = z.object({
   clusters: z.array(aiClusterSchema).min(1).max(30),
 });
 const UNASSIGNED_CLUSTER = "Other (not grouped by the model)";
+class OpenRouterHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
 const aiInput = readInput.extend({ confirmCost: z.literal(true), startIndex: z.number().int().min(0).max(999) });
 const AI_BATCH_SIZE = 15;
 const aiKey = (projectId: string, id: string) => `${prefix(projectId)}ai/${id}.json`;
@@ -196,50 +204,80 @@ export const analyseTopicalMapWithAi = createServerFn({ method: "POST" })
       url: page.page,
       path: page.relativePath ?? new URL(page.page).pathname,
     }));
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        max_tokens: 4000,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: "Group the supplied website URL paths by likely topic and search intent. Return ONLY a JSON object: {clusters:[{name:string,intent:string,indices:number[]}]}. The indices are zero-based positions in the supplied pages array. Include each index 0 through N-1 exactly once. Never output URLs, markdown, or extra fields. Do not invent page contents; categories are inferred only from paths." },
-          { role: "user", content: JSON.stringify({ domain: snapshot.domain, pages: inputs }) },
-        ],
-      }),
-      signal: AbortSignal.timeout(45000),
-    });
-    if (!response.ok) {
-      // OpenRouter explains refusals (unknown model, no credit, no JSON mode)
-      // in error.message; show it instead of a bare status.
-      const body = await response.text();
-      let reason = "";
-      try {
-        reason = z.object({ error: z.object({ message: z.string() }) })
-          .parse(JSON.parse(body)).error.message;
-      } catch { /* not OpenRouter's JSON error shape */ }
-      throw new Error(`OpenRouter request failed (HTTP ${response.status}${reason ? `: ${reason.slice(0, 200)}` : ""}). Check the model in Project Integrations and your OpenRouter credits.`);
-    }
-    const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = payload.choices?.[0]?.message?.content;
-    if (!raw) throw new Error("OpenRouter returned no analysis.");
-    let parsed: z.infer<typeof aiResultSchema>;
-    try {
-      const json = JSON.parse(raw.replace(/^\s*```(?:json)?\s*/i, "").replace(/\s*```\s*$/, ""));
-      const { clusters, skipped } = readModelClusters(json, inputs);
-      if (skipped.length > 0) {
-        clusters.push({ name: UNASSIGNED_CLUSTER, intent: "unknown", urls: skipped });
+    const systemPrompt = "Group the supplied website URL paths by likely topic and search intent. Return ONLY a JSON object: {\"clusters\":[{\"name\":string,\"intent\":string,\"indices\":number[]}]}. The indices are zero-based positions in the supplied pages array. Include each index 0 through N-1 exactly once. Never output URLs, markdown, or extra fields. Do not invent page contents; categories are inferred only from paths.";
+    // JSON mode is requested from providers that support it
+    // (require_parameters). Some providers' JSON mode still returns junk (a
+    // bare number), and some models have no JSON-mode provider at all, so a
+    // failed first attempt is retried once as plain text.
+    const ask = async (jsonMode: boolean): Promise<string> => {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          max_tokens: 4000,
+          ...(jsonMode
+            ? { response_format: { type: "json_object" }, provider: { require_parameters: true } }
+            : {}),
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: JSON.stringify({ domain: snapshot.domain, pages: inputs }) },
+          ],
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (!response.ok) {
+        // OpenRouter explains refusals (unknown model, no credit, no JSON
+        // mode) in error.message; show it instead of a bare status.
+        const body = await response.text();
+        let reason = "";
+        try {
+          reason = z.object({ error: z.object({ message: z.string() }) })
+            .parse(JSON.parse(body)).error.message;
+        } catch { /* not OpenRouter's JSON error shape */ }
+        throw new OpenRouterHttpError(response.status, `OpenRouter request failed (HTTP ${response.status}${reason ? `: ${reason.slice(0, 200)}` : ""}). Check the model in Project Integrations and your OpenRouter credits.`);
       }
-      parsed = aiResultSchema.parse({ clusters: clusters.slice(0, 30) });
-    } catch (error) {
+      const payload = z.object({
+        choices: z.array(z.object({ message: z.object({ content: z.string().nullish() }).nullish() })).optional(),
+      }).parse(await response.json());
+      return payload.choices?.[0]?.message?.content ?? "";
+    };
+
+    let parsed: z.infer<typeof aiResultSchema> | undefined;
+    let raw = "";
+    let lastError: unknown;
+    for (const jsonMode of [true, false]) {
+      try {
+        raw = await ask(jsonMode);
+      } catch (error) {
+        // 400/404 means no provider takes JSON mode for this model; any other
+        // failure (key, credits, outage) is not fixed by asking again.
+        if (jsonMode && error instanceof OpenRouterHttpError && (error.status === 400 || error.status === 404)) {
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+      try {
+        const { clusters, skipped } = readModelClusters(parseModelJson(raw), inputs);
+        if (skipped.length > 0) {
+          clusters.push({ name: UNASSIGNED_CLUSTER, intent: "unknown", urls: skipped });
+        }
+        parsed = aiResultSchema.parse({ clusters: clusters.slice(0, 30) });
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!parsed) {
+      const error = lastError;
       const detail = error instanceof SyntaxError ? "The AI model returned incomplete or invalid JSON." :
         error instanceof z.ZodError ? `The AI model returned unexpected values (${error.issues[0]?.path.join(".") || "root"}: ${error.issues[0]?.message ?? "invalid"}).` :
         error instanceof Error ? error.message : "Invalid JSON result.";
       // A short preview of the answer makes a model-specific shape diagnosable.
-      const preview = raw.replace(/\s+/g, " ").slice(0, 160);
-      throw new Error(`AI output validation failed: ${detail} Model answer starts: ${preview} No results saved.`, { cause: error });
+      const preview = raw.replace(/\s+/g, " ").slice(0, 160) || "(empty)";
+      throw new Error(`AI output validation failed after a retry with ${model}: ${detail} Model answer starts: ${preview} Try another model in Project Integrations. No results saved.`, { cause: error });
     }
     const clusters = [...(previous?.clusters ?? [])];
     for (const group of parsed.clusters) {

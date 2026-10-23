@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readModelClusters } from "./aiClusters";
+import { parseModelJson, readModelClusters } from "./aiClusters";
 
 const pages = [
   { url: "https://a.com/web-design/", path: "/web-design/" },
@@ -48,5 +48,21 @@ describe("readModelClusters", () => {
     expect(() => readModelClusters({ summary: "web agency" }, pages)).toThrow(
       "no list of topic groups",
     );
+  });
+
+  // Plain-text replies (the retry without JSON mode) often wrap the JSON.
+  it("finds the JSON inside a chatty or fenced reply", () => {
+    const json = '{"clusters":[{"name":"SEO","indices":[1]}]}';
+    const chatty = `Sure! Here are the groups:\n${json}\nHope this helps.`;
+    expect(parseModelJson(chatty)).toEqual(JSON.parse(json));
+    expect(parseModelJson("```json\n" + json + "\n```")).toEqual(
+      JSON.parse(json),
+    );
+  });
+
+  it("rejects a junk number such as a broken JSON mode returns", () => {
+    expect(() =>
+      readModelClusters(parseModelJson("1.0000000000000002e+308"), pages),
+    ).toThrow("no list of topic groups");
   });
 });
