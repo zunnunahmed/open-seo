@@ -88,26 +88,25 @@ export function ClusterRunForm({
   }
 
   const tooMany = parsed.keywords.length > MAX_CLUSTER_KEYWORDS;
+  const count = parsed.keywords.length;
   return (
     <CardShell title="New clustering run">
-      <div className="space-y-4 text-sm">
-        <p className="text-muted-foreground">
-          Keywords that share enough of the same top-10 Google results target
-          the same intent, so they belong on one page. Paste up to 5,000
-          keywords or upload a CSV.
-        </p>
-        <label className="block space-y-1">
-          <span className="font-medium">Run name (optional)</span>
-          <Input
-            value={name}
-            maxLength={120}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Plumbing services AU"
-          />
-        </label>
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-end justify-between gap-2">
-            <span className="font-medium">Keywords</span>
+      <div className="grid gap-6 text-sm lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-medium">
+              Keywords{" "}
+              <span
+                className={
+                  tooMany
+                    ? "font-normal text-destructive"
+                    : "font-normal text-muted-foreground"
+                }
+              >
+                · {count.toLocaleString()} of{" "}
+                {MAX_CLUSTER_KEYWORDS.toLocaleString()}
+              </span>
+            </span>
             <input
               ref={fileInput}
               type="file"
@@ -119,17 +118,29 @@ export function ClusterRunForm({
                 e.target.value = "";
               }}
             />
-            {!uploaded ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInput.current?.click()}
-              >
-                <Upload className="size-4" />
-                Upload CSV
-              </Button>
-            ) : null}
+            <div className="flex gap-2">
+              {!uploaded && text ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setText("")}
+                >
+                  Clear
+                </Button>
+              ) : null}
+              {!uploaded ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload className="size-4" />
+                  Upload CSV
+                </Button>
+              ) : null}
+            </div>
           </div>
           {uploaded ? (
             <div className="flex items-center gap-3 rounded-md border bg-muted/40 p-3">
@@ -155,7 +166,7 @@ export function ClusterRunForm({
             </div>
           ) : (
             <Textarea
-              rows={10}
+              className="min-h-72 flex-1 font-mono text-xs"
               value={text}
               onChange={(e) => setText(e.target.value)}
               aria-label="Keywords, one per line"
@@ -167,71 +178,112 @@ export function ClusterRunForm({
           <p className="text-xs text-muted-foreground">
             {uploaded
               ? "Clustering uses the keyword column from this file. Remove it to paste keywords instead."
-              : "Optional: add search volume and CPC after a comma or tab (pasting from a spreadsheet works). CSV files need a keyword or query column; volume and CPC columns are optional."}
+              : "Paste from a spreadsheet: keyword, then optional volume and CPC. CSV files need a keyword or query column."}
           </p>
+          {parsed.duplicates || parsed.invalid || tooMany ? (
+            <p
+              className={
+                tooMany
+                  ? "text-xs text-destructive"
+                  : "text-xs text-muted-foreground"
+              }
+            >
+              {parsed.duplicates
+                ? `${parsed.duplicates.toLocaleString()} duplicates removed. `
+                : ""}
+              {parsed.invalid
+                ? `${parsed.invalid.toLocaleString()} too long, skipped. `
+                : ""}
+              {tooMany
+                ? `The limit is ${MAX_CLUSTER_KEYWORDS.toLocaleString()} per run.`
+                : ""}
+            </p>
+          ) : null}
         </div>
-        {activeMarket ? (
-          <div className="space-y-1">
-            <ProjectMarketFields
-              value={activeMarket}
-              onChange={(next) => {
-                // A city belongs to one country.
-                if (next.locationCode !== activeMarket.locationCode)
-                  setLocationName(undefined);
-                setMarket(next);
-              }}
+
+        <div className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4">
+          <label className="block space-y-1">
+            <span className="font-medium">Run name (optional)</span>
+            <Input
+              value={name}
+              maxLength={120}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Plumbing services AU"
             />
-            <div className="flex flex-wrap items-center gap-2">
-              <KeywordAreaField
-                locationCode={activeMarket.locationCode}
-                value={locationName}
-                onChange={setLocationName}
+          </label>
+          {activeMarket ? (
+            <>
+              <ProjectMarketFields
+                value={activeMarket}
+                onChange={(next) => {
+                  // A city belongs to one country.
+                  if (next.locationCode !== activeMarket.locationCode)
+                    setLocationName(undefined);
+                  setMarket(next);
+                }}
               />
-              <span className="text-xs text-muted-foreground">
-                Optional: cluster on one city’s Google results (best for local
-                services). Leave empty for the whole country.
-              </span>
-            </div>
-          </div>
-        ) : null}
-        <Label className="font-normal">
-          <Checkbox
-            checked={fetchVolume}
-            onCheckedChange={(checked) => setFetchVolume(checked)}
-          />
-          Look up search volume and CPC for keywords without them
-          {missingVolume ? ` (${missingVolume.toLocaleString()} keywords)` : ""}
-        </Label>
-        <p className={tooMany ? "text-destructive" : "text-muted-foreground"}>
-          {parsed.keywords.length.toLocaleString()} unique keywords
-          {parsed.duplicates
-            ? ` · ${parsed.duplicates.toLocaleString()} duplicates removed`
-            : ""}
-          {parsed.invalid
-            ? ` · ${parsed.invalid.toLocaleString()} too long, skipped`
-            : ""}
-          {tooMany
-            ? ` · the limit is ${MAX_CLUSTER_KEYWORDS.toLocaleString()} per run`
-            : ""}
-        </p>
-        <div className="flex justify-end">
+              <div className="space-y-1">
+                <span className="font-medium">City (optional)</span>
+                <KeywordAreaField
+                  className="w-full"
+                  locationCode={activeMarket.locationCode}
+                  value={locationName}
+                  onChange={setLocationName}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use one city’s Google results for local services. Leave empty
+                  for the whole country.
+                </p>
+              </div>
+            </>
+          ) : null}
+          <Label className="items-start font-normal">
+            <Checkbox
+              className="mt-0.5"
+              checked={fetchVolume}
+              onCheckedChange={(checked) => setFetchVolume(checked)}
+            />
+            <span>
+              Look up search volume and CPC for keywords without them
+              {missingVolume
+                ? ` (${missingVolume.toLocaleString()} keywords)`
+                : ""}
+            </span>
+          </Label>
           <Button
-            disabled={
-              parsed.keywords.length < 2 ||
-              tooMany ||
-              !activeMarket ||
-              create.isPending
-            }
+            className="w-full"
+            disabled={count < 2 || tooMany || !activeMarket || create.isPending}
             onClick={() => create.mutate()}
           >
-            {create.isPending ? "Preparing…" : "Review cost"}
+            {create.isPending
+              ? "Preparing…"
+              : count < 2
+                ? "Add at least 2 keywords"
+                : `Review cost for ${count.toLocaleString()} keywords`}
           </Button>
-        </div>
-        {create.isError ? (
-          <p role="alert" className="text-destructive">
-            {getStandardErrorMessage(create.error)}
+          <p className="-mt-2 text-center text-xs text-muted-foreground">
+            You see the price before anything is charged.
           </p>
-        ) : null}
+          {create.isError ? (
+            <p role="alert" className="text-destructive">
+              {getStandardErrorMessage(create.error)}
+            </p>
+          ) : null}
+          <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">How it works</p>
+            <ol className="list-decimal space-y-0.5 pl-4">
+              <li>We fetch Google’s top 10 results for every keyword.</li>
+              <li>
+                Keywords that share enough of the same pages go in one cluster:
+                one page should target them all.
+              </li>
+              <li>
+                You tune the grouping afterwards for free: no new searches
+                needed.
+              </li>
+            </ol>
+          </div>
+        </div>
       </div>
     </CardShell>
   );
