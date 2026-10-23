@@ -1137,6 +1137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectIdDomainRouteImport
       parentRoute: typeof AppPProjectIdRouteRoute
     }
+    '/_app/p/$projectId/competitor-overview': {
+      id: '/_app/p/$projectId/competitor-overview'
+      path: '/competitor-overview'
+      fullPath: '/p/$projectId/competitor-overview'
+      preLoaderRoute: typeof AppPProjectIdCompetitorOverviewRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
     '/_app/p/$projectId/keyword-clustering': {
       id: '/_app/p/$projectId/keyword-clustering'
       path: '/keyword-clustering'
