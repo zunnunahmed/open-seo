@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
 import { toast } from "sonner";
 import { Network, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { PageHeader } from "@/client/components/PageHeader";
@@ -49,12 +51,19 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [analysedDomain, setAnalysedDomain] = useState("");
   const [completed, setCompleted] = useState(0);
   const [error, setError] = useState("");
-  const [selectedTab, setSelectedTab] = useState<"map" | "pages">("map");
+  const [selectedTab, setSelectedTab] = useState<"map" | "pages" | "compare">("map");
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const [saved, setSaved] = useState<Array<{ id: string; domain: string; market: number; requestedLimit: number; pageCount: number; complete: boolean; savedAt: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const { data: projects } = useQuery(projectsQueryOptions());
+  const mySite = projects?.find((project) => project.id === projectId)?.domain ?? "";
+  const [comparison, setComparison] = useState<PageRow[]>([]);
+  const [comparing, setComparing] = useState(false);
+  const [comparisonDomain, setComparisonDomain] = useState("");
+  const [comparisonError, setComparisonError] = useState("");
+
 
   async function refreshSaved() {
     try {
@@ -79,6 +88,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
       setCompleted(record.pages.length);
       setAnalysedDomain(record.domain);
       setSavedId(record.id);
+      setComparison([]);
+      setComparisonDomain("");
       setError("");
       setExpanded(null);
       toast.success("Saved research loaded. No SEO API request made.");
@@ -128,6 +139,55 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     })).sort((a, b) => b.estimatedTraffic - a.estimatedTraffic);
   }, [pages]);
 
+
+  const comparisonGroups = useMemo(() => {
+    const own = new Map<string, PageRow[]>();
+    for (const row of comparison) {
+      const key = clusterName(row.relativePath ?? new URL(row.page).pathname).toLowerCase();
+      own.set(key, [...(own.get(key) ?? []), row]);
+    }
+    return groups.map((group) => ({
+      ...group,
+      ownPages: own.get(group.name.toLowerCase()) ?? [],
+    }));
+  }, [comparison, groups]);
+
+  async function compareWithMine() {
+    if (!mySite || !pages.length || comparing || !acknowledged) return;
+    let host: string;
+    try {
+      host = domainField.parse(mySite);
+    } catch {
+      setComparisonError("Your project needs a valid website domain in Project Settings.");
+      return;
+    }
+    setComparison([]);
+    setComparisonDomain("");
+    setComparisonError("");
+    setComparing(true);
+    const results: PageRow[] = [];
+    const pageSize = limit <= 50 ? 50 : limit <= 100 ? 100 : 200;
+    try {
+      for (let offset = 0; offset < limit; offset += pageSize) {
+        const response = await getDomainPagesPage({
+          data: {
+            projectId, domain: host, scope: "domain", locationCode: market,
+            page: Math.floor(offset / pageSize) + 1, pageSize,
+            sortMode: "traffic", sortOrder: "desc", filters: {},
+          },
+        });
+        results.push(...response.pages.slice(0, limit - offset));
+        if (!response.hasMore || !response.pages.length) break;
+      }
+      setComparison(results);
+      setComparisonDomain(host);
+    } catch (cause) {
+      setComparisonError(cause instanceof Error ? cause.message : "Could not retrieve your site's ranking pages.");
+    } finally {
+      setComparing(false);
+    }
+  }
+
   async function analyse() {
     let host: string;
     try {
@@ -146,6 +206,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     setCompleted(0);
     setAnalysedDomain(host);
     setSavedId(null);
+    setComparison([]);
+    setComparisonDomain("");
     let complete = false;
     const collected: PageRow[] = [];
     const batchSize = limit <= 50 ? 50 : limit <= 100 ? 100 : 200;
@@ -274,8 +336,38 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
             <div className="flex gap-2 border-b pb-2">
               <Button variant={selectedTab === "map" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("map")}>Topical Map</Button>
               <Button variant={selectedTab === "pages" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("pages")}>Pages</Button>
+              <Button variant={selectedTab === "compare" ? "secondary" : "ghost"} size="sm" onClick={() => setSelectedTab("compare")}>Compare with My Site</Button>
             </div>
-            {selectedTab === "map" ? (
+            {selectedTab === "compare" ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Your project website: {mySite || "Not configured"}. Compare ranked pages for the same country and page limit. This is a URL-path grouping comparison, not yet a semantic content gap audit.</p>
+                <Button disabled={!mySite || !pages.length || !acknowledged || comparing || running}
+                  onClick={() => void compareWithMine()}>
+                  {comparing ? "Comparing…" : "Compare with My Site"}
+                </Button>
+                {!acknowledged && <p className="text-xs text-muted-foreground">Approve potentially chargeable requests above before comparing.</p>}
+                {comparisonError && <p role="alert" className="text-sm text-destructive">{comparisonError}</p>}
+                {comparisonDomain && (
+                  <>
+                    <p className="text-sm">{comparisonDomain}: {comparison.length} ranked pages compared with {pages.length} competitor pages.</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead><tr className="border-b"><th className="p-2">Competitor URL group</th><th className="p-2 text-right">Competitor pages</th><th className="p-2 text-right">My pages</th><th className="p-2">Preliminary status</th></tr></thead>
+                        <tbody>{comparisonGroups.map((group) => (
+                          <tr key={group.name} className="border-b">
+                            <td className="p-2">{group.name}</td>
+                            <td className="p-2 text-right">{group.rows.length}</td>
+                            <td className="p-2 text-right">{group.ownPages.length}</td>
+                            <td className="p-2">{group.ownPages.length ? "URL group overlap" : "Possible gap — verify manually"}</td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Absence from the ranked-page sample does not prove a missing topic. Review your indexed pages and content before creating new URLs.</p>
+                  </>
+                )}
+              </div>
+            ) : selectedTab === "map" ? (
               <div className="space-y-2">
                 {groups.map((group) => (
                   <div key={group.name} className="rounded-lg border">
