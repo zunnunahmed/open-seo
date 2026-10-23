@@ -8,7 +8,7 @@ import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Card } from "@/client/components/ui/card";
 import { getDomainPagesPage } from "@/serverFunctions/domain";
-import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap } from "@/serverFunctions/competitorTopicalMap";
+import { saveCompetitorTopicalMap, listCompetitorTopicalMaps, getCompetitorTopicalMap, deleteCompetitorTopicalMap, getCompetitorCrawlHistory, importCompetitorCrawl } from "@/serverFunctions/competitorTopicalMap";
 import { domainField } from "@/types/schemas/domain";
 import type { PageRow } from "@/client/features/domain/types";
 
@@ -63,6 +63,9 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [comparing, setComparing] = useState(false);
   const [comparisonDomain, setComparisonDomain] = useState("");
   const [comparisonError, setComparisonError] = useState("");
+  const [crawls, setCrawls] = useState<Array<{ id: string; startUrl: string; pagesCrawled: number; completedAt: string | null }>>([]);
+  const [crawlId, setCrawlId] = useState("");
+  const [loadingCrawls, setLoadingCrawls] = useState(false);
 
 
   async function refreshSaved() {
@@ -188,6 +191,50 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
     }
   }
 
+
+  async function loadCrawls() {
+    setLoadingCrawls(true);
+    try {
+      const history = await getCompetitorCrawlHistory({ data: { projectId } });
+      setCrawls(history);
+      setCrawlId(history[0]?.id ?? "");
+    } catch {
+      toast.error("Could not load completed crawls.");
+    } finally {
+      setLoadingCrawls(false);
+    }
+  }
+
+  async function useCrawl() {
+    try {
+      const host = domainField.parse(domain);
+      if (!crawlId) { setError("Select a completed crawl first."); return; }
+      setRunning(true);
+      setError("");
+      const crawled = await importCompetitorCrawl({
+        data: { projectId, competitorDomain: host, auditId: crawlId, maxPages: limit },
+      });
+      const seen = new Set<string>();
+      const merged = [...pages, ...crawled].filter((row) => {
+        const key = row.page.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, limit);
+      setPages(merged);
+      setAnalysedDomain(host);
+      setCompleted(merged.length);
+      setComparison([]);
+      setComparisonDomain("");
+      if (merged.length > 0) await storeSnapshot(host, merged, true);
+      toast.success("Crawl URLs imported. Ranking metrics are kept where already available.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not import crawl.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function analyse() {
     let host: string;
     try {
@@ -295,6 +342,25 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
               onChange={(event) => setAcknowledged(event.target.checked)} className="mt-1" />
             I approve potentially chargeable SEO data requests for this analysis.
           </label>
+
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div>
+              <h2 className="text-sm font-semibold">Reuse existing Site Audit crawl</h2>
+              <p className="text-xs text-muted-foreground">Import previously crawled competitor URLs, including pages without rankings. No new crawl or paid SEO provider calls. The crawl must have been completed within this project.</p>
+            </div>
+            <Button type="button" size="sm" variant="outline" disabled={running || loadingCrawls}
+              onClick={() => void loadCrawls()}>{loadingCrawls ? "Loading…" : "Find completed crawls"}</Button>
+            {crawls.length > 0 && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select value={crawlId} onChange={(event) => setCrawlId(event.target.value)}
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm">
+                  {crawls.map((crawl) => <option key={crawl.id} value={crawl.id}>{new URL(crawl.startUrl).hostname} — {crawl.pagesCrawled} pages</option>)}
+                </select>
+                <Button type="button" variant="secondary" disabled={running || !crawlId || !domain.trim()}
+                  onClick={() => void useCrawl()}>Import crawl pages</Button>
+              </div>
+            )}
+          </div>
           {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
           <Button onClick={() => void analyse()} disabled={running || !domain.trim() || !acknowledged}>
             <Network className="size-4" />
