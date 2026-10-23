@@ -174,7 +174,19 @@ async function verify(email: string): Promise<Verification> {
   return "unknown";
 }
 
-/** A finder's failure (rate limit, provider outage) is a miss, not fatal. */
+/**
+ * treg itself is unusable: not configured (no HTTP status), a bad token, or
+ * no balance. Every other error is the provider's own answer, which treg
+ * relays unchanged (some answer "not found" with a 404 or 422).
+ */
+function isTregAccountError(error: unknown): boolean {
+  if (!(error instanceof AppError) || error.code !== "TREG_REQUEST_FAILED")
+    return false;
+  const status = error.details?.providerStatus;
+  return !status || ["401", "402", "403"].includes(status);
+}
+
+/** A finder's failure (no match, rate limit, outage) is a miss, not fatal. */
 async function attempt<T>(
   label: string,
   run: () => Promise<T>,
@@ -182,8 +194,7 @@ async function attempt<T>(
   try {
     return await run();
   } catch (error) {
-    if (error instanceof AppError && error.code === "TREG_REQUEST_FAILED")
-      throw error; // treg itself is misconfigured or out of balance
+    if (isTregAccountError(error)) throw error;
     console.warn(`outreach.${label} failed`, error);
     return null;
   }
@@ -207,9 +218,9 @@ export async function findContactsForDomain(
     return true;
   };
 
-  // Dropleads is free and decides the rest: an error here (bad token, treg
-  // down) surfaces instead of silently finding nobody.
-  const people = await searchPeople(domain, kind);
+  // A treg account problem still surfaces instead of silently finding nobody.
+  const people =
+    (await attempt("dropleads", () => searchPeople(domain, kind))) ?? [];
   for (const person of people) {
     if (found.length >= MAX_CONTACTS) break;
     const firstName = person.first_name?.trim() || null;

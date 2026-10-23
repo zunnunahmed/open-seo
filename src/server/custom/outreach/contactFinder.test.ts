@@ -25,7 +25,9 @@ function stubTreg(bodies: Record<string, unknown>) {
             : input.url,
       );
       const endpoint = url.pathname.replace("/call/", "");
-      return Response.json(bodies[endpoint] ?? {});
+      const body = bodies[endpoint];
+      // A Response stands for an error answer relayed by treg.
+      return body instanceof Response ? body : Response.json(body ?? {});
     });
 }
 
@@ -75,6 +77,39 @@ describe("findContactsForDomain", () => {
     expect(calledEndpoints(fetchMock)).not.toContain(
       "tomba.companies.emails.list",
     );
+  });
+
+  it("treats a provider's error answer as a miss and an empty treg balance as fatal", async () => {
+    const lead = {
+      data: {
+        leads: [
+          {
+            first_name: "Jane",
+            last_name: "Doe",
+            linkedin_url: "https://www.linkedin.com/in/jane",
+          },
+        ],
+      },
+    };
+    stubTreg({
+      "dropleads.people.search": lead,
+      "blitzapi.people.email.find": new Response("not found", { status: 404 }),
+      "trykitt.people.email.find": { email: "jane@site.com" },
+    });
+    const { contacts } = await findContactsForDomain(
+      "site.com",
+      "link",
+      new Set(),
+    );
+    expect(contacts.map((c) => c.email)).toEqual(["jane@site.com"]);
+
+    vi.restoreAllMocks();
+    stubTreg({
+      "dropleads.people.search": new Response("no balance", { status: 402 }),
+    });
+    await expect(
+      findContactsForDomain("site.com", "link", new Set()),
+    ).rejects.toThrow("treg HTTP 402");
   });
 
   it("falls back to the domain's listed emails and reports catch-all honestly", async () => {
