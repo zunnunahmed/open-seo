@@ -91,3 +91,47 @@ export const deleteCompetitorTopicalMap = createServerFn({ method: "POST" })
     await env.R2.delete(objectKey(context.projectId, data.id));
     return { deleted: true };
   });
+
+import { AuditRepository } from "@/server/features/audit/repositories/AuditRepository";
+
+const crawlImportSchema = projectInput.extend({
+  auditId: z.string().uuid(),
+  competitorDomain: domainField,
+  maxPages: z.number().int().min(25).max(1000),
+});
+
+export const getCompetitorCrawlHistory = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(projectInput)
+  .handler(async ({ context }) => {
+    const history = await AuditRepository.getAuditsByProject(context.projectId);
+    return history.filter((audit) => audit.status === "completed").map((audit) => ({
+      id: audit.id, startUrl: audit.startUrl, pagesCrawled: audit.pagesCrawled,
+      completedAt: audit.completedAt,
+    }));
+  });
+
+export const importCompetitorCrawl = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(crawlImportSchema)
+  .handler(async ({ data, context }) => {
+    const result = await AuditRepository.getAuditResultsForProject(data.auditId, context.projectId);
+    if (!result.audit || result.audit.status !== "completed") {
+      throw new Error("Choose a completed crawl from this project.");
+    }
+    const crawlHost = new URL(result.audit.startUrl).hostname.replace(/^www\./, "").toLowerCase();
+    if (crawlHost !== data.competitorDomain) {
+      throw new Error("The selected crawl belongs to a different domain.");
+    }
+    const pages = result.pages.filter((p) => {
+      try {
+        return new URL(p.url).hostname.replace(/^www\./, "").toLowerCase() === data.competitorDomain;
+      } catch { return false; }
+    }).slice(0, data.maxPages);
+    return pages.map((p) => ({
+      page: p.url,
+      relativePath: new URL(p.url).pathname,
+      organicTraffic: null,
+      keywords: null,
+    }));
+  });
