@@ -67,6 +67,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
   const [crawls, setCrawls] = useState<Array<{ id: string; startUrl: string; pagesCrawled: number; completedAt: string | null }>>([]);
   const [crawlId, setCrawlId] = useState("");
   const [loadingCrawls, setLoadingCrawls] = useState(false);
+  const [crawlsChecked, setCrawlsChecked] = useState(false);
+  const [crawlLookupError, setCrawlLookupError] = useState("");
 
 
   async function refreshSaved() {
@@ -194,12 +196,17 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
 
   async function loadCrawls() {
     setLoadingCrawls(true);
+    setCrawlLookupError("");
+    setCrawlsChecked(false);
     try {
       const history = await getCompetitorCrawlHistory({ data: { projectId } });
-      setCrawls(history);
-      setCrawlId(history[0]?.id ?? "");
+      const host = domainField.safeParse(domain);
+      const matching = host.success ? history.filter((audit) => new URL(audit.startUrl).hostname.replace(/^www\./, "").toLowerCase() === host.data) : history;
+      setCrawls(matching);
+      setCrawlId(matching[0]?.id ?? "");
+      setCrawlsChecked(true);
     } catch {
-      toast.error("Could not load completed crawls.");
+      setCrawlLookupError("Could not load completed crawls. Try again.");
     } finally {
       setLoadingCrawls(false);
     }
@@ -349,6 +356,8 @@ export function CompetitorTopicalMapPage({ projectId }: { projectId: string }) {
             </div>
             <Button type="button" size="sm" variant="outline" disabled={running || loadingCrawls}
               onClick={() => void loadCrawls()}>{loadingCrawls ? "Loading…" : "Find completed crawls"}</Button>
+            {crawlLookupError && <p className="text-sm text-destructive" role="alert">{crawlLookupError}</p>}
+            {crawlsChecked && crawls.length === 0 && <p className="text-sm text-muted-foreground" role="status">No completed Site Audit crawl found for this competitor in the current project. This option imports existing crawls only; it does not start a new crawl. Run a Site Audit for this domain first, then return to import it.</p>}
             {crawls.length > 0 && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <select value={crawlId} onChange={(event) => setCrawlId(event.target.value)}
