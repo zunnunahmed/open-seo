@@ -81,23 +81,50 @@ async function requireTregToken(): Promise<string> {
  * POST to one treg catalog endpoint. Never retried: treg bills per call, and a
  * failed response does not prove the provider skipped the charge.
  */
-export async function postToTreg(
+export function postToTreg(
   endpointId: string,
   body: unknown,
   signal?: AbortSignal,
 ): Promise<Response> {
+  return sendToTreg(endpointId, { method: "POST", body, signal });
+}
+
+/** GET a treg catalog endpoint whose provider takes query parameters. */
+export function getFromTreg(
+  endpointId: string,
+  query: Record<string, string | number | boolean>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return sendToTreg(endpointId, { method: "GET", query, signal });
+}
+
+async function sendToTreg(
+  endpointId: string,
+  request: {
+    method: "GET" | "POST";
+    body?: unknown;
+    query?: Record<string, string | number | boolean>;
+    signal?: AbortSignal;
+  },
+): Promise<Response> {
   const token = await requireTregToken();
+  const url = new URL(`https://treg.to/call/${endpointId}`);
+  for (const [key, value] of Object.entries(request.query ?? {}))
+    url.searchParams.set(key, String(value));
   let response: Response;
   try {
-    response = await fetch(`https://treg.to/call/${endpointId}`, {
-      method: "POST",
+    response = await fetch(url.href, {
+      method: request.method,
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
+        ...(request.method === "POST"
+          ? { "Content-Type": "application/json" }
+          : {}),
         "X-Treg-Token": token,
       },
-      body: JSON.stringify(body),
-      signal: signal ?? AbortSignal.timeout(60_000),
+      body:
+        request.method === "POST" ? JSON.stringify(request.body) : undefined,
+      signal: request.signal ?? AbortSignal.timeout(60_000),
     });
   } catch (error) {
     if (

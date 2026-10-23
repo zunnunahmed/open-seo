@@ -127,4 +127,7 @@ export const {
   aiObservations,
   aiSources,
   aiMatches,
+  outreachProspects,
+  outreachContacts,
+  outreachSuppressions,
 } = schema;

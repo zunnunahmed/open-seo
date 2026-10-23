@@ -15,6 +15,7 @@ import {
   Network,
   Map,
   Search,
+  Send,
   TrendingUp,
 } from "lucide-react";
 import { linkOptions } from "@tanstack/react-router";
@@ -83,6 +84,11 @@ const projectNavItems = [
     to: "/p/$projectId/backlinks" as const,
     label: "Backlinks",
     icon: Link2,
+  },
+  {
+    to: "/p/$projectId/outreach" as const,
+    label: "Link Prospects",
+    icon: Send,
   },
   {
     to: "/p/$projectId/audit" as const,
@@ -173,7 +179,10 @@ export function getProjectNavGroups(projectId: string) {
     },
     {
       label: "Outreach",
-      items: [byPath("/p/$projectId/backlinks")],
+      items: [
+        byPath("/p/$projectId/backlinks"),
+        byPath("/p/$projectId/outreach"),
+      ],
     },
     {
       label: "AI Visibility",

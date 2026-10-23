@@ -496,3 +496,116 @@ export const crawlerCredentials = sqliteTable(
 );
 
 export { dataRefreshClaims } from "./dashboard.schema";
+
+// ============================================================================
+// Outreach (fork): link-building and PR prospects, the contacts found for
+// them through treg, and a do-not-contact list. Sending happens in
+// Instantly.ai; these rows record what was pushed there.
+// ============================================================================
+
+export const outreachProspects = sqliteTable(
+  "outreach_prospects",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    domain: text("domain").notNull(),
+    source: text("source", {
+      enum: ["link_gap", "guest_post", "pr", "import"],
+    }).notNull(),
+    // Competitor domain (link gap), search query (guest post), topic (PR).
+    sourceDetail: text("source_detail"),
+    // Linking page, contribution page or article that surfaced the prospect.
+    sourceUrl: text("source_url"),
+    sourceTitle: text("source_title"),
+    authority: integer("authority"),
+    status: text("status", {
+      enum: [
+        "new",
+        "contacts_found",
+        "no_contacts",
+        "sent",
+        "replied",
+        "won",
+        "skipped",
+      ],
+    })
+      .notNull()
+      .default("new"),
+    contactsCheckedAt: text("contacts_checked_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [
+    uniqueIndex("outreach_prospects_project_domain_source_unique").on(
+      table.projectId,
+      table.domain,
+      table.source,
+    ),
+    index("outreach_prospects_project_created_idx").on(
+      table.projectId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const outreachContacts = sqliteTable(
+  "outreach_contacts",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    prospectId: text("prospect_id")
+      .notNull()
+      .references(() => outreachProspects.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    title: text("title"),
+    linkedinUrl: text("linkedin_url"),
+    foundVia: text("found_via", {
+      enum: ["blitz", "trykitt", "tomba", "import"],
+    }).notNull(),
+    verification: text("verification", {
+      enum: ["valid", "catch_all", "unknown", "invalid", "unverified"],
+    })
+      .notNull()
+      .default("unverified"),
+    verifiedAt: text("verified_at"),
+    instantlyCampaignId: text("instantly_campaign_id"),
+    sentAt: text("sent_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [
+    // One contact per email per project: nobody is pitched twice.
+    uniqueIndex("outreach_contacts_project_email_unique").on(
+      table.projectId,
+      table.email,
+    ),
+    index("outreach_contacts_prospect_idx").on(table.prospectId),
+  ],
+);
+
+// Emails or whole domains never to contact (lowercased).
+export const outreachSuppressions = sqliteTable(
+  "outreach_suppressions",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    value: text("value").notNull(),
+    reason: text("reason"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [primaryKey({ columns: [table.projectId, table.value] })],
+);

@@ -54,6 +54,7 @@ import { Route as AppPProjectIdContextRouteImport } from './routes/_app/p/$proje
 import { Route as AppPProjectIdDomainRouteImport } from './routes/_app/p/$projectId/domain'
 import { Route as AppPProjectIdKeywordClusteringRouteImport } from './routes/_app/p/$projectId/keyword-clustering'
 import { Route as AppPProjectIdKeywordsRouteImport } from './routes/_app/p/$projectId/keywords'
+import { Route as AppPProjectIdOutreachRouteImport } from './routes/_app/p/$projectId/outreach'
 import { Route as AppPProjectIdPromptExplorerRouteImport } from './routes/_app/p/$projectId/prompt-explorer'
 import { Route as AppPProjectIdRankTrackingRouteImport } from './routes/_app/p/$projectId/rank-tracking'
 import { Route as AppPProjectIdSamRouteImport } from './routes/_app/p/$projectId/sam'
@@ -308,6 +309,11 @@ const AppPProjectIdKeywordsRoute = AppPProjectIdKeywordsRouteImport.update({
   path: '/keywords',
   getParentRoute: () => AppPProjectIdRouteRoute,
 } as any)
+const AppPProjectIdOutreachRoute = AppPProjectIdOutreachRouteImport.update({
+  id: '/outreach',
+  path: '/outreach',
+  getParentRoute: () => AppPProjectIdRouteRoute,
+} as any)
 const AppPProjectIdPromptExplorerRoute =
   AppPProjectIdPromptExplorerRouteImport.update({
     id: '/prompt-explorer',
@@ -483,6 +489,7 @@ export interface FileRoutesByFullPath {
   '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
+  '/p/$projectId/outreach': typeof AppPProjectIdOutreachRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
   '/p/$projectId/rank-tracking': typeof AppPProjectIdRankTrackingRouteWithChildren
   '/p/$projectId/sam': typeof AppPProjectIdSamRoute
@@ -547,6 +554,7 @@ export interface FileRoutesByTo {
   '/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
+  '/p/$projectId/outreach': typeof AppPProjectIdOutreachRoute
   '/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
   '/p/$projectId/sam': typeof AppPProjectIdSamRoute
   '/p/$projectId/saved': typeof AppPProjectIdSavedRoute
@@ -616,6 +624,7 @@ export interface FileRoutesById {
   '/_app/p/$projectId/domain': typeof AppPProjectIdDomainRoute
   '/_app/p/$projectId/keyword-clustering': typeof AppPProjectIdKeywordClusteringRoute
   '/_app/p/$projectId/keywords': typeof AppPProjectIdKeywordsRoute
+  '/_app/p/$projectId/outreach': typeof AppPProjectIdOutreachRoute
   '/_app/p/$projectId/prompt-explorer': typeof AppPProjectIdPromptExplorerRoute
   '/_app/p/$projectId/rank-tracking': typeof AppPProjectIdRankTrackingRouteWithChildren
   '/_app/p/$projectId/sam': typeof AppPProjectIdSamRoute
@@ -685,6 +694,7 @@ export interface FileRouteTypes {
     | '/p/$projectId/domain'
     | '/p/$projectId/keyword-clustering'
     | '/p/$projectId/keywords'
+    | '/p/$projectId/outreach'
     | '/p/$projectId/prompt-explorer'
     | '/p/$projectId/rank-tracking'
     | '/p/$projectId/sam'
@@ -749,6 +759,7 @@ export interface FileRouteTypes {
     | '/p/$projectId/domain'
     | '/p/$projectId/keyword-clustering'
     | '/p/$projectId/keywords'
+    | '/p/$projectId/outreach'
     | '/p/$projectId/prompt-explorer'
     | '/p/$projectId/sam'
     | '/p/$projectId/saved'
@@ -817,6 +828,7 @@ export interface FileRouteTypes {
     | '/_app/p/$projectId/domain'
     | '/_app/p/$projectId/keyword-clustering'
     | '/_app/p/$projectId/keywords'
+    | '/_app/p/$projectId/outreach'
     | '/_app/p/$projectId/prompt-explorer'
     | '/_app/p/$projectId/rank-tracking'
     | '/_app/p/$projectId/sam'
@@ -1182,6 +1194,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPProjectIdKeywordsRouteImport
       parentRoute: typeof AppPProjectIdRouteRoute
     }
+    '/_app/p/$projectId/outreach': {
+      id: '/_app/p/$projectId/outreach'
+      path: '/outreach'
+      fullPath: '/p/$projectId/outreach'
+      preLoaderRoute: typeof AppPProjectIdOutreachRouteImport
+      parentRoute: typeof AppPProjectIdRouteRoute
+    }
     '/_app/p/$projectId/prompt-explorer': {
       id: '/_app/p/$projectId/prompt-explorer'
       path: '/prompt-explorer'
@@ -1425,6 +1444,7 @@ interface AppPProjectIdRouteRouteChildren {
   AppPProjectIdDomainRoute: typeof AppPProjectIdDomainRoute
   AppPProjectIdKeywordClusteringRoute: typeof AppPProjectIdKeywordClusteringRoute
   AppPProjectIdKeywordsRoute: typeof AppPProjectIdKeywordsRoute
+  AppPProjectIdOutreachRoute: typeof AppPProjectIdOutreachRoute
   AppPProjectIdPromptExplorerRoute: typeof AppPProjectIdPromptExplorerRoute
   AppPProjectIdRankTrackingRoute: typeof AppPProjectIdRankTrackingRouteWithChildren
   AppPProjectIdSamRoute: typeof AppPProjectIdSamRoute
@@ -1452,6 +1472,7 @@ const AppPProjectIdRouteRouteChildren: AppPProjectIdRouteRouteChildren = {
   AppPProjectIdDomainRoute: AppPProjectIdDomainRoute,
   AppPProjectIdKeywordClusteringRoute: AppPProjectIdKeywordClusteringRoute,
   AppPProjectIdKeywordsRoute: AppPProjectIdKeywordsRoute,
+  AppPProjectIdOutreachRoute: AppPProjectIdOutreachRoute,
   AppPProjectIdPromptExplorerRoute: AppPProjectIdPromptExplorerRoute,
   AppPProjectIdRankTrackingRoute: AppPProjectIdRankTrackingRouteWithChildren,
   AppPProjectIdSamRoute: AppPProjectIdSamRoute,
