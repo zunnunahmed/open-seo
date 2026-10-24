@@ -47,7 +47,7 @@ function fakeClient(pages: Record<string, ReturnType<typeof ranked>[]>) {
 }
 
 describe("extractInfoTopics", () => {
-  it("takes a topic that is already searched as it is, without a SERP", async () => {
+  it("takes a topic that is already searched as it is, with its top result but no page lookup", async () => {
     const { client, typed } = fakeClient({});
     client.labs.keywordOverview.mockResolvedValue([
       { keyword: "carpal tunnel", keyword_info: { search_volume: 900 } },
@@ -66,8 +66,10 @@ describe("extractInfoTopics", () => {
       topic: "Carpal Tunnel",
       infoTopic: "carpal tunnel",
       matchedBy: "existing",
+      url: "https://a.com/1",
+      aiOverview: true,
     });
-    expect(client.serp.live).not.toHaveBeenCalled();
+    expect(client.domain.rankedKeywords).not.toHaveBeenCalled();
   });
 
   it("stops at the first page with a matching keyword and reuses cached pages", async () => {

@@ -134,13 +134,8 @@ const emptyRow = (topic: string, aiOverview: boolean | null): InfoTopicRow => ({
 });
 
 /** One topic through Google's top 3 pages, stopping at the first match. */
-async function extractOne(
-  client: Client,
-  kv: InfoTopicsKv,
-  topic: string,
-  market: Market,
-  ai: { apiKey: string; model: string } | null,
-): Promise<InfoTopicRow> {
+/** Google's top organic URLs for a topic, and whether it shows an AI Overview. */
+async function topResults(client: Client, topic: string, market: Market) {
   const serp = await client.serp.live({
     keyword: topic,
     locationCode: market.locationCode,
@@ -148,11 +143,42 @@ async function extractOne(
     depth: 10,
     creditFeature: "keyword_research",
   });
-  const aiOverview = serp.some((item) => item.type === "ai_overview");
-  const urls = serp
-    .filter((item) => item.type === "organic" && item.url)
-    .slice(0, TOP_URLS)
-    .flatMap((item) => (item.url ? [item.url] : []));
+  return {
+    aiOverview: serp.some((item) => item.type === "ai_overview"),
+    urls: serp
+      .filter((item) => item.type === "organic" && item.url)
+      .slice(0, TOP_URLS)
+      .flatMap((item) => (item.url ? [item.url] : [])),
+  };
+}
+
+/**
+ * A topic that is already a keyword still gets Google's #1 result and the
+ * AI Overview check (one cheap SERP), but no page keyword lookup.
+ */
+async function withTopResult(
+  client: Client,
+  row: InfoTopicRow,
+  market: Market,
+): Promise<InfoTopicRow> {
+  const { aiOverview, urls } = await topResults(client, row.topic, market);
+  return {
+    ...row,
+    aiOverview,
+    url: urls[0] ?? null,
+    urlRank: urls[0] ? 1 : null,
+    position: urls[0] ? 1 : null,
+  };
+}
+
+async function extractOne(
+  client: Client,
+  kv: InfoTopicsKv,
+  topic: string,
+  market: Market,
+  ai: { apiKey: string; model: string } | null,
+): Promise<InfoTopicRow> {
+  const { aiOverview, urls } = await topResults(client, topic, market);
   for (const [index, url] of urls.entries()) {
     const candidates = await pageKeywords(client, kv, url, market);
     let picked = candidates.find((candidate) =>
@@ -227,7 +253,12 @@ export async function extractInfoTopics(input: {
   const settled = await Promise.allSettled(
     topics.map(async (topic) => {
       const found = existing.get(topic.toLowerCase());
-      if (found) return { ...found, topic };
+      if (found)
+        // The SERP only adds detail: if it fails, the match still stands.
+        return withTopResult(client, { ...found, topic }, market).catch(() => ({
+          ...found,
+          topic,
+        }));
       return extractOne(client, kv, topic, market, ai);
     }),
   );
