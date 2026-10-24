@@ -99,10 +99,7 @@ export const GROUP_OPTIONS: Array<{
 ];
 
 /** Modifier counts per group, for cost estimates (each runs before + after). */
-export const MODIFIER_COUNTS: Record<
-  SuggestionModifierGroup,
-  number
-> = {
+export const MODIFIER_COUNTS: Record<SuggestionModifierGroup, number> = {
   letters: 26,
   questions: 12,
   commercial: 11,

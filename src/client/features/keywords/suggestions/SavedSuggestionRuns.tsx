@@ -15,6 +15,7 @@ import {
 } from "@/serverFunctions/savedSuggestions";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
+import { InfoTopicsResults } from "./InfoTopicsResults";
 
 type SavedRun = Awaited<ReturnType<typeof listSavedSuggestionRuns>>[number];
 
@@ -106,6 +107,11 @@ export function SavedRunView({
           queriesRun={result.queriesRun}
           countryName={result.countryName}
         />
+      ) : result.mode === "info" ? (
+        <InfoTopicsResults
+          rows={result.rows}
+          countryName={result.countryName}
+        />
       ) : (
         <SuggestionsDfsResults
           rows={result.rows}
@@ -156,7 +162,11 @@ export function SavedSuggestionRuns({
       columnHelper.accessor("mode", {
         header: "Type",
         cell: ({ getValue }) =>
-          getValue() === "paid" ? (
+          getValue() === "info" ? (
+            <Badge variant="info" size="sm">
+              Info topics
+            </Badge>
+          ) : getValue() === "paid" ? (
             <Badge variant="soft" size="sm">
               Paid + volume
             </Badge>

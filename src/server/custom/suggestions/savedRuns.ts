@@ -67,16 +67,42 @@ const paidRunSchema = z.object({
     .max(MAX_ROWS),
 });
 
+const infoRunSchema = z.object({
+  mode: z.literal("info"),
+  countryName: z.string().max(100),
+  rows: z
+    .array(
+      z.object({
+        topic: z.string().max(200),
+        infoTopic: z.string().max(500).nullable(),
+        volume: z.number().nullable(),
+        difficulty: z.number().nullable(),
+        cpc: z.number().nullable(),
+        intent: z.string().max(40).nullable(),
+        matchedBy: z.enum(["existing", "word", "ai"]).nullable(),
+        urlRank: z.number().int().nullable(),
+        url: z.string().max(2048).nullable(),
+        position: z.number().nullable(),
+        aiOverview: z.boolean().nullable(),
+      }),
+    )
+    .max(MAX_ROWS),
+});
+
 export const savedRunInputSchema = z.object({
   name: z.string().trim().min(1).max(160),
-  result: z.discriminatedUnion("mode", [freeRunSchema, paidRunSchema]),
+  result: z.discriminatedUnion("mode", [
+    freeRunSchema,
+    paidRunSchema,
+    infoRunSchema,
+  ]),
 });
 type SavedRunInput = z.infer<typeof savedRunInputSchema>;
 
 const metaSchema = z.object({
   id: z.string(),
   name: z.string(),
-  mode: z.enum(["free", "paid"]),
+  mode: z.enum(["free", "paid", "info"]),
   keywordCount: z.number(),
   savedAt: z.string(),
   expiresAt: z.string(),
