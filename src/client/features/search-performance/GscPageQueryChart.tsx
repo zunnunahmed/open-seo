@@ -1,4 +1,4 @@
-import { Bar, BarChart } from "recharts";
+import { Bar, BarChart, LabelList } from "recharts";
 import {
   ChartGrid,
   ChartXAxis,
@@ -41,11 +41,11 @@ export function GscPageQueryChart({ months }: { months: Month[] }) {
     );
   return (
     <div className="space-y-1">
-      <div className="h-48 w-full min-w-0">
+      <div className="h-64 w-full min-w-0">
         <ChartContainer config={chartConfig} className="h-full">
           <BarChart
             data={months}
-            margin={{ top: 4, right: 0, bottom: 0, left: 0 }}
+            margin={{ top: 20, right: 0, bottom: 0, left: 0 }}
           >
             <ChartGrid />
             <ChartXAxis dataKey="month" tickFormatter={monthLabel} />
@@ -68,15 +68,24 @@ export function GscPageQueryChart({ months }: { months: Month[] }) {
             <Bar
               dataKey="queries"
               fill="var(--color-queries)"
-              radius={[2, 2, 0, 0]}
-              maxBarSize={28}
-            />
+              radius={[3, 3, 0, 0]}
+              maxBarSize={40}
+            >
+              <LabelList
+                dataKey="queries"
+                position="top"
+                className="fill-foreground text-[10px]"
+                formatter={(value: unknown) =>
+                  Number(value) > 0 ? Number(value).toLocaleString("en-US") : ""
+                }
+              />
+            </Bar>
           </BarChart>
         </ChartContainer>
       </div>
       <p className="text-xs text-muted-foreground">
-        Different queries per month. Google leaves out rare and private
-        searches, so real counts are higher. The last bar is this month so far.
+        Google leaves out rare and private searches, so real counts are a little
+        higher. The last bar is this month so far.
       </p>
     </div>
   );
