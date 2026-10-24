@@ -1,3 +1,5 @@
+import { sort } from "remeda";
+
 /**
  * Info Topic Extraction: for each original topic, the search keyword that
  * best represents it, taken from what Google's top pages already rank for.
@@ -103,4 +105,61 @@ export function isWordMatch(topic: string, keyword: string): boolean {
   if (new Set(all).size !== all.length) return false;
   const have = new Set(all);
   return needed.every((word) => have.has(word));
+}
+
+/** Words that never change what a topic means. */
+const FILLER = new Set(["a", "an", "the"]);
+
+/**
+ * Two topics with the same key are the same search: same words in any order,
+ * plurals and a/an/the ignored. Other small words stay, so "how to budget
+ * for retirement" and "retirement budget" remain different topics.
+ */
+function topicKey(text: string): string {
+  return sort(
+    words(text)
+      .filter((word) => !FILLER.has(word))
+      .map(stem),
+    (a, b) => a.localeCompare(b),
+  ).join(" ");
+}
+
+export type TopicCleaning = {
+  topics: string[];
+  /** The same topic again, ignoring capitals, spaces and punctuation. */
+  exactDuplicates: number;
+  /** A different spelling of a topic already listed, and the one kept. */
+  merged: Array<{ removed: string; kept: string }>;
+  /** Too short, too long, or nothing but symbols. */
+  invalid: number;
+};
+
+/** The pasted list as it will run: cleaned, each search once. */
+export function cleanTopics(lines: string[]): TopicCleaning {
+  const result: TopicCleaning = {
+    topics: [],
+    exactDuplicates: 0,
+    merged: [],
+    invalid: 0,
+  };
+  const keptByKey = new Map<string, string>();
+  for (const line of lines) {
+    const topic = line.replace(/\s+/g, " ").trim();
+    if (!topic) continue;
+    const key = topicKey(topic);
+    if (topic.length < 2 || topic.length > 120 || !key) {
+      result.invalid += 1;
+      continue;
+    }
+    const kept = keptByKey.get(key);
+    if (kept === undefined) {
+      keptByKey.set(key, topic);
+      result.topics.push(topic);
+    } else if (words(kept).join(" ") === words(topic).join(" ")) {
+      result.exactDuplicates += 1;
+    } else {
+      result.merged.push({ removed: topic, kept });
+    }
+  }
+  return result;
 }

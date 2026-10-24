@@ -15,7 +15,11 @@ import {
   getTopicalAiAnalysis,
   listCompetitorTopicalMaps,
 } from "@/serverFunctions/competitorTopicalMap";
-import { MAX_INFO_TOPICS } from "@/shared/infoTopics";
+import {
+  cleanTopics,
+  MAX_INFO_TOPICS,
+  type TopicCleaning,
+} from "@/shared/infoTopics";
 import { getLanguageCode, LOCATION_OPTIONS } from "@/shared/keyword-locations";
 import { InfoTopicsResults } from "./InfoTopicsResults";
 import { useInfoTopicRun } from "./useInfoTopicRun";
@@ -128,6 +132,61 @@ function TopicalMapImport({
   );
 }
 
+/** What cleaning changed in the pasted list, before anything is paid for. */
+function TopicCleaningSummary({
+  lines,
+  cleaning,
+  onApply,
+}: {
+  lines: number;
+  cleaning: TopicCleaning;
+  onApply: () => void;
+}) {
+  const parts = [
+    cleaning.exactDuplicates
+      ? `${cleaning.exactDuplicates.toLocaleString("en-US")} exact duplicates`
+      : "",
+    cleaning.merged.length
+      ? `${cleaning.merged.length.toLocaleString("en-US")} near-duplicates merged`
+      : "",
+    cleaning.invalid
+      ? `${cleaning.invalid.toLocaleString("en-US")} too short or too long`
+      : "",
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return (
+    <div className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span>
+          Cleaned: {lines.toLocaleString("en-US")} lines →{" "}
+          <strong>
+            {cleaning.topics.length.toLocaleString("en-US")} topics
+          </strong>{" "}
+          · {parts.join(" · ")}
+        </span>
+        <Button size="sm" variant="outline" className="h-6" onClick={onApply}>
+          Apply cleaning to the list
+        </Button>
+      </div>
+      {cleaning.merged.length ? (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">
+            Show merged near-duplicates
+          </summary>
+          <ul className="mt-1 max-h-48 space-y-0.5 overflow-auto">
+            {cleaning.merged.slice(0, 300).map((entry) => (
+              <li key={entry.removed}>
+                <span className="line-through">{entry.removed}</span> → kept as
+                “{entry.kept}”
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Suggestions → Info topics: for each topic, the searched keyword that best
  * represents it, from what Google's top pages rank for. Runs save themselves
@@ -156,14 +215,10 @@ export function InfoTopicExtraction({
   const [startError, setStartError] = useState("");
   const run = useInfoTopicRun(projectId);
 
-  const allTopics = [
-    ...new Set(
-      text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length >= 2 && line.length <= 120),
-    ),
-  ];
+  // The run always uses the cleaned list: each search is paid for once.
+  const lines = text.split("\n").filter((line) => line.trim());
+  const cleaning = cleanTopics(lines);
+  const allTopics = cleaning.topics;
   const topics = allTopics.slice(0, MAX_INFO_TOPICS);
   const typicalUsd = topics.length * (SERP_USD + PAGE_KEYWORDS_USD);
   const maxUsd = topics.length * (SERP_USD + 3 * PAGE_KEYWORDS_USD);
@@ -226,9 +281,14 @@ export function InfoTopicExtraction({
               onChange={(event) => setText(event.target.value)}
               placeholder={"carpal tunnel exercises\nwrist pain at night"}
             />
+            <TopicCleaningSummary
+              lines={lines.length}
+              cleaning={cleaning}
+              onApply={() => setText(allTopics.join("\n"))}
+            />
             <p className="text-xs text-muted-foreground">
               {topics.length.toLocaleString("en-US")} unique{" "}
-              {topics.length === 1 ? "topic" : "topics"}
+              {topics.length === 1 ? "topic" : "topics"} will run
               {allTopics.length > MAX_INFO_TOPICS ? (
                 <span className="text-destructive">
                   {" "}
