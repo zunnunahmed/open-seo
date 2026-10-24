@@ -44,6 +44,16 @@ const HEADERS = [
   "AI Overview",
 ];
 
+/** For topics taken as they are: no Google search was made for them. */
+const NOT_CHECKED = (
+  <span
+    className="text-xs text-muted-foreground"
+    title="The topic is already a searched keyword, so no Google search was needed."
+  >
+    Not checked
+  </span>
+);
+
 const count = (value: number | null) =>
   value == null ? "-" : value.toLocaleString("en-US");
 
@@ -115,8 +125,9 @@ const columns = [
   }),
   columnHelper.accessor("url", {
     header: "Ranking URL",
-    cell: ({ getValue }) => {
+    cell: ({ row, getValue }) => {
       const url = getValue();
+      if (row.original.matchedBy === "existing") return NOT_CHECKED;
       return url ? (
         <a
           href={url}
@@ -138,11 +149,13 @@ const columns = [
       <SortableHeader column={column} label="AI Overview" />
     ),
     cell: ({ row }) =>
-      row.original.aiOverview == null
-        ? "-"
-        : row.original.aiOverview
-          ? "Yes"
-          : "No",
+      row.original.matchedBy === "existing"
+        ? NOT_CHECKED
+        : row.original.aiOverview == null
+          ? "-"
+          : row.original.aiOverview
+            ? "Yes"
+            : "No",
   }),
 ];
 

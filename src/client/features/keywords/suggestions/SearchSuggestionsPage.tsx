@@ -150,6 +150,7 @@ export function SearchSuggestionsPage({ projectId }: { projectId: string }) {
           <InfoTopicExtraction
             projectId={projectId}
             modeButtons={modeButtons}
+            hideResults={openRunId !== null}
           />
           {savedRuns}
         </div>

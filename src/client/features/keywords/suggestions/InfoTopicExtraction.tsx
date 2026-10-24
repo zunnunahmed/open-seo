@@ -136,9 +136,12 @@ function TopicalMapImport({
 export function InfoTopicExtraction({
   projectId,
   modeButtons,
+  hideResults = false,
 }: {
   projectId: string;
   modeButtons: ReactNode;
+  /** A saved run is open below; its table replaces this one. */
+  hideResults?: boolean;
 }) {
   const projectsQuery = useQuery(projectsQueryOptions());
   const project = projectsQuery.data?.find((p) => p.id === projectId);
@@ -224,7 +227,8 @@ export function InfoTopicExtraction({
               placeholder={"carpal tunnel exercises\nwrist pain at night"}
             />
             <p className="text-xs text-muted-foreground">
-              {topics.length.toLocaleString("en-US")} unique topics
+              {topics.length.toLocaleString("en-US")} unique{" "}
+              {topics.length === 1 ? "topic" : "topics"}
               {allTopics.length > MAX_INFO_TOPICS ? (
                 <span className="text-destructive">
                   {" "}
@@ -326,7 +330,7 @@ export function InfoTopicExtraction({
           ) : null}
         </CardContent>
       </Card>
-      {run.rows.length ? (
+      {run.rows.length && !hideResults ? (
         <InfoTopicsResults rows={run.rows} countryName={countryName} />
       ) : null}
     </>
