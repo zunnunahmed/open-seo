@@ -26,6 +26,21 @@ import {
 
 const projectInput = z.object({ projectId: z.string().min(1) });
 const topicsInput = z.array(z.string().trim().min(2).max(80)).min(1).max(5);
+/** The country to search; the project's market when left out. */
+const marketInput = {
+  locationCode: z.number().int().positive().optional(),
+  languageCode: z.string().min(2).max(10).optional(),
+};
+
+function marketOf(
+  project: { locationCode: number; languageCode: string },
+  data: { locationCode?: number; languageCode?: string },
+) {
+  return {
+    locationCode: data.locationCode ?? project.locationCode,
+    languageCode: data.languageCode ?? project.languageCode,
+  };
+}
 
 function ownDomain(project: { domain?: string | null }): string | null {
   return project.domain ? bareDomain(project.domain) : null;
@@ -82,7 +97,7 @@ export const findLinkGapProspects = createServerFn({ method: "POST" })
 /** Sites inviting guest posts on 1–5 topics (3 paid SERP lookups per topic). */
 export const findGuestPostProspects = createServerFn({ method: "POST" })
   .middleware(requireProjectSeoRoute)
-  .validator(projectInput.extend({ topics: topicsInput }))
+  .validator(projectInput.extend({ topics: topicsInput, ...marketInput }))
   .handler(async ({ data, context }) => {
     const own = ownDomain(context.project);
     const prospects = await keepUnsuppressed(
@@ -90,10 +105,7 @@ export const findGuestPostProspects = createServerFn({ method: "POST" })
       await guestPostProspects(
         createDataforseoClient(context),
         data.topics,
-        {
-          locationCode: context.project.locationCode,
-          languageCode: context.project.languageCode,
-        },
+        marketOf(context.project, data),
         own ? [own] : [],
       ),
     );
@@ -101,15 +113,19 @@ export const findGuestPostProspects = createServerFn({ method: "POST" })
     return { found: prospects.length };
   });
 
-/** Publications that recently covered 1–5 topics (free news search via treg). */
+/** Publications in one country that covered 1–5 topics (free news search). */
 export const findPrProspects = createServerFn({ method: "POST" })
   .middleware(requireProjectContext)
-  .validator(projectInput.extend({ topics: topicsInput }))
+  .validator(projectInput.extend({ topics: topicsInput, ...marketInput }))
   .handler(async ({ data, context }) => {
     const own = ownDomain(context.project);
     const prospects = await keepUnsuppressed(
       context.projectId,
-      await prProspects(data.topics, own ? [own] : []),
+      await prProspects(
+        data.topics,
+        marketOf(context.project, data),
+        own ? [own] : [],
+      ),
     );
     await OutreachRepository.addProspects(context.projectId, prospects);
     return { found: prospects.length };

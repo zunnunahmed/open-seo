@@ -1,9 +1,14 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { CountryCombobox } from "@/client/components/CountryCombobox";
 import { Button } from "@/client/components/ui/button";
 import { Card } from "@/client/components/ui/card";
 import { Textarea } from "@/client/components/ui/textarea";
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
+import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
+import { getStandardErrorMessage } from "@/client/lib/error-messages";
+import { getLanguageCode } from "@/shared/keyword-locations";
 import {
   findGuestPostProspects,
   findLinkGapProspects,
@@ -31,14 +36,14 @@ const FINDERS: Array<{
     value: "guest_post",
     label: "Guest posts",
     placeholder: "web design\nsmall business marketing",
-    help: 'Sites with "write for us", "guest post" or "contribute" pages for up to 5 topics: 3 paid Google searches per topic, in your project market.',
+    help: 'Sites with "write for us", "guest post" or "contribute" pages for up to 5 topics, from Google in the country you pick: 3 paid searches per topic.',
     action: "Find guest-post sites (paid)",
   },
   {
     value: "pr",
     label: "PR",
     placeholder: "small business websites\nAustralian startups",
-    help: "Publications that recently covered up to 5 topics. Free news search through treg; contacts are found for their editors and reporters.",
+    help: "News sites in the country you pick that covered up to 5 topics in the last year, including articles quoting experts (the likeliest to quote you). Free news search through treg; press-release wires are skipped.",
     action: "Find publications (free)",
   },
   {
@@ -62,6 +67,14 @@ export function OutreachFinders({
   const [text, setText] = useState("");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
+  const projectsQuery = useQuery(projectsQueryOptions());
+  const project = projectsQuery.data?.find((p) => p.id === projectId);
+  const [pickedCountry, setPickedCountry] = useState<number | null>(null);
+  const country = pickedCountry ?? project?.locationCode ?? null;
+  const market = country
+    ? { locationCode: country, languageCode: getLanguageCode(country) }
+    : {};
+  const needsCountry = finder === "guest_post" || finder === "pr";
   const current = FINDERS.find((entry) => entry.value === finder) ?? FINDERS[0];
   const lines = [
     ...new Set(
@@ -83,11 +96,11 @@ export function OutreachFinders({
             })
           : finder === "guest_post"
             ? await findGuestPostProspects({
-                data: { projectId, topics: lines.slice(0, 5) },
+                data: { projectId, topics: lines.slice(0, 5), ...market },
               })
             : finder === "pr"
               ? await findPrProspects({
-                  data: { projectId, topics: lines.slice(0, 5) },
+                  data: { projectId, topics: lines.slice(0, 5), ...market },
                 })
               : await importOutreachProspects({
                   data: { projectId, domains: lines.slice(0, 500) },
@@ -98,7 +111,7 @@ export function OutreachFinders({
       setText("");
       onAdded();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Search failed.");
+      setError(getStandardErrorMessage(cause, "Search failed. Try again."));
     } finally {
       setRunning(false);
     }
@@ -126,6 +139,14 @@ export function OutreachFinders({
         ))}
       </div>
       <p className="text-sm text-muted-foreground">{current.help}</p>
+      {needsCountry && country ? (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="font-medium">Country</span>
+          <div className="w-64">
+            <CountryCombobox value={country} onChange={setPickedCountry} />
+          </div>
+        </div>
+      ) : null}
       <Textarea
         rows={4}
         value={text}

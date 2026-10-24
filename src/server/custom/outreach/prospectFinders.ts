@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { createDataforseoClient } from "@/server/lib/dataforseo";
 import { getFromTreg } from "@/server/custom/providers/treg/dataforseoTransport";
+import { getIsoCountryCode } from "@/shared/keyword-locations";
 import type { NewProspect } from "./OutreachRepository";
 
 type Client = ReturnType<typeof createDataforseoClient>;
@@ -155,36 +156,57 @@ const GUEST_POST_FOOTPRINTS = [
   '"contribute" OR "submit an article"',
 ];
 
+type Market = { locationCode: number; languageCode: string };
+
+/**
+ * Run every search at once and keep what succeeded: one slow or failed
+ * search must not lose the others. Fails only when all of them failed.
+ */
+async function settleAll<T>(runs: Array<() => Promise<T>>): Promise<T[]> {
+  const settled = await Promise.allSettled(runs.map((run) => run()));
+  const ok = settled.flatMap((outcome) =>
+    outcome.status === "fulfilled" ? [outcome.value] : [],
+  );
+  const failed = settled.find((outcome) => outcome.status === "rejected");
+  if (ok.length === 0 && failed) throw failed.reason;
+  return ok;
+}
+
 export async function guestPostProspects(
   client: Client,
   topics: string[],
-  market: { locationCode: number; languageCode: string },
+  market: Market,
   excludedDomains: string[],
 ): Promise<NewProspect[]> {
   const excluded = new Set(excludedDomains);
   const prospects = new Map<string, NewProspect>();
-  for (const topic of topics) {
-    for (const footprint of GUEST_POST_FOOTPRINTS) {
-      const query = `${topic} ${footprint}`;
-      const items = await client.serp.live({
+  const queries = topics.flatMap((topic) =>
+    GUEST_POST_FOOTPRINTS.map((footprint) => `${topic} ${footprint}`),
+  );
+  const results = await settleAll(
+    queries.map((query) => async () => ({
+      query,
+      items: await client.serp.live({
         keyword: query,
         locationCode: market.locationCode,
         languageCode: market.languageCode,
         depth: 20,
+      }),
+    })),
+  );
+  for (const { query, items } of results) {
+    for (const item of items) {
+      if (item.type !== "organic" || !item.url) continue;
+      const domain = bareDomain(item.url);
+      if (!domain || prospects.has(domain) || !isPitchable(domain, excluded))
+        continue;
+      prospects.set(domain, {
+        domain,
+        source: "guest_post",
+        sourceDetail: query,
+        sourceUrl: item.url,
+        sourceTitle: item.title ?? null,
       });
-      for (const item of items) {
-        if (item.type !== "organic" || !item.url) continue;
-        const domain = bareDomain(item.url);
-        if (!domain || prospects.has(domain) || !isPitchable(domain, excluded))
-          continue;
-        prospects.set(domain, {
-          domain,
-          source: "guest_post",
-          sourceDetail: query,
-          sourceUrl: item.url,
-          sourceTitle: item.title ?? null,
-        });
-      }
     }
   }
   return [...prospects.values()];
@@ -202,19 +224,53 @@ const newsSchema = z.object({
   ),
 });
 
-/** Publications that recently covered each topic (TinyFish news, free). */
+/**
+ * Two angles per topic: outlets covering it, and articles quoting experts on
+ * it, which are the likeliest to quote you next.
+ */
+const PR_ANGLES = ["", " experts say"];
+
+/** Press-release wires publish anything paid for; nobody there takes pitches. */
+const PRESS_WIRES = [
+  "prnewswire.com",
+  "businesswire.com",
+  "globenewswire.com",
+  "einpresswire.com",
+  "accesswire.com",
+  "newswire.com",
+  "openpr.com",
+  "prweb.com",
+];
+
+/** Publications in one country that covered each topic in the last year. */
 export async function prProspects(
   topics: string[],
+  market: Market,
   excludedDomains: string[],
 ): Promise<NewProspect[]> {
-  const excluded = new Set(excludedDomains);
+  const excluded = new Set([...excludedDomains, ...PRESS_WIRES]);
+  const country = getIsoCountryCode(market.locationCode).toUpperCase();
+  const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const searches = topics.flatMap((topic) =>
+    PR_ANGLES.map((angle) => ({ topic, query: `${topic}${angle}` })),
+  );
+  const results = await settleAll(
+    searches.map(({ topic, query }) => async () => {
+      const response = await getFromTreg("tinyfish.web.search.news", {
+        query,
+        domain_type: "news",
+        location: country,
+        language: market.languageCode,
+        after_date: since,
+      });
+      return { topic, body: (await response.json()) as unknown };
+    }),
+  );
   const prospects = new Map<string, NewProspect>();
-  for (const topic of topics) {
-    const response = await getFromTreg("tinyfish.web.search.news", {
-      query: topic,
-      domain_type: "news",
-    });
-    const parsed = newsSchema.safeParse(await response.json());
+  for (const { topic, body } of results) {
+    const parsed = newsSchema.safeParse(body);
     if (!parsed.success) continue;
     for (const article of parsed.data.results) {
       const domain = bareDomain(article.url);
