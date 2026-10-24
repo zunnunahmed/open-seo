@@ -84,7 +84,7 @@ describe("guestPostProspects", () => {
     const client = { serp: { live } } as never;
 
     const prospects = await guestPostProspects(client, ["seo"], market, [], {
-      localOnly: true,
+      endings: ["au"],
       maxAuthority: 60,
     });
 
@@ -92,5 +92,20 @@ describe("guestPostProspects", () => {
     expect(prospects).toEqual([
       expect.objectContaining({ domain: "smallblog.com.au", authority: 24 }),
     ]);
+  });
+
+  it("searches several domain endings in one query", async () => {
+    const live = vi.fn().mockResolvedValue([]);
+    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+    const client = { serp: { live } } as never;
+
+    await guestPostProspects(client, ["seo"], market, [], {
+      endings: ["au", "nz"],
+      maxAuthority: 60,
+    });
+
+    expect(live.mock.calls[0][0].keyword).toMatch(
+      /\(site:\.au OR site:\.nz\)$/,
+    );
   });
 });

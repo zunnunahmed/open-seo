@@ -161,16 +161,9 @@ const GUEST_POST_FOOTPRINTS = [
 const ADVICE_TITLE =
   /\b(how to|tips|ways to|guide to|top \d+|\d+ (best|top)|list of|best .*sites|sites (that|to|for)|websites (that|to|for))\b/i;
 
-/** The country's own domain ending, e.g. au; none for the US. */
-function countryTld(locationCode: number): string | null {
-  const iso = getIsoCountryCode(locationCode);
-  if (iso === "us") return null;
-  return iso === "gb" ? "uk" : iso;
-}
-
 type GuestPostOptions = {
-  /** Only sites on the country's own domain ending (site:.au). */
-  localOnly: boolean;
+  /** Only sites on these domain endings, e.g. ["au", "nz"]; [] for any. */
+  endings: string[];
   /** Drop sites above this authority (0-100); big brands rarely say yes. */
   maxAuthority: number;
 };
@@ -196,14 +189,20 @@ export async function guestPostProspects(
   topics: string[],
   market: Market,
   excludedDomains: string[],
-  options: GuestPostOptions = { localOnly: false, maxAuthority: 100 },
+  options: GuestPostOptions = { endings: [], maxAuthority: 100 },
 ): Promise<NewProspect[]> {
   const excluded = new Set(excludedDomains);
   const prospects = new Map<string, NewProspect>();
-  const tld = options.localOnly ? countryTld(market.locationCode) : null;
+  const sites = options.endings.map((ending) => `site:.${ending}`);
+  const restrict =
+    sites.length === 0
+      ? ""
+      : sites.length === 1
+        ? ` ${sites[0]}`
+        : ` (${sites.join(" OR ")})`;
   const queries = topics.flatMap((topic) =>
     GUEST_POST_FOOTPRINTS.map(
-      (footprint) => `${topic} ${footprint}${tld ? ` site:.${tld}` : ""}`,
+      (footprint) => `${topic} ${footprint}${restrict}`,
     ),
   );
   const results = await settleAll(

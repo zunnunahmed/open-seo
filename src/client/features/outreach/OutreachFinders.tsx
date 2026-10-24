@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { CountryCombobox } from "@/client/components/CountryCombobox";
 import { Button } from "@/client/components/ui/button";
 import { Card } from "@/client/components/ui/card";
-import { Checkbox } from "@/client/components/ui/checkbox";
 import { Input } from "@/client/components/ui/input";
 import { Textarea } from "@/client/components/ui/textarea";
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
@@ -77,10 +76,21 @@ export function OutreachFinders({
     ? { locationCode: country, languageCode: getLanguageCode(country) }
     : {};
   const needsCountry = finder === "guest_post" || finder === "pr";
-  const [localOnly, setLocalOnly] = useState(true);
   const [maxAuthority, setMaxAuthority] = useState("60");
   const iso = country ? getIsoCountryCode(country) : "us";
-  const tld = iso === "us" ? null : iso === "gb" ? "uk" : iso;
+  // The country's own ending by default (none for the US); editable.
+  const [pickedEndings, setPickedEndings] = useState<string | null>(null);
+  const endingsText =
+    pickedEndings ?? (iso === "us" ? "" : `.${iso === "gb" ? "uk" : iso}`);
+  const endings = [
+    ...new Set(
+      endingsText
+        .toLowerCase()
+        .split(/[\s,]+/)
+        .map((ending) => ending.replace(/^\.+/, ""))
+        .filter((ending) => /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(ending)),
+    ),
+  ].slice(0, 5);
   const current = FINDERS.find((entry) => entry.value === finder) ?? FINDERS[0];
   const lines = [
     ...new Set(
@@ -106,7 +116,7 @@ export function OutreachFinders({
                   projectId,
                   topics: lines.slice(0, 5),
                   ...market,
-                  localOnly: Boolean(tld) && localOnly,
+                  endings,
                   maxAuthority: Math.min(
                     100,
                     Math.max(1, Number(maxAuthority) || 60),
@@ -158,19 +168,29 @@ export function OutreachFinders({
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="font-medium">Country</span>
           <div className="w-64">
-            <CountryCombobox value={country} onChange={setPickedCountry} />
+            <CountryCombobox
+              value={country}
+              onChange={(next) => {
+                setPickedCountry(next);
+                // Endings follow the new country unless typed again.
+                setPickedEndings(null);
+              }}
+            />
           </div>
           {finder === "guest_post" ? (
             <>
-              {tld ? (
-                <label className="flex items-center gap-2">
-                  <Checkbox
-                    checked={localOnly}
-                    onCheckedChange={(checked) => setLocalOnly(checked)}
-                  />
-                  Only .{tld} sites
-                </label>
-              ) : null}
+              <label
+                className="flex items-center gap-2"
+                title="Only sites on these domain endings, separated by commas. Leave empty for any site."
+              >
+                Domain endings
+                <Input
+                  className="h-8 w-44"
+                  value={endingsText}
+                  placeholder="Any, e.g. .au, .nz, .org"
+                  onChange={(event) => setPickedEndings(event.target.value)}
+                />
+              </label>
               <label className="flex items-center gap-2">
                 Max authority
                 <Input

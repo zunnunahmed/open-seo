@@ -101,7 +101,11 @@ export const findGuestPostProspects = createServerFn({ method: "POST" })
     projectInput.extend({
       topics: topicsInput,
       ...marketInput,
-      localOnly: z.boolean().default(true),
+      // Domain endings without the dot, e.g. "au" or "com.au".
+      endings: z
+        .array(z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)*$/))
+        .max(5)
+        .default([]),
       maxAuthority: z.number().int().min(1).max(100).default(60),
     }),
   )
@@ -114,7 +118,7 @@ export const findGuestPostProspects = createServerFn({ method: "POST" })
         data.topics,
         marketOf(context.project, data),
         own ? [own] : [],
-        { localOnly: data.localOnly, maxAuthority: data.maxAuthority },
+        { endings: data.endings, maxAuthority: data.maxAuthority },
       ),
     );
     await OutreachRepository.addProspects(context.projectId, prospects);
