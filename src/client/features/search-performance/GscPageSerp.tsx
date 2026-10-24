@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
+import { Input } from "@/client/components/ui/input";
 import { SerpAnalysisCard } from "@/client/features/keywords/components/SerpAnalysisCard";
 import type { useKeywordSerpAnalysis } from "@/client/features/keywords/hooks/useKeywordSerpAnalysis";
 import type { SerpResultItem } from "@/types/keywords";
@@ -54,43 +55,38 @@ function PagePosition({
 /** Check today's Google results for one of the page's queries (paid). */
 export function GscPageSerp({
   page,
-  queries,
   selected,
   onSelect,
   serp,
 }: {
   page: string;
-  /** The page's queries, best first. */
-  queries: string[];
   selected: string;
   onSelect: (query: string) => void;
   serp: Serp;
 }) {
-  const options = queries.slice(0, 100);
   const checked = serp.activeSerpKeyword;
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          className="h-9 min-w-0 max-w-md flex-1 rounded-md border bg-background px-2 text-sm"
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const query = selected.trim();
+          if (query) serp.setSerpKeyword(query);
+        }}
+      >
+        <Input
+          className="h-9 min-w-0 max-w-md flex-1"
           aria-label="Query to check"
+          placeholder="Paste or type a query"
           value={selected}
           onChange={(event) => onSelect(event.target.value)}
-        >
-          {options.map((query) => (
-            <option key={query} value={query}>
-              {query}
-            </option>
-          ))}
-        </select>
-        <Button
-          disabled={!selected || serp.serpLoading}
-          onClick={() => serp.setSerpKeyword(selected)}
-        >
+        />
+        <Button type="submit" disabled={!selected.trim() || serp.serpLoading}>
           <Search className="size-4" />
           Check live SERP (paid)
         </Button>
-      </div>
+      </form>
       {checked && !serp.serpLoading && serp.serpResults.length ? (
         <PagePosition page={page} items={serp.serpResults} />
       ) : null}

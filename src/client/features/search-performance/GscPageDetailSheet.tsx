@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, ExternalLink, MessageSquare } from "lucide-react";
+import { ChevronRight, Copy, ExternalLink, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { sort } from "remeda";
 import { Button } from "@/client/components/ui/button";
@@ -102,10 +102,12 @@ function DetailBody({
     (a, b) => b.clicks - a.clicks || b.impressions - a.impressions,
   ).map((row) => row.query);
   const [selected, setSelected] = useState(ranked[0] ?? "");
-  const serpSection = useRef<HTMLDivElement>(null);
+  const serpSection = useRef<HTMLDetailsElement>(null);
+  const [serpOpen, setSerpOpen] = useState(true);
   const checkSerp = (query: string) => {
     setSelected(query);
     serp.setSerpKeyword(query);
+    setSerpOpen(true);
     serpSection.current?.scrollIntoView({ behavior: "smooth" });
   };
   const report = () =>
@@ -180,20 +182,31 @@ function DetailBody({
       >
         <GscPageQueryChart months={detail.months} />
       </Section>
-      <div ref={serpSection} className="scroll-mt-4">
-        <Section
-          title="Live Google SERP"
-          note="Today’s Google results for one of this page’s queries: where the page ranks and who is above it."
-        >
+      <details
+        ref={serpSection}
+        open={serpOpen}
+        onToggle={(event) => setSerpOpen(event.currentTarget.open)}
+        className="group scroll-mt-4 rounded-lg border"
+      >
+        <summary className="flex cursor-pointer list-none items-start gap-2 p-4">
+          <ChevronRight className="mt-0.5 size-4 shrink-0 transition-transform group-open:rotate-90" />
+          <span>
+            <span className="block font-semibold">Live Google SERP</span>
+            <span className="block text-xs text-muted-foreground">
+              Today’s Google results for one of this page’s queries: where the
+              page ranks and who is above it.
+            </span>
+          </span>
+        </summary>
+        <div className="px-4 pb-4">
           <GscPageSerp
             page={page}
-            queries={ranked}
             selected={selected}
             onSelect={setSelected}
             serp={serp}
           />
-        </Section>
-      </div>
+        </div>
+      </details>
       <Section
         title={`All ${formatCount(detail.queryCount)} queries`}
         note="Every search this page appeared for in the selected range. Click a query to check its live SERP."
