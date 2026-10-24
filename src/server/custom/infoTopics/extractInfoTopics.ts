@@ -111,9 +111,11 @@ async function pageKeywords(
       },
     ];
   });
-  await kv.put(key, JSON.stringify(candidates), {
-    expirationTtl: URL_CACHE_SECONDS,
-  });
+  // Best effort: Workers Free allows 1,000 KV writes a day, and a full
+  // cache must not fail the topic it was only meant to make cheaper.
+  await kv
+    .put(key, JSON.stringify(candidates), { expirationTtl: URL_CACHE_SECONDS })
+    .catch(() => undefined);
   return candidates;
 }
 

@@ -75,6 +75,7 @@ export function useInfoTopicRun(projectId: string) {
     setRows(done);
     setProgress({ done: done.length, total: run.topics.length });
     let aiWarned = false;
+    let saveWarned = false;
     try {
       for (let i = 0; i < remaining.length; i += INFO_TOPIC_BATCH) {
         if (stopRequested.current) break;
@@ -100,8 +101,21 @@ export function useInfoTopicRun(projectId: string) {
         setRows(done);
         setProgress({ done: done.length, total: run.topics.length });
         if (unsaved >= SAVE_EVERY) {
-          await persist(run, done);
-          unsaved = 0;
+          // A failed save (e.g. the daily storage write limit) must not stop
+          // the run; the next save or the final one tries again.
+          await persist(run, done).then(
+            () => {
+              unsaved = 0;
+            },
+            () => {
+              if (!saveWarned) {
+                saveWarned = true;
+                toast.warning(
+                  "Progress could not be saved just now; the run continues and will try again.",
+                );
+              }
+            },
+          );
         }
       }
     } catch (cause) {
