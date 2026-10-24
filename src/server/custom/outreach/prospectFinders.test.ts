@@ -46,7 +46,12 @@ describe("guestPostProspects", () => {
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
     const client = { serp: { live } } as never;
 
-    const prospects = await guestPostProspects(client, ["seo"], market, []);
+    const prospects = await guestPostProspects(
+      client,
+      ["a", "b", "c"],
+      market,
+      [],
+    );
 
     expect(prospects.map((p) => p.domain)).toEqual(["blog.site.com.au"]);
     expect(live).toHaveBeenCalledTimes(3);

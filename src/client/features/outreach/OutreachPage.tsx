@@ -49,6 +49,7 @@ const SOURCE_LABEL: Record<Prospect["source"], string> = {
   pr: "PR",
   import: "Import",
   backlinks: "Backlinks",
+  search: "Google search",
 };
 
 const PAGE_SIZES = [25, 50, 100] as const;

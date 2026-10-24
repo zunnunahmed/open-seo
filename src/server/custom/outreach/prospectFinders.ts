@@ -150,25 +150,18 @@ export async function linkGapProspects(
   return [...prospects.values()];
 }
 
-/** Google footprints for sites that publish outside contributions. */
-const GUEST_POST_FOOTPRINTS = [
-  'intitle:"write for us"',
-  '"guest post guidelines" OR "submit a guest post"',
-  '"become a contributor" OR inurl:contribute',
-];
-
 /** Articles about guest posting (advice, lists of sites), not invitations. */
 const ADVICE_TITLE =
   /\b(how to|tips|ways to|guide to|top \d+|\d+ (best|top)|list of|best .*sites|sites (that|to|for)|websites (that|to|for))\b/i;
 
-type GuestPostOptions = {
+type Market = { locationCode: number; languageCode: string };
+
+type SerpFilters = {
   /** Only sites on these domain endings, e.g. ["au", "nz"]; [] for any. */
   endings: string[];
   /** Drop sites above this authority (0-100); big brands rarely say yes. */
   maxAuthority: number;
 };
-
-type Market = { locationCode: number; languageCode: string };
 
 /**
  * Run every search at once and keep what succeeded: one slow or failed
@@ -184,49 +177,57 @@ async function settleAll<T>(runs: Array<() => Promise<T>>): Promise<T[]> {
   return ok;
 }
 
-export async function guestPostProspects(
+/** " site:.au" or " (site:.au OR site:.nz)" for the chosen endings. */
+function siteRestriction(endings: string[]): string {
+  const sites = endings.map((ending) => `site:.${ending}`);
+  if (sites.length === 0) return "";
+  return sites.length === 1 ? ` ${sites[0]}` : ` (${sites.join(" OR ")})`;
+}
+
+/**
+ * Websites ranking in Google for each query, deduplicated, rated for
+ * authority and capped at the maximum.
+ */
+async function serpProspects(
   client: Client,
-  topics: string[],
-  market: Market,
-  excludedDomains: string[],
-  options: GuestPostOptions = { endings: [], maxAuthority: 100 },
+  input: {
+    queries: Array<{ query: string; label: string }>;
+    market: Market;
+    excluded: Set<string>;
+    filters: SerpFilters;
+    depth: number;
+    source: NewProspect["source"];
+    skipTitle?: RegExp;
+  },
 ): Promise<NewProspect[]> {
-  const excluded = new Set(excludedDomains);
-  const prospects = new Map<string, NewProspect>();
-  const sites = options.endings.map((ending) => `site:.${ending}`);
-  const restrict =
-    sites.length === 0
-      ? ""
-      : sites.length === 1
-        ? ` ${sites[0]}`
-        : ` (${sites.join(" OR ")})`;
-  const queries = topics.flatMap((topic) =>
-    GUEST_POST_FOOTPRINTS.map(
-      (footprint) => `${topic} ${footprint}${restrict}`,
-    ),
-  );
+  const restrict = siteRestriction(input.filters.endings);
   const results = await settleAll(
-    queries.map((query) => async () => ({
-      query,
+    input.queries.map(({ query, label }) => async () => ({
+      label,
       items: await client.serp.live({
-        keyword: query,
-        locationCode: market.locationCode,
-        languageCode: market.languageCode,
-        depth: 20,
+        keyword: `${query}${restrict}`,
+        locationCode: input.market.locationCode,
+        languageCode: input.market.languageCode,
+        depth: input.depth,
       }),
     })),
   );
-  for (const { query, items } of results) {
+  const prospects = new Map<string, NewProspect>();
+  for (const { label, items } of results) {
     for (const item of items) {
       if (item.type !== "organic" || !item.url) continue;
-      if (item.title && ADVICE_TITLE.test(item.title)) continue;
+      if (item.title && input.skipTitle?.test(item.title)) continue;
       const domain = bareDomain(item.url);
-      if (!domain || prospects.has(domain) || !isPitchable(domain, excluded))
+      if (
+        !domain ||
+        prospects.has(domain) ||
+        !isPitchable(domain, input.excluded)
+      )
         continue;
       prospects.set(domain, {
         domain,
-        source: "guest_post",
-        sourceDetail: query,
+        source: input.source,
+        sourceDetail: label,
         sourceUrl: item.url,
         sourceTitle: item.title ?? null,
       });
@@ -235,8 +236,45 @@ export async function guestPostProspects(
   const authority = await domainAuthority([...prospects.keys()]);
   return [...prospects.values()].flatMap((prospect) => {
     const score = authority.get(prospect.domain) ?? null;
-    if (score !== null && score > options.maxAuthority) return [];
+    if (score !== null && score > input.filters.maxAuthority) return [];
     return [{ ...prospect, authority: score }];
+  });
+}
+
+/** Sites inviting guest posts, from the chosen Google phrases per topic. */
+export function guestPostProspects(
+  client: Client,
+  queries: string[],
+  market: Market,
+  excludedDomains: string[],
+  filters: SerpFilters = { endings: [], maxAuthority: 100 },
+): Promise<NewProspect[]> {
+  return serpProspects(client, {
+    queries: queries.map((query) => ({ query, label: query })),
+    market,
+    excluded: new Set(excludedDomains),
+    filters,
+    depth: 20,
+    source: "guest_post",
+    skipTitle: ADVICE_TITLE,
+  });
+}
+
+/** The websites ranking for any Google search, as leads (10-100 each). */
+export function searchProspects(
+  client: Client,
+  terms: string[],
+  market: Market,
+  excludedDomains: string[],
+  filters: SerpFilters & { depth: number },
+): Promise<NewProspect[]> {
+  return serpProspects(client, {
+    queries: terms.map((term) => ({ query: term, label: term })),
+    market,
+    excluded: new Set(excludedDomains),
+    filters,
+    depth: filters.depth,
+    source: "search",
   });
 }
 

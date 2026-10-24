@@ -113,6 +113,7 @@ const SOURCES = [
   { value: "link_gap", label: "Link gap" },
   { value: "guest_post", label: "Guest post" },
   { value: "pr", label: "PR" },
+  { value: "search", label: "Google search" },
   { value: "import", label: "Import" },
 ];
 

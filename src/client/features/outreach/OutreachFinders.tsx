@@ -1,23 +1,23 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CountryCombobox } from "@/client/components/CountryCombobox";
 import { Button } from "@/client/components/ui/button";
 import { Card } from "@/client/components/ui/card";
-import { Input } from "@/client/components/ui/input";
 import { Textarea } from "@/client/components/ui/textarea";
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
-import { getIsoCountryCode, getLanguageCode } from "@/shared/keyword-locations";
+import { guestPostQueries } from "@/shared/outreachFootprints";
+import { importOutreachProspects } from "@/serverFunctions/outreach";
 import {
   findGuestPostProspects,
   findLinkGapProspects,
   findPrProspects,
-  importOutreachProspects,
-} from "@/serverFunctions/outreach";
+  findSearchProspects,
+} from "@/serverFunctions/outreachFinders";
+import { SearchOptions, useSearchOptions } from "./OutreachSearchOptions";
 
-type Finder = "link_gap" | "guest_post" | "pr" | "import";
+type Finder = "link_gap" | "guest_post" | "search" | "pr" | "import";
 
 const FINDERS: Array<{
   value: Finder;
@@ -36,9 +36,16 @@ const FINDERS: Array<{
   {
     value: "guest_post",
     label: "Guest posts",
-    placeholder: "web design\nsmall business marketing",
-    help: 'Sites with "write for us", guest-post guideline or contributor pages for up to 5 topics, from Google in the country you pick: 3 paid searches per topic, plus about US$0.03 to rate every site’s authority. Articles about guest posting and sites above your maximum authority are left out.',
+    placeholder: "marketing automation\nAI for small business",
+    help: "Sites inviting guest posts on up to 5 topics: one paid Google search per topic and phrase (up to 20), plus about US$0.03 to rate every site’s authority. Articles about guest posting and sites above your maximum authority are left out.",
     action: "Find guest-post sites (paid)",
+  },
+  {
+    value: "search",
+    label: "Google search",
+    placeholder: "small business\nmarketing agency sydney",
+    help: "Every website ranking in Google for up to 5 searches, as leads: up to 100 results per search (one paid search each), rated for authority. Platforms, government and giant sites are left out.",
+    action: "Add websites from Google (paid)",
   },
   {
     value: "pr",
@@ -56,6 +63,13 @@ const FINDERS: Array<{
   },
 ];
 
+/** " site:.au" or " (site:.au OR site:.nz)", as the server adds it. */
+function siteRestriction(endings: string[]): string {
+  const sites = endings.map((ending) => `site:.${ending}`);
+  if (sites.length === 0) return "";
+  return sites.length === 1 ? ` ${sites[0]}` : ` (${sites.join(" OR ")})`;
+}
+
 /** Step 1: add prospects to the project's outreach list. */
 export function OutreachFinders({
   projectId,
@@ -70,27 +84,7 @@ export function OutreachFinders({
   const [error, setError] = useState("");
   const projectsQuery = useQuery(projectsQueryOptions());
   const project = projectsQuery.data?.find((p) => p.id === projectId);
-  const [pickedCountry, setPickedCountry] = useState<number | null>(null);
-  const country = pickedCountry ?? project?.locationCode ?? null;
-  const market = country
-    ? { locationCode: country, languageCode: getLanguageCode(country) }
-    : {};
-  const needsCountry = finder === "guest_post" || finder === "pr";
-  const [maxAuthority, setMaxAuthority] = useState("60");
-  const iso = country ? getIsoCountryCode(country) : "us";
-  // The country's own ending by default (none for the US); editable.
-  const [pickedEndings, setPickedEndings] = useState<string | null>(null);
-  const endingsText =
-    pickedEndings ?? (iso === "us" ? "" : `.${iso === "gb" ? "uk" : iso}`);
-  const endings = [
-    ...new Set(
-      endingsText
-        .toLowerCase()
-        .split(/[\s,]+/)
-        .map((ending) => ending.replace(/^\.+/, ""))
-        .filter((ending) => /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(ending)),
-    ),
-  ].slice(0, 5);
+  const options = useSearchOptions(project?.locationCode ?? null);
   const current = FINDERS.find((entry) => entry.value === finder) ?? FINDERS[0];
   const lines = [
     ...new Set(
@@ -100,36 +94,59 @@ export function OutreachFinders({
         .filter(Boolean),
     ),
   ];
+  const topics = lines.slice(0, 5);
+  const restrict = siteRestriction(options.request().endings);
+  const guestQueries =
+    finder === "guest_post"
+      ? guestPostQueries(
+          topics,
+          options.footprints,
+          options.customFootprint,
+        ).map((query) => `${query}${restrict}`)
+      : [];
+
+  async function find() {
+    if (finder === "link_gap")
+      return findLinkGapProspects({
+        data: { projectId, competitors: lines.slice(0, 3) },
+      });
+    if (finder === "guest_post")
+      return findGuestPostProspects({
+        data: {
+          projectId,
+          topics,
+          ...options.request(),
+          footprints: options.footprints,
+          customFootprint: options.customFootprint,
+        },
+      });
+    if (finder === "search")
+      return findSearchProspects({
+        data: {
+          projectId,
+          topics,
+          ...options.request(),
+          depth: options.depth,
+        },
+      });
+    if (finder === "pr")
+      return findPrProspects({
+        data: { projectId, topics, ...options.request() },
+      });
+    return importOutreachProspects({
+      data: { projectId, domains: lines.slice(0, 500) },
+    });
+  }
 
   async function run() {
     setRunning(true);
     setError("");
     try {
-      const result =
-        finder === "link_gap"
-          ? await findLinkGapProspects({
-              data: { projectId, competitors: lines.slice(0, 3) },
-            })
-          : finder === "guest_post"
-            ? await findGuestPostProspects({
-                data: {
-                  projectId,
-                  topics: lines.slice(0, 5),
-                  ...market,
-                  endings,
-                  maxAuthority: Math.min(
-                    100,
-                    Math.max(1, Number(maxAuthority) || 60),
-                  ),
-                },
-              })
-            : finder === "pr"
-              ? await findPrProspects({
-                  data: { projectId, topics: lines.slice(0, 5), ...market },
-                })
-              : await importOutreachProspects({
-                  data: { projectId, domains: lines.slice(0, 500) },
-                });
+      const result = await find();
+      if ("error" in result && typeof result.error === "string") {
+        setError(result.error);
+        return;
+      }
       toast.success(
         `${result.found.toLocaleString()} prospects found. Domains already in your list were kept as they were.`,
       );
@@ -142,6 +159,9 @@ export function OutreachFinders({
     }
   }
 
+  const blocked =
+    lines.length === 0 ||
+    (finder === "guest_post" && guestQueries.length === 0);
   return (
     <Card className="space-y-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -164,47 +184,8 @@ export function OutreachFinders({
         ))}
       </div>
       <p className="text-sm text-muted-foreground">{current.help}</p>
-      {needsCountry && country ? (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-medium">Country</span>
-          <div className="w-64">
-            <CountryCombobox
-              value={country}
-              onChange={(next) => {
-                setPickedCountry(next);
-                // Endings follow the new country unless typed again.
-                setPickedEndings(null);
-              }}
-            />
-          </div>
-          {finder === "guest_post" ? (
-            <>
-              <label
-                className="flex items-center gap-2"
-                title="Only sites on these domain endings, separated by commas. Leave empty for any site."
-              >
-                Domain endings
-                <Input
-                  className="h-8 w-44"
-                  value={endingsText}
-                  placeholder="Any, e.g. .au, .nz, .org"
-                  onChange={(event) => setPickedEndings(event.target.value)}
-                />
-              </label>
-              <label className="flex items-center gap-2">
-                Max authority
-                <Input
-                  className="h-8 w-20"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={maxAuthority}
-                  onChange={(event) => setMaxAuthority(event.target.value)}
-                />
-              </label>
-            </>
-          ) : null}
-        </div>
+      {finder === "guest_post" || finder === "search" || finder === "pr" ? (
+        <SearchOptions options={options} kind={finder} queries={guestQueries} />
       ) : null}
       <Textarea
         rows={4}
@@ -213,10 +194,7 @@ export function OutreachFinders({
         onChange={(event) => setText(event.target.value)}
         aria-label={current.label}
       />
-      <Button
-        disabled={running || lines.length === 0}
-        onClick={() => void run()}
-      >
+      <Button disabled={running || blocked} onClick={() => void run()}>
         {running ? "Searching…" : current.action}
       </Button>
       {error ? (
