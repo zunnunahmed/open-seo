@@ -28,61 +28,73 @@ const right = {
   cellClassName: "text-right tabular-nums",
 } as const;
 
-const columns = [
-  helper.display({
-    id: "rowNumber",
-    header: "#",
-    cell: ({ row, table }) =>
-      table.getSortedRowModel().rows.findIndex((shown) => shown.id === row.id) +
-      1,
-    meta: { cellClassName: "w-10 tabular-nums text-muted-foreground" },
-  }),
-  helper.accessor("query", {
-    header: ({ column }) => <SortableHeader column={column} label="Query" />,
-    cell: ({ getValue }) => (
-      <span className="block max-w-sm truncate" title={getValue()}>
-        {getValue()}
-      </span>
-    ),
-  }),
-  helper.accessor("clicks", {
-    header: ({ column }) => (
-      <SortableHeader column={column} label="Clicks" align="right" />
-    ),
-    cell: ({ getValue }) => formatCount(getValue()),
-    meta: right,
-  }),
-  helper.accessor("impressions", {
-    header: ({ column }) => (
-      <SortableHeader column={column} label="Impressions" align="right" />
-    ),
-    cell: ({ getValue }) => formatCount(getValue()),
-    meta: right,
-  }),
-  helper.accessor("ctr", {
-    header: ({ column }) => (
-      <SortableHeader column={column} label="CTR" align="right" />
-    ),
-    cell: ({ getValue }) => formatCtr(getValue()),
-    meta: right,
-  }),
-  helper.accessor("position", {
-    header: ({ column }) => (
-      <SortableHeader column={column} label="Position" align="right" />
-    ),
-    cell: ({ getValue }) => formatPosition(getValue()),
-    meta: right,
-  }),
-];
+function buildColumns(onCheckSerp: (query: string) => void) {
+  return [
+    helper.display({
+      id: "rowNumber",
+      header: "#",
+      cell: ({ row, table }) =>
+        table
+          .getSortedRowModel()
+          .rows.findIndex((shown) => shown.id === row.id) + 1,
+      meta: { cellClassName: "w-10 tabular-nums text-muted-foreground" },
+    }),
+    helper.accessor("query", {
+      header: ({ column }) => <SortableHeader column={column} label="Query" />,
+      cell: ({ getValue }) => (
+        <button
+          type="button"
+          className="block max-w-sm truncate text-left text-primary underline-offset-4 hover:underline"
+          title={`${getValue()}: check its live Google results`}
+          onClick={() => onCheckSerp(getValue())}
+        >
+          {getValue()}
+        </button>
+      ),
+    }),
+    helper.accessor("clicks", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Clicks" align="right" />
+      ),
+      cell: ({ getValue }) => formatCount(getValue()),
+      meta: right,
+    }),
+    helper.accessor("impressions", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Impressions" align="right" />
+      ),
+      cell: ({ getValue }) => formatCount(getValue()),
+      meta: right,
+    }),
+    helper.accessor("ctr", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="CTR" align="right" />
+      ),
+      cell: ({ getValue }) => formatCtr(getValue()),
+      meta: right,
+    }),
+    helper.accessor("position", {
+      header: ({ column }) => (
+        <SortableHeader column={column} label="Position" align="right" />
+      ),
+      cell: ({ getValue }) => formatPosition(getValue()),
+      meta: right,
+    }),
+  ];
+}
 
 /** Every query Google showed one page for, searchable and exportable. */
 export function GscPageQueries({
   page,
   queries,
+  onCheckSerp,
 }: {
   page: string;
   queries: QueryRow[];
+  /** Check a query's live Google results in the panel's SERP section. */
+  onCheckSerp: (query: string) => void;
 }) {
+  const columns = useMemo(() => buildColumns(onCheckSerp), [onCheckSerp]);
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "clicks", desc: true },

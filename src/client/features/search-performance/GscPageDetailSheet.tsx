@@ -1,6 +1,11 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
+import { Copy, ExternalLink, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
+import { sort } from "remeda";
+import { Button } from "@/client/components/ui/button";
+import { useKeywordSerpAnalysis } from "@/client/features/keywords/hooks/useKeywordSerpAnalysis";
+import { useProjectMarket } from "@/client/features/projects/useProjectMarket";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +26,8 @@ import {
 import { GscPageQueries } from "./GscPageQueries";
 import { GscPageQueryChart } from "./GscPageQueryChart";
 import { InspectionDetails, InspectionStatus } from "./GscPageInspection";
+import { GscPageSerp } from "./GscPageSerp";
+import { buildPageReport } from "./gscPageReport";
 
 type Detail = Extract<
   Awaited<ReturnType<typeof getGscPageDetail>>,
@@ -56,7 +63,59 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DetailBody({ detail, page }: { detail: Detail; page: string }) {
+/** Copy the page report for ChatGPT, optionally opening ChatGPT too. */
+async function copyReport(report: string, openChatGpt: boolean) {
+  // Open first: browsers only allow a new tab straight from the click.
+  const tab = openChatGpt
+    ? window.open("https://chatgpt.com/", "_blank")
+    : null;
+  try {
+    await navigator.clipboard.writeText(report);
+    toast.success(
+      openChatGpt
+        ? "Report copied. Paste it into ChatGPT (Ctrl+V) and send."
+        : "Report copied. Paste it into ChatGPT or any AI assistant.",
+    );
+  } catch {
+    tab?.close();
+    toast.error("Could not copy the report. Allow clipboard access and retry.");
+  }
+}
+
+function DetailBody({
+  projectId,
+  detail,
+  page,
+}: {
+  projectId: string;
+  detail: Detail;
+  page: string;
+}) {
+  const market = useProjectMarket(projectId);
+  const serp = useKeywordSerpAnalysis(
+    projectId,
+    market?.locationCode,
+    undefined,
+  );
+  const ranked = sort(
+    detail.queries,
+    (a, b) => b.clicks - a.clicks || b.impressions - a.impressions,
+  ).map((row) => row.query);
+  const [selected, setSelected] = useState(ranked[0] ?? "");
+  const serpSection = useRef<HTMLDivElement>(null);
+  const checkSerp = (query: string) => {
+    setSelected(query);
+    serp.setSerpKeyword(query);
+    serpSection.current?.scrollIntoView({ behavior: "smooth" });
+  };
+  const report = () =>
+    buildPageReport(
+      page,
+      detail,
+      serp.activeSerpKeyword && serp.serpResults.length
+        ? { keyword: serp.activeSerpKeyword, items: serp.serpResults }
+        : null,
+    );
   const clicks = detail.queries.reduce((sum, row) => sum + row.clicks, 0);
   const impressions = detail.queries.reduce(
     (sum, row) => sum + row.impressions,
@@ -72,6 +131,24 @@ function DetailBody({ detail, page }: { detail: Detail; page: string }) {
       : 0;
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+        <span className="mr-auto text-sm">
+          Get an AI analysis: everything on this panel, ready for ChatGPT
+          {serp.serpResults.length ? ", including the live SERP" : ""}.
+        </span>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void copyReport(report(), false)}
+        >
+          <Copy className="size-4" />
+          Copy for ChatGPT
+        </Button>
+        <Button size="sm" onClick={() => void copyReport(report(), true)}>
+          <MessageSquare className="size-4" />
+          Open in ChatGPT
+        </Button>
+      </div>
       <Section title="Health in Google" note="From Google’s URL Inspection.">
         {detail.inspection ? (
           <InspectionStatus inspection={detail.inspection} />
@@ -103,11 +180,29 @@ function DetailBody({ detail, page }: { detail: Detail; page: string }) {
       >
         <GscPageQueryChart months={detail.months} />
       </Section>
+      <div ref={serpSection} className="scroll-mt-4">
+        <Section
+          title="Live Google SERP"
+          note="Today’s Google results for one of this page’s queries: where the page ranks and who is above it."
+        >
+          <GscPageSerp
+            page={page}
+            queries={ranked}
+            selected={selected}
+            onSelect={setSelected}
+            serp={serp}
+          />
+        </Section>
+      </div>
       <Section
         title={`All ${formatCount(detail.queryCount)} queries`}
-        note="Every search this page appeared for in the selected range."
+        note="Every search this page appeared for in the selected range. Click a query to check its live SERP."
       >
-        <GscPageQueries page={page} queries={detail.queries} />
+        <GscPageQueries
+          page={page}
+          queries={detail.queries}
+          onCheckSerp={checkSerp}
+        />
       </Section>
       {detail.inspection ? (
         <InspectionDetails inspection={detail.inspection} />
@@ -181,7 +276,7 @@ export function GscPageDetailSheet({
               Search Console is not connected for this project.
             </p>
           ) : page ? (
-            <DetailBody detail={query.data} page={page} />
+            <DetailBody projectId={projectId} detail={query.data} page={page} />
           ) : null}
         </div>
       </SheetContent>
