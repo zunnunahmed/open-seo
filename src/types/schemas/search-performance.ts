@@ -11,6 +11,8 @@ export const SEARCH_PERFORMANCE_RANGES = [
   "last_7_days",
   "last_28_days",
   "last_3_months",
+  "last_6_months",
+  "last_12_months",
 ] as const;
 
 /** Device values exactly as the GSC `device` dimension returns/accepts them. */
@@ -20,9 +22,24 @@ export type SearchPerformanceDateRange =
   (typeof SEARCH_PERFORMANCE_RANGES)[number];
 export type SearchPerformanceDevice = (typeof GSC_DEVICES)[number];
 
+/** Ranges on a row's own numbers. Search Console cannot filter by them, so
+ *  the server fetches the full list for the range and filters it. */
+export const metricFilterSchema = z
+  .object({
+    minClicks: z.number().nonnegative().optional(),
+    maxClicks: z.number().nonnegative().optional(),
+    minImpressions: z.number().nonnegative().optional(),
+    maxImpressions: z.number().nonnegative().optional(),
+    minPosition: z.number().nonnegative().optional(),
+    maxPosition: z.number().nonnegative().optional(),
+  })
+  .optional();
+export type MetricFilter = z.infer<typeof metricFilterSchema>;
+
 // Shared report/table filters. Spread into each request schema so the overview
 // and the paginated table calls always accept the exact same filter surface.
 const searchPerformanceFilterShape = {
+  metricFilter: metricFilterSchema,
   pageFilter: z
     .object({
       operator: z.enum(["contains", "equals"]),
@@ -90,6 +107,12 @@ const textMatchParam = z
   .optional()
   .catch(undefined);
 
+const optionalSearchNumber = z.coerce
+  .number()
+  .nonnegative()
+  .optional()
+  .catch(undefined);
+
 /** /p/$projectId/search-performance query params. */
 export const searchPerformanceSearchSchema = z.object({
   tab: z.enum(SEARCH_PERFORMANCE_TABS).optional().catch(undefined),
@@ -100,6 +123,16 @@ export const searchPerformanceSearchSchema = z.object({
   pageMatch: textMatchParam,
   queryText: searchTextParam,
   queryMatch: textMatchParam,
+  category: z
+    .enum(["Performance", "Good", "Fair", "Weak", "Dead"])
+    .optional()
+    .catch(undefined),
+  clicksMin: optionalSearchNumber,
+  clicksMax: optionalSearchNumber,
+  imprMin: optionalSearchNumber,
+  imprMax: optionalSearchNumber,
+  posMin: optionalSearchNumber,
+  posMax: optionalSearchNumber,
   page: optionalSearchPositiveIntParam,
   size: z.coerce
     .number()

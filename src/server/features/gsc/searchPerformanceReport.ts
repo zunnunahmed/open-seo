@@ -1,3 +1,4 @@
+import type { MetricFilter } from "@/types/schemas/search-performance";
 import { sort } from "remeda";
 import type { GscSearchAnalyticsRow } from "@/server/lib/gscClient";
 
@@ -58,6 +59,27 @@ export function sumSearchTotals(
 }
 
 /** Flatten single-dimension rows (query or page) into a keyed table row. */
+const within = (value: number, min?: number, max?: number) =>
+  (min === undefined || value >= min) && (max === undefined || value <= max);
+
+/** Rows inside every range set in the metric filter (bounds inclusive). */
+export function applyMetricFilter<
+  T extends { clicks: number; impressions: number; position: number },
+>(rows: T[], filter: MetricFilter | undefined): T[] {
+  if (!filter) return rows;
+  return rows.filter(
+    (row) =>
+      within(row.clicks, filter.minClicks, filter.maxClicks) &&
+      within(row.impressions, filter.minImpressions, filter.maxImpressions) &&
+      within(row.position, filter.minPosition, filter.maxPosition),
+  );
+}
+
+/** A metric filter with at least one bound set. */
+export function hasMetricFilter(filter: MetricFilter | undefined): boolean {
+  return Boolean(filter && Object.values(filter).some((v) => v !== undefined));
+}
+
 export function toDimensionRows(
   rows: GscSearchAnalyticsRow[],
 ): SearchPerformanceDimensionRow[] {

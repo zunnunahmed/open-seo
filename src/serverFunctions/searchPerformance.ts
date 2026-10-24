@@ -9,7 +9,9 @@ import {
   type GscPerformanceFilter,
 } from "@/server/features/gsc/searchAnalytics";
 import {
+  applyMetricFilter,
   buildStrikingDistanceRows,
+  hasMetricFilter,
   previousPeriod,
   sumSearchTotals,
   toDimensionRows,
@@ -23,12 +25,16 @@ import {
 
 // query x page fan-out needs more rows to find the 5..20 band.
 const STRIKING_DISTANCE_FETCH_LIMIT = 1000;
-// dimensions:["date"] returns one row per day; the longest range is ~92 days.
-const DAILY_ROW_LIMIT = 200;
+// dimensions:["date"] returns one row per day; the longest range is a year.
+const DAILY_ROW_LIMIT = 400;
+// Metric filters need the whole list for the range: Google's largest page.
+const FULL_LIST_ROW_LIMIT = 25_000;
+// Search Console keeps 16 months; an older previous period is incomplete.
+const RETENTION_MONTHS = 16;
 const COUNTRY_ROW_LIMIT = 25;
-// Export pulls the whole dimension in one shot, capped at GSC's per-call max
-// (GSC_MAX_ROW_LIMIT). Large stores get everything up to this ceiling.
-const EXPORT_ROW_LIMIT = 1000;
+// Export (and the category chart) pulls the whole dimension in one shot, up to
+// Google's largest page, so long ranges on big sites are not cut short.
+const EXPORT_ROW_LIMIT = 25_000;
 
 /** Build GSC filter groups shared by every call. Device, page, and query apply everywhere;
  *  country applies everywhere except the country breakdown itself (so the
@@ -79,6 +85,12 @@ export const getSearchPerformanceReport = createServerFn({ method: "POST" })
       dateRange: data.dateRange,
     });
     const prev = previousPeriod(startDate, endDate);
+    const retentionStart = new Date();
+    retentionStart.setUTCMonth(retentionStart.getUTCMonth() - RETENTION_MONTHS);
+    // A previous period Search Console no longer holds in full would compare
+    // against partial data; the Change column then shows no change instead.
+    const comparable =
+      prev.startDate >= retentionStart.toISOString().slice(0, 10);
     const projectId = context.projectId;
     const { nonCountryFilters, filters } = buildGscFilters(data);
 
@@ -92,14 +104,16 @@ export const getSearchPerformanceReport = createServerFn({ method: "POST" })
           filters,
           rowLimit: DAILY_ROW_LIMIT,
         }),
-        GscService.getPerformance({
-          projectId,
-          startDate: prev.startDate,
-          endDate: prev.endDate,
-          dimensions: ["date"],
-          filters,
-          rowLimit: DAILY_ROW_LIMIT,
-        }),
+        comparable
+          ? GscService.getPerformance({
+              projectId,
+              startDate: prev.startDate,
+              endDate: prev.endDate,
+              dimensions: ["date"],
+              filters,
+              rowLimit: DAILY_ROW_LIMIT,
+            })
+          : { rows: [] },
         GscService.getPerformance({
           projectId,
           startDate,
@@ -155,6 +169,32 @@ export const getSearchPerformanceTable = createServerFn({ method: "POST" })
     const offset = (data.page - 1) * data.pageSize;
 
     try {
+      if (hasMetricFilter(data.metricFilter)) {
+        // Search Console cannot filter by clicks, impressions or position:
+        // fetch the whole list for the range, filter, then page through it.
+        const all = await GscService.getPerformance({
+          projectId: context.projectId,
+          startDate,
+          endDate,
+          dimensions: [data.dimension],
+          filters,
+          rowLimit: FULL_LIST_ROW_LIMIT,
+        });
+        const matching = applyMetricFilter(
+          toDimensionRows(all.rows),
+          data.metricFilter,
+        );
+        return {
+          connected: true as const,
+          dimension: data.dimension,
+          page: data.page,
+          pageSize: data.pageSize,
+          hasNextPage: offset + data.pageSize < matching.length,
+          totalCount: matching.length,
+          rows: matching.slice(offset, offset + data.pageSize),
+        };
+      }
+
       const result = await GscService.getPerformance({
         projectId: context.projectId,
         startDate,
@@ -214,6 +254,6 @@ export const exportSearchPerformanceTable = createServerFn({ method: "POST" })
 
     return {
       dimension: data.dimension,
-      rows: toDimensionRows(result.rows),
+      rows: applyMetricFilter(toDimensionRows(result.rows), data.metricFilter),
     };
   });

@@ -17,6 +17,8 @@ const RANGE_LABELS: Record<SearchPerformanceDateRange, string> = {
   last_7_days: "Last 7 days",
   last_28_days: "Last 28 days",
   last_3_months: "Last 3 months",
+  last_6_months: "Last 6 months",
+  last_12_months: "Last 12 months",
 };
 const RANGE_OPTIONS = SEARCH_PERFORMANCE_RANGES.map((value) => ({
   value,

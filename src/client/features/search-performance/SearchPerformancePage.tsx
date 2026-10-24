@@ -18,6 +18,13 @@ import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConne
 import { DimensionSection } from "@/client/features/search-performance/SearchPerformanceDimensionSection";
 import { GscCategoryChart } from "@/client/features/search-performance/GscCategoryChart";
 import { GscPageDetailSheet } from "@/client/features/search-performance/GscPageDetailSheet";
+import { metricDraftFromSearch } from "@/client/features/search-performance/MetricFilterFields";
+import {
+  metricFilterCount,
+  metricFilterFromSearch,
+  metricSearchFromDraft,
+  NO_METRIC_FILTERS,
+} from "@/client/features/search-performance/metricFilters";
 import { SearchPerformanceSelects } from "@/client/features/search-performance/SearchPerformanceSelects";
 import { SearchPerformanceLoadingState } from "@/client/features/search-performance/SearchPerformanceLoadingState";
 import {
@@ -97,7 +104,9 @@ export function SearchPerformancePage({
   const [showFilters, setShowFilters] = useState(false);
   const [openPage, setOpenPage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const metricFilter = metricFilterFromSearch(search);
   const activeFilterCount =
+    metricFilterCount(search) +
     Number(Boolean(textFilters.pageFilter)) +
     Number(Boolean(textFilters.queryFilter)) +
     Number(Boolean(country)) +
@@ -110,6 +119,7 @@ export function SearchPerformancePage({
   const filterInput = {
     ...buildFilterInput({ range, device, country }),
     ...textFilters,
+    metricFilter,
   };
 
   const reportQuery = useQuery({
@@ -193,6 +203,7 @@ export function SearchPerformancePage({
       pageMatch: undefined,
       queryText: undefined,
       queryMatch: undefined,
+      ...NO_METRIC_FILTERS,
       country: undefined,
       device: undefined,
       range: undefined,
@@ -210,16 +221,18 @@ export function SearchPerformancePage({
   const filtersPanel = (
     <SearchPerformanceTextFilters
       // Remount on URL changes (back/forward) so the draft matches.
-      key={JSON.stringify(textFilters)}
+      key={JSON.stringify([textFilters, metricFilter, search.category])}
       value={textFilters}
+      metrics={metricDraftFromSearch(search)}
       activeFilterCount={activeFilterCount}
-      onApply={(filters) => {
+      onApply={(filters, metrics) => {
         onSearchChange({
           page: undefined,
           pageText: filters.pageFilter?.expression,
           pageMatch: filters.pageFilter?.operator,
           queryText: filters.queryFilter?.expression,
           queryMatch: filters.queryFilter?.operator,
+          ...metricSearchFromDraft(metrics),
         });
       }}
       onReset={resetFilters}

@@ -12,6 +12,11 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import type { searchPerformanceInputSchema } from "@/types/schemas/search-performance";
+import {
+  EMPTY_METRIC_DRAFT,
+  MetricFilterFields,
+  type MetricDraft,
+} from "./MetricFilterFields";
 
 const MATCH_ITEMS = [
   { value: "contains", label: "Contains" },
@@ -25,15 +30,18 @@ export type TextFilters = Pick<
 
 export function SearchPerformanceTextFilters({
   value,
+  metrics,
   activeFilterCount,
   onApply,
   onReset,
 }: {
   value: TextFilters;
+  metrics: MetricDraft;
   activeFilterCount: number;
-  onApply: (filters: TextFilters) => void;
+  onApply: (filters: TextFilters, metrics: MetricDraft) => void;
   onReset: () => void;
 }) {
+  const [metricDraft, setMetricDraft] = useState(metrics);
   const [page, setPage] = useState(value.pageFilter?.expression ?? "");
   const [query, setQuery] = useState(value.queryFilter?.expression ?? "");
   const [pageOperator, setPageOperator] = useState<"contains" | "equals">(
@@ -50,12 +58,14 @@ export function SearchPerformanceTextFilters({
     Number(
       query.trim() !== (value.queryFilter?.expression ?? "") ||
         queryOperator !== (value.queryFilter?.operator ?? "contains"),
-    );
+    ) +
+    Number(JSON.stringify(metricDraft) !== JSON.stringify(metrics));
   const cancel = () => {
     setPage(value.pageFilter?.expression ?? "");
     setQuery(value.queryFilter?.expression ?? "");
     setPageOperator(value.pageFilter?.operator ?? "contains");
     setQueryOperator(value.queryFilter?.operator ?? "contains");
+    setMetricDraft(metrics);
   };
   return (
     <form
@@ -67,14 +77,17 @@ export function SearchPerformanceTextFilters({
         setQuery(query.trim());
         if (!page.trim()) setPageOperator("contains");
         if (!query.trim()) setQueryOperator("contains");
-        onApply({
-          pageFilter: page.trim()
-            ? { operator: pageOperator, expression: page.trim() }
-            : undefined,
-          queryFilter: query.trim()
-            ? { operator: queryOperator, expression: query.trim() }
-            : undefined,
-        });
+        onApply(
+          {
+            pageFilter: page.trim()
+              ? { operator: pageOperator, expression: page.trim() }
+              : undefined,
+            queryFilter: query.trim()
+              ? { operator: queryOperator, expression: query.trim() }
+              : undefined,
+          },
+          metricDraft,
+        );
       }}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -99,6 +112,7 @@ export function SearchPerformanceTextFilters({
             setQuery("");
             setPageOperator("contains");
             setQueryOperator("contains");
+            setMetricDraft(EMPTY_METRIC_DRAFT);
             onReset();
           }}
         >
@@ -182,6 +196,11 @@ export function SearchPerformanceTextFilters({
           </div>
         </div>
       </div>
+      <MetricFilterFields draft={metricDraft} onChange={setMetricDraft} />
+      <p className="text-xs text-muted-foreground">
+        Category, clicks, impressions and position filter the Queries and Pages
+        tables (category uses clicks: Weak is 1–99, Dead is 0).
+      </p>
       <p className="text-xs text-muted-foreground">
         All filters must match. Contains ignores case and matches text anywhere,
         including a subfolder. Exactly matches compares the full URL or query,
