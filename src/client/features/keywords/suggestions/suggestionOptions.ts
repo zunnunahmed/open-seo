@@ -117,3 +117,8 @@ export const DFS_HEADERS = [
   "Intent",
   "Seed",
 ];
+
+/** React Query key of a project’s saved suggestion runs. */
+export function savedRunsQueryKey(projectId: string) {
+  return ["saved-suggestion-runs", projectId];
+}

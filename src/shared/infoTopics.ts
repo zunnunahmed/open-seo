@@ -25,7 +25,7 @@ export type InfoTopicRow = {
 
 /** Topics per request: a batch stays inside Workers Free request limits. */
 export const INFO_TOPIC_BATCH = 5;
-export const MAX_INFO_TOPICS = 500;
+export const MAX_INFO_TOPICS = 5000;
 
 const STOP_WORDS = new Set([
   "a",

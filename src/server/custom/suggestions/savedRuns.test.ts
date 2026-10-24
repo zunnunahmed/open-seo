@@ -4,6 +4,7 @@ import {
   getSavedRun,
   listSavedRuns,
   saveRun,
+  updateRun,
   type SavedRunsKv,
 } from "./savedRuns";
 
@@ -39,6 +40,35 @@ const input = {
   },
 };
 
+const row = {
+  topic: "carpal tunnel",
+  infoTopic: "carpal tunnel",
+  volume: 900,
+  difficulty: null,
+  cpc: null,
+  intent: null,
+  matchedBy: "existing" as const,
+  urlRank: null,
+  url: null,
+  position: null,
+  aiOverview: null,
+};
+const info = (rows: (typeof row)[]) => ({
+  name: "2 info topics · Australia",
+  result: {
+    mode: "info" as const,
+    countryName: "Australia",
+    rows,
+    topics: ["carpal tunnel", "wrist pain"],
+    settings: {
+      locationCode: 2036,
+      languageCode: "en",
+      acceptExisting: true,
+      useAi: false,
+    },
+  },
+});
+
 describe("saved suggestion runs", () => {
   it("stores a run that Cloudflare deletes after 28 days", async () => {
     const { kv, store } = fakeKv();
@@ -70,5 +100,18 @@ describe("saved suggestion runs", () => {
     await deleteSavedRun(kv, "p1", fresh.id, now);
     expect(await listSavedRuns(kv, "p1", now)).toEqual([]);
     expect(await getSavedRun(kv, "p1", fresh.id)).toBeNull();
+  });
+
+  it("saves a running Info topics run's progress over the same run", async () => {
+    const { kv } = fakeKv();
+    const meta = await saveRun(kv, "p1", info([]));
+    await updateRun(kv, "p1", meta.id, info([row]));
+
+    expect(await getSavedRun(kv, "p1", meta.id)).toMatchObject({
+      result: { rows: [row], topics: ["carpal tunnel", "wrist pain"] },
+    });
+    expect(await listSavedRuns(kv, "p1")).toEqual([
+      expect.objectContaining({ id: meta.id, keywordCount: 1 }),
+    ]);
   });
 });

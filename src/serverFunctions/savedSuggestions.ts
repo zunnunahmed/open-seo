@@ -8,6 +8,7 @@ import {
   listSavedRuns,
   savedRunInputSchema,
   saveRun,
+  updateRun,
 } from "@/server/custom/suggestions/savedRuns";
 
 const projectRequest = z.object({ projectId: z.string().min(1) });
@@ -23,6 +24,17 @@ export const saveSuggestionRun = createServerFn({ method: "POST" })
   .validator(projectRequest.merge(savedRunInputSchema))
   .handler(async ({ data, context }) =>
     saveRun(env.KV, context.projectId, {
+      name: data.name,
+      result: data.result,
+    }),
+  );
+
+/** Save a running Info topics run's progress over its earlier save. */
+export const updateSuggestionRun = createServerFn({ method: "POST" })
+  .middleware(requireProjectContext)
+  .validator(runRequest.merge(savedRunInputSchema))
+  .handler(async ({ data, context }) =>
+    updateRun(env.KV, context.projectId, data.runId, {
       name: data.name,
       result: data.result,
     }),

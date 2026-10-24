@@ -87,6 +87,17 @@ const infoRunSchema = z.object({
       }),
     )
     .max(MAX_ROWS),
+  /** Every topic of the run, so an unfinished run can be resumed. */
+  topics: z.array(z.string().max(200)).max(MAX_ROWS).default([]),
+  settings: z
+    .object({
+      locationCode: z.number().int(),
+      languageCode: z.string().max(10),
+      acceptExisting: z.boolean(),
+      useAi: z.boolean(),
+    })
+    .nullable()
+    .default(null),
 });
 
 export const savedRunInputSchema = z.object({
@@ -170,6 +181,34 @@ export async function saveRun(
   for (const dropped of runs.slice(MAX_RUNS))
     await kv.delete(runKey(projectId, dropped.id));
   await writeIndex(kv, projectId, runs.slice(0, MAX_RUNS));
+  return meta;
+}
+
+/** Replace a saved run's results (an Info topics run saving its progress). */
+export async function updateRun(
+  kv: SavedRunsKv,
+  projectId: string,
+  id: string,
+  input: SavedRunInput,
+  now = new Date(),
+): Promise<SavedRunMeta | null> {
+  const existing = await getSavedRun(kv, projectId, id);
+  if (!existing) return null;
+  const meta: SavedRunMeta = {
+    ...existing.meta,
+    name: input.name,
+    keywordCount: input.result.rows.length,
+    expiresAt: new Date(now.getTime() + TTL_SECONDS * 1000).toISOString(),
+  };
+  await kv.put(runKey(projectId, id), JSON.stringify({ ...input, meta }), {
+    expirationTtl: TTL_SECONDS,
+  });
+  const runs = await readIndex(kv, projectId, now);
+  await writeIndex(
+    kv,
+    projectId,
+    runs.map((run) => (run.id === id ? meta : run)),
+  );
   return meta;
 }
 

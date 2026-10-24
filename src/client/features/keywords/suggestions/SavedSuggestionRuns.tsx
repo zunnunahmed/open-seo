@@ -15,7 +15,8 @@ import {
 } from "@/serverFunctions/savedSuggestions";
 import { SuggestionsDfsResults } from "./SuggestionsDfsResults";
 import { SuggestionsFreeResults } from "./SuggestionsFreeResults";
-import { InfoTopicsResults } from "./InfoTopicsResults";
+import { InfoTopicRunView } from "./InfoTopicRunView";
+import { savedRunsQueryKey } from "./suggestionOptions";
 
 type SavedRun = Awaited<ReturnType<typeof listSavedSuggestionRuns>>[number];
 
@@ -27,10 +28,6 @@ const formatDate = (iso: string) =>
     month: "short",
     year: "numeric",
   });
-
-function savedRunsQueryKey(projectId: string) {
-  return ["saved-suggestion-runs", projectId];
-}
 
 type SavedRunResult = Parameters<typeof saveSuggestionRun>[0]["data"]["result"];
 
@@ -108,9 +105,11 @@ export function SavedRunView({
           countryName={result.countryName}
         />
       ) : result.mode === "info" ? (
-        <InfoTopicsResults
-          rows={result.rows}
-          countryName={result.countryName}
+        <InfoTopicRunView
+          key={runId}
+          projectId={projectId}
+          runId={runId}
+          result={result}
         />
       ) : (
         <SuggestionsDfsResults
