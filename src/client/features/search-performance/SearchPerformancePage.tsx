@@ -17,6 +17,7 @@ import { TabsTrigger } from "@/client/components/ui/tabs";
 import { GoogleConnectionCard } from "@/client/features/integrations/GoogleConnectionCard";
 import { DimensionSection } from "@/client/features/search-performance/SearchPerformanceDimensionSection";
 import { GscCategoryChart } from "@/client/features/search-performance/GscCategoryChart";
+import { GscPageDetailSheet } from "@/client/features/search-performance/GscPageDetailSheet";
 import { SearchPerformanceSelects } from "@/client/features/search-performance/SearchPerformanceSelects";
 import { SearchPerformanceLoadingState } from "@/client/features/search-performance/SearchPerformanceLoadingState";
 import {
@@ -94,6 +95,7 @@ export function SearchPerformancePage({
     [search.pageText, search.pageMatch, search.queryText, search.queryMatch],
   );
   const [showFilters, setShowFilters] = useState(false);
+  const [openPage, setOpenPage] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const activeFilterCount =
     Number(Boolean(textFilters.pageFilter)) +
@@ -378,12 +380,19 @@ export function SearchPerformancePage({
                   }
                   isFiltered={activeFilterCount > 0}
                   onClearFilters={resetFilters}
+                  onOpenPage={tab === "queries" ? undefined : setOpenPage}
                 />
               )}
             </div>
           </>
         )}
       </div>
+      <GscPageDetailSheet
+        projectId={projectId}
+        page={openPage}
+        filterInput={filterInput}
+        onClose={() => setOpenPage(null)}
+      />
     </div>
   );
 }

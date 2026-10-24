@@ -18,8 +18,10 @@ export function DimensionSection({
   onPageSizeChange,
   isFiltered,
   onClearFilters,
+  onOpenPage,
 }: {
   projectId: string;
+  onOpenPage?: (page: string) => void;
   tableQuery: UseQueryResult<
     Awaited<ReturnType<typeof getSearchPerformanceTable>>
   >;
@@ -68,6 +70,8 @@ export function DimensionSection({
         <DimensionTable
           rows={tableData.rows}
           keyLabel={keyLabel}
+          rowOffset={(page - 1) * pageSize}
+          onOpenPage={onOpenPage}
           isFiltered={isFiltered}
           isPastEnd={isPastEnd}
           onClearFilters={onClearFilters}

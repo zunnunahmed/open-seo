@@ -44,16 +44,43 @@ const dimensionHelper = createColumnHelper<DimensionRow>();
 
 export function buildDimensionColumns(
   keyLabel: string,
+  /** Rows on earlier pages, so numbering continues across pages. */
+  rowOffset: number,
+  /** Opens a page's Search Console details (Pages table only). */
+  onOpenPage?: (page: string) => void,
 ): ColumnDef<DimensionRow>[] {
   return [
+    dimensionHelper.display({
+      id: "rowNumber",
+      header: "#",
+      // Numbered in the order shown, after sorting.
+      cell: ({ row, table }) =>
+        rowOffset +
+        table.getRowModel().rows.findIndex((shown) => shown.id === row.id) +
+        1,
+      meta: {
+        headerClassName: "w-10",
+        cellClassName: "w-10 tabular-nums text-muted-foreground",
+      },
+    }),
     dimensionHelper.accessor("key", {
       enableSorting: false,
       header: () => keyLabel,
-      cell: ({ getValue }) => (
-        <span className="block max-w-xl truncate" title={getValue()}>
-          {getValue()}
-        </span>
-      ),
+      cell: ({ getValue }) =>
+        onOpenPage ? (
+          <button
+            type="button"
+            className="block max-w-xl truncate text-left text-primary underline-offset-4 hover:underline"
+            title={`${getValue()}: show Search Console details`}
+            onClick={() => onOpenPage(getValue())}
+          >
+            {getValue()}
+          </button>
+        ) : (
+          <span className="block max-w-xl truncate" title={getValue()}>
+            {getValue()}
+          </span>
+        ),
     }),
     dimensionHelper.accessor("clicks", {
       header: ({ column }) => (

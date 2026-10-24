@@ -196,6 +196,8 @@ export function TotalsTable({ report }: { report: Report }) {
 export function DimensionTable({
   rows,
   keyLabel,
+  rowOffset,
+  onOpenPage,
   isFiltered,
   isPastEnd,
   onClearFilters,
@@ -203,12 +205,17 @@ export function DimensionTable({
 }: {
   rows: SearchPerformanceTableRow[];
   keyLabel: string;
+  rowOffset: number;
+  onOpenPage?: (page: string) => void;
   isFiltered: boolean;
   isPastEnd: boolean;
   onClearFilters: () => void;
   onFirstPage: () => void;
 }) {
-  const columns = useMemo(() => buildDimensionColumns(keyLabel), [keyLabel]);
+  const columns = useMemo(
+    () => buildDimensionColumns(keyLabel, rowOffset, onOpenPage),
+    [keyLabel, rowOffset, onOpenPage],
+  );
   const table = useDataTable({
     data: rows,
     columns,
