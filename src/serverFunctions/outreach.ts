@@ -97,7 +97,14 @@ export const findLinkGapProspects = createServerFn({ method: "POST" })
 /** Sites inviting guest posts on 1–5 topics (3 paid SERP lookups per topic). */
 export const findGuestPostProspects = createServerFn({ method: "POST" })
   .middleware(requireProjectSeoRoute)
-  .validator(projectInput.extend({ topics: topicsInput, ...marketInput }))
+  .validator(
+    projectInput.extend({
+      topics: topicsInput,
+      ...marketInput,
+      localOnly: z.boolean().default(true),
+      maxAuthority: z.number().int().min(1).max(100).default(60),
+    }),
+  )
   .handler(async ({ data, context }) => {
     const own = ownDomain(context.project);
     const prospects = await keepUnsuppressed(
@@ -107,6 +114,7 @@ export const findGuestPostProspects = createServerFn({ method: "POST" })
         data.topics,
         marketOf(context.project, data),
         own ? [own] : [],
+        { localOnly: data.localOnly, maxAuthority: data.maxAuthority },
       ),
     );
     await OutreachRepository.addProspects(context.projectId, prospects);

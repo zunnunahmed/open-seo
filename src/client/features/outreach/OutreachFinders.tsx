@@ -4,11 +4,13 @@ import { toast } from "sonner";
 import { CountryCombobox } from "@/client/components/CountryCombobox";
 import { Button } from "@/client/components/ui/button";
 import { Card } from "@/client/components/ui/card";
+import { Checkbox } from "@/client/components/ui/checkbox";
+import { Input } from "@/client/components/ui/input";
 import { Textarea } from "@/client/components/ui/textarea";
 import { DataSourceLabel } from "@/client/features/integrations/DataSourceLabel";
 import { projectsQueryOptions } from "@/client/features/projects/projectQueries";
 import { getStandardErrorMessage } from "@/client/lib/error-messages";
-import { getLanguageCode } from "@/shared/keyword-locations";
+import { getIsoCountryCode, getLanguageCode } from "@/shared/keyword-locations";
 import {
   findGuestPostProspects,
   findLinkGapProspects,
@@ -36,14 +38,14 @@ const FINDERS: Array<{
     value: "guest_post",
     label: "Guest posts",
     placeholder: "web design\nsmall business marketing",
-    help: 'Sites with "write for us", "guest post" or "contribute" pages for up to 5 topics, from Google in the country you pick: 3 paid searches per topic.',
+    help: 'Sites with "write for us", guest-post guideline or contributor pages for up to 5 topics, from Google in the country you pick: 3 paid searches per topic, plus about US$0.03 to rate every site’s authority. Articles about guest posting and sites above your maximum authority are left out.',
     action: "Find guest-post sites (paid)",
   },
   {
     value: "pr",
     label: "PR",
     placeholder: "small business websites\nAustralian startups",
-    help: "News sites in the country you pick that covered up to 5 topics in the last year, including articles quoting experts (the likeliest to quote you). Free news search through treg; press-release wires are skipped.",
+    help: "News sites in the country you pick that covered up to 5 topics in the last year, including articles quoting experts (the likeliest to quote you). Free news search through treg, plus about US$0.03 to rate each site’s authority; press-release wires are skipped.",
     action: "Find publications (free)",
   },
   {
@@ -75,6 +77,10 @@ export function OutreachFinders({
     ? { locationCode: country, languageCode: getLanguageCode(country) }
     : {};
   const needsCountry = finder === "guest_post" || finder === "pr";
+  const [localOnly, setLocalOnly] = useState(true);
+  const [maxAuthority, setMaxAuthority] = useState("60");
+  const iso = country ? getIsoCountryCode(country) : "us";
+  const tld = iso === "us" ? null : iso === "gb" ? "uk" : iso;
   const current = FINDERS.find((entry) => entry.value === finder) ?? FINDERS[0];
   const lines = [
     ...new Set(
@@ -96,7 +102,16 @@ export function OutreachFinders({
             })
           : finder === "guest_post"
             ? await findGuestPostProspects({
-                data: { projectId, topics: lines.slice(0, 5), ...market },
+                data: {
+                  projectId,
+                  topics: lines.slice(0, 5),
+                  ...market,
+                  localOnly: Boolean(tld) && localOnly,
+                  maxAuthority: Math.min(
+                    100,
+                    Math.max(1, Number(maxAuthority) || 60),
+                  ),
+                },
               })
             : finder === "pr"
               ? await findPrProspects({
@@ -145,6 +160,30 @@ export function OutreachFinders({
           <div className="w-64">
             <CountryCombobox value={country} onChange={setPickedCountry} />
           </div>
+          {finder === "guest_post" ? (
+            <>
+              {tld ? (
+                <label className="flex items-center gap-2">
+                  <Checkbox
+                    checked={localOnly}
+                    onCheckedChange={(checked) => setLocalOnly(checked)}
+                  />
+                  Only .{tld} sites
+                </label>
+              ) : null}
+              <label className="flex items-center gap-2">
+                Max authority
+                <Input
+                  className="h-8 w-20"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={maxAuthority}
+                  onChange={(event) => setMaxAuthority(event.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
         </div>
       ) : null}
       <Textarea

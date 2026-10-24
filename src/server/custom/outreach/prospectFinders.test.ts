@@ -1,4 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("./authority", () => ({
+  domainAuthority: vi.fn(
+    async () =>
+      new Map([
+        ["bigbrand.com.au", 92],
+        ["smallblog.com.au", 24],
+      ]),
+  ),
+}));
+
 import { guestPostProspects, isUnpitchableDomain } from "./prospectFinders";
 
 describe("isUnpitchableDomain", () => {
@@ -49,5 +60,37 @@ describe("guestPostProspects", () => {
     await expect(
       guestPostProspects(client, ["seo"], market, []),
     ).rejects.toThrow("timed out");
+  });
+
+  it("searches local sites, skips advice articles and big brands", async () => {
+    const live = vi.fn().mockResolvedValue([
+      {
+        type: "organic",
+        url: "https://smallblog.com.au/write-for-us",
+        title: "Write for us",
+      },
+      {
+        type: "organic",
+        url: "https://bigbrand.com.au/contribute",
+        title: "Become a contributor",
+      },
+      {
+        type: "organic",
+        url: "https://advice.com.au/guest-posting",
+        title: "How to pitch a guest post",
+      },
+    ]);
+    // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+    const client = { serp: { live } } as never;
+
+    const prospects = await guestPostProspects(client, ["seo"], market, [], {
+      localOnly: true,
+      maxAuthority: 60,
+    });
+
+    expect(live.mock.calls[0][0].keyword).toContain("site:.au");
+    expect(prospects).toEqual([
+      expect.objectContaining({ domain: "smallblog.com.au", authority: 24 }),
+    ]);
   });
 });

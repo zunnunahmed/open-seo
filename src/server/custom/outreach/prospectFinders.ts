@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { createDataforseoClient } from "@/server/lib/dataforseo";
 import { getFromTreg } from "@/server/custom/providers/treg/dataforseoTransport";
 import { getIsoCountryCode } from "@/shared/keyword-locations";
+import { domainAuthority } from "./authority";
 import type { NewProspect } from "./OutreachRepository";
 
 type Client = ReturnType<typeof createDataforseoClient>;
@@ -151,10 +152,28 @@ export async function linkGapProspects(
 
 /** Google footprints for sites that publish outside contributions. */
 const GUEST_POST_FOOTPRINTS = [
-  '"write for us"',
-  '"guest post"',
-  '"contribute" OR "submit an article"',
+  'intitle:"write for us"',
+  '"guest post guidelines" OR "submit a guest post"',
+  '"become a contributor" OR inurl:contribute',
 ];
+
+/** Articles about guest posting (advice, lists of sites), not invitations. */
+const ADVICE_TITLE =
+  /\b(how to|tips|ways to|guide to|top \d+|\d+ (best|top)|list of|best .*sites|sites (that|to|for)|websites (that|to|for))\b/i;
+
+/** The country's own domain ending, e.g. au; none for the US. */
+function countryTld(locationCode: number): string | null {
+  const iso = getIsoCountryCode(locationCode);
+  if (iso === "us") return null;
+  return iso === "gb" ? "uk" : iso;
+}
+
+type GuestPostOptions = {
+  /** Only sites on the country's own domain ending (site:.au). */
+  localOnly: boolean;
+  /** Drop sites above this authority (0-100); big brands rarely say yes. */
+  maxAuthority: number;
+};
 
 type Market = { locationCode: number; languageCode: string };
 
@@ -177,11 +196,15 @@ export async function guestPostProspects(
   topics: string[],
   market: Market,
   excludedDomains: string[],
+  options: GuestPostOptions = { localOnly: false, maxAuthority: 100 },
 ): Promise<NewProspect[]> {
   const excluded = new Set(excludedDomains);
   const prospects = new Map<string, NewProspect>();
+  const tld = options.localOnly ? countryTld(market.locationCode) : null;
   const queries = topics.flatMap((topic) =>
-    GUEST_POST_FOOTPRINTS.map((footprint) => `${topic} ${footprint}`),
+    GUEST_POST_FOOTPRINTS.map(
+      (footprint) => `${topic} ${footprint}${tld ? ` site:.${tld}` : ""}`,
+    ),
   );
   const results = await settleAll(
     queries.map((query) => async () => ({
@@ -197,6 +220,7 @@ export async function guestPostProspects(
   for (const { query, items } of results) {
     for (const item of items) {
       if (item.type !== "organic" || !item.url) continue;
+      if (item.title && ADVICE_TITLE.test(item.title)) continue;
       const domain = bareDomain(item.url);
       if (!domain || prospects.has(domain) || !isPitchable(domain, excluded))
         continue;
@@ -209,7 +233,12 @@ export async function guestPostProspects(
       });
     }
   }
-  return [...prospects.values()];
+  const authority = await domainAuthority([...prospects.keys()]);
+  return [...prospects.values()].flatMap((prospect) => {
+    const score = authority.get(prospect.domain) ?? null;
+    if (score !== null && score > options.maxAuthority) return [];
+    return [{ ...prospect, authority: score }];
+  });
 }
 
 const newsSchema = z.object({
@@ -285,5 +314,10 @@ export async function prProspects(
       });
     }
   }
-  return [...prospects.values()];
+  // Big outlets are the point in PR, so the score only helps sort them.
+  const authority = await domainAuthority([...prospects.keys()]);
+  return [...prospects.values()].map((prospect) => ({
+    ...prospect,
+    authority: authority.get(prospect.domain) ?? null,
+  }));
 }
